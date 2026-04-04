@@ -40,7 +40,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The app now saves and opens user work as Markdown files with a compact metadata block. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad metadata never blocks正文 editing.
 - The app-owned local store now only keeps lightweight recent-document entries; the actual writing state is file-backed and lives in the user's Markdown document.
 - Edit streaming now starts from the selected passage instead of replaying from the top of the document, so local patch responses feel anchored to the user’s selection.
-- The page header subtitle now uses the project’s next-focus text instead of the raw AI summary, which prevents transient model copy from leaking into the title area.
+- The page header subtitle continues to use `project.summary`; if the text under the title is off-topic, the issue is in the summary source, not the subtitle component.
 - `task/TASK_20260403_024.md` completed the visual restyle pass, but the deeper post-submit diagnosis found an app-side hang rather than an XCTest idle issue.
 - The hang was fixed in `SelectableTextEditor` and `VibeWriteAppFlow`, and the targeted UI test now gets past the second submit.
 - The latest prompt-path fix restored `startDraft` user input into the actual LLM payload, and the正文 editor now applies a clearer, larger AppKit text style so remote drafts are readable on the dark shell.

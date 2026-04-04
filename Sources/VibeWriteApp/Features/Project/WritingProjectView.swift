@@ -256,8 +256,8 @@ struct WritingProjectView: View {
             return project.mode.stageDescription
         }
 
-        let trimmedNextFocus = project.context.nextFocus.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedNextFocus.isEmpty ? project.mode.stageDescription : trimmedNextFocus
+        let trimmedSummary = project.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmedSummary.isEmpty ? project.mode.stageDescription : trimmedSummary
     }
 
     private func editorBody(minimumHeight: CGFloat) -> some View {
