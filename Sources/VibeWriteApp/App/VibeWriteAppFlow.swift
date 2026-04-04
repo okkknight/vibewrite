@@ -280,7 +280,19 @@ final class VibeWriteAppFlow: ObservableObject {
                 liveProject.documentText = renderedText
                 self.replaceActiveProject(liveProject, persist: false)
             }
-            let revealFromCharacterCount = action == .continueWriting ? beforeSnapshot.documentText.count : 0
+            let revealFromCharacterCount: Int = {
+                switch action {
+                case .startDraft:
+                    return 0
+                case .continueWriting:
+                    return beforeSnapshot.documentText.count
+                case .edit:
+                    return selectionRevealStartCharacterCount(
+                        in: beforeSnapshot.documentText,
+                        selectionText: normalizedSelectionText
+                    )
+                }
+            }()
             var finalResponse: WritingAIResponse?
             for try await event in aiClient.streamResponse(for: request) {
                 switch event {
@@ -395,6 +407,18 @@ final class VibeWriteAppFlow: ObservableObject {
         }
     }
 
+    private func selectionRevealStartCharacterCount(
+        in documentText: String,
+        selectionText: String?
+    ) -> Int {
+        guard let selectionText,
+              let targetRange = documentText.range(of: selectionText) else {
+            return 0
+        }
+
+        return documentText.distance(from: documentText.startIndex, to: targetRange.lowerBound)
+    }
+
     private func streamingSummary(for action: WritingAIAction) -> String {
         switch action {
         case .startDraft:
@@ -402,7 +426,7 @@ final class VibeWriteAppFlow: ObservableObject {
         case .continueWriting:
             return "正在续写下一段"
         case .edit:
-            return "正在局部 patch"
+            return "局部润色中"
         }
     }
 

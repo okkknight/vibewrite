@@ -16,6 +16,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and the editor follows the document end during AI streaming so the output feels fast without turning into big bursty jumps.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
+- Edit streaming now reveals from the selected region instead of replaying from character 0, so local patch responses feel anchored to the passage the user selected.
+- The page header subtitle no longer surfaces the raw AI summary text; it now prefers the project's next focus text and falls back to the stage description when empty.
 - The app has switched to a file-first document model: Markdown files carry a compact YAML-style metadata block plus正文, the header title is directly editable, `Cmd+O` / `Cmd+S` / `Cmd+Shift+S` now live in the File menu, and context recovery never blocks writing even if metadata is missing or malformed.
 - User文本 and协作 state are no longer kept in the app's primary local store. Only lightweight recent-document entries remain app-owned; the writable project state now lives in the user's Markdown file.
 - `task/TASK_20260403_024.md` completed the visual restyle pass: the app keeps the same structure and interactions, but the shell/theme now uses a clearer Apple-style visual system.
@@ -34,6 +36,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Follow-up debugging showed the popover was still not appearing because the AppKit bridge kept syncing a nil binding back into `NSTextView` and clearing the user's non-empty selection during layout/update churn. The current fix only clears the editor selection after a real mirrored selection existed, so the user selection can stabilize and the popover can render.
 - A later trace narrowed another popover regression further: non-empty selection snapshots were only reaching SwiftUI on scroll-bounds changes, while direct user selection changes were often missed during layout churn. `SelectableTextEditor` now listens to `NSTextView.didChangeSelectionNotification` directly and flushes any selection sync that arrived mid-layout as soon as layout finishes, so the popover no longer has to wait for a manual scroll to appear.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the update.
+- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle fixes.
 - `swift test` currently compiles successfully but fails to launch the macOS test bundle in this environment because of a local library-load/code-signing policy issue; the app target still builds cleanly with `xcodebuild build`.
 - The targeted UI test now gets past the second submit and into the rail section, but it is still not fully green because `project.assistantRailShell` does not appear within the current timeout.
 - The writing session remains正文-first with collapsible AI/history rails and a standalone bottom composer.
@@ -86,6 +89,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Keep local Xcode-generated files, `Config/VibeWrite.local.xcconfig`, and user workspace state out of commits; `.gitignore` now covers them, but double-check before staging if the repo status looks noisy.
 - Avoid adding UI-test waits that depend on app idle or repeated `exists` / snapshot polling around the editor bridge; that was the area that hid the real hang.
 - If you touch `SelectableTextEditor` or the AI writeback path, rerun the targeted UI test before assuming the post-submit flow is safe.
+- If you touch the edit streaming preview path, check both `startDraft` and `edit` so the stream still reveals from the intended region.
 - If you touch the start-draft request assembly again, make sure the prompt is still passed to the AI request once and is not silently dropped by dedup logic.
 - If you touch the file document parser or save flow, make sure malformed metadata still degrades to正文-only editing instead of blocking open/save.
 

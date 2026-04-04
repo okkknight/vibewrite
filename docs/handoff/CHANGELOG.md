@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-04-04
+- Edit streaming now reveals from the selected passage instead of from the top of the document. The edit flow computes a reveal offset from the selected range so the streaming preview is anchored to the user's selection.
+- The page header subtitle no longer shows the raw AI summary string. It now prefers the project's next-focus text and falls back to the stage description when that field is empty.
+
+## 2026-04-04
 - The latest selection-popover regression was traced to the AppKit bridge missing direct non-empty selection changes and only recomputing the overlay once the scroll view bounds moved. `SelectableTextEditor` now observes `NSTextView.didChangeSelectionNotification` directly and flushes any selection sync that arrived during layout as soon as layout completes, so the popover does not have to wait for a manual scroll.
 
 ## 2026-04-04
