@@ -32,6 +32,10 @@ struct WritingProjectView: View {
     }
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
+    /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
+    private var writingBodyTextContainerInset: NSSize {
+        NSSize(width: 12, height: 18)
+    }
 
     init(
         flow: VibeWriteAppFlow,
@@ -289,7 +293,8 @@ struct WritingProjectView: View {
                     textFont: NSFont.systemFont(ofSize: 16, weight: .regular),
                     textColor: NSColor.vibeCanvasInk,
                     insertionPointColor: NSColor.vibeAccent,
-                    selectedTextBackgroundColor: NSColor.vibeAccent.withAlphaComponent(0.30)
+                    selectedTextBackgroundColor: NSColor.vibeAccent.withAlphaComponent(0.30),
+                    textContainerInset: writingBodyTextContainerInset
                 )
                 .id(project.id)
                 .frame(

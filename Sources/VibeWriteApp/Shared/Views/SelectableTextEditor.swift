@@ -14,6 +14,7 @@ struct SelectableTextEditor: NSViewRepresentable {
     var textColor: NSColor = .labelColor
     var insertionPointColor: NSColor = .vibeAccent
     var selectedTextBackgroundColor: NSColor = NSColor.vibeAccent.withAlphaComponent(0.22)
+    var textContainerInset: NSSize = NSSize(width: 18, height: 18)
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -51,7 +52,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
         textView.usesFindBar = false
-        textView.textContainerInset = NSSize(width: 18, height: 18)
+        textView.textContainerInset = textContainerInset
         textView.textContainer?.widthTracksTextView = false
         textView.textContainer?.containerSize = NSSize(
             width: CGFloat.greatestFiniteMagnitude,
@@ -382,8 +383,8 @@ struct SelectableTextEditor: NSViewRepresentable {
             let clipBounds = scrollView.contentView.bounds
             let visibleWidth = max(clipBounds.width, 1)
             let visibleHeight = max(clipBounds.height, 1)
-            let textInsetY: CGFloat = 18
-            let textInsetX: CGFloat = 18
+            let textInsetY = max(textView.textContainerInset.height, 0)
+            let textInsetX = max(textView.textContainerInset.width, 0)
             let horizontalInset = textInsetX
             let containerWidth = max(visibleWidth - (textInsetX * 2), 1)
 
