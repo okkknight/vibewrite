@@ -49,6 +49,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `VibeWriteAppFlow` is the main state owner: it manages the project list, active project, AI request state, local persistence, and revision history.
 - `SelectableTextEditor` is the AppKit bridge for正文 selection/editing; it is the most sensitive place for reentrancy and snapshot-driven UI hangs.
 - `WritingEditPatch` and revision history keep edit flows local and reversible.
+- Recent crash investigation added targeted logs around `performWritingAction`, `WritingEditPatch.build`, and `WritingEditPatch.init` so we can pinpoint the exact field assignment if the first-draft path still segfaults.
 - UI tests launch against stub AI mode and reset the app's own container-local store.
 
 ## Key files

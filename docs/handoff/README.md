@@ -70,3 +70,4 @@ This directory is the compact handoff layer for VibeWrite.
 - Keep `PROJECT_CONTEXT.md` as the primary source of truth and `CHANGELOG.md` as the append-only history.
 - The app no longer synthesizes fallback next-step suggestions when the model omits metadata: `summary`, `nextFocus`, and `suggestionChips` now stay empty unless the remote response provides them, and the sidebar/composer render only real model output.
 - Runtime AI logs now record whether completion metadata was actually parsed, along with the parsed summary/next-focus/suggestion counts, so the next real request can confirm whether the remote model is returning suggestions or the UI is simply receiving an empty block.
+- Crash tracing logs were added around the first-draft patch path so the next reproduce cycle can tell whether the segfault happens before `WritingEditPatch.init` finishes or inside one of its field assignments.

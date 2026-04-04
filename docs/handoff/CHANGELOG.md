@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-04-04
+- Added targeted crash logs around `performWritingAction`, `WritingEditPatch.build`, and `WritingEditPatch.init` to pinpoint the first-draft segfault without changing behavior.
+
+## 2026-04-04
 - Local edit now carries a stable `selectionRange` from the editor bridge through the AI request, patch builder, mock engine, response builder, and live preview. That removes the old string-only re-match path that could drift after repeated local edits.
 - Edit mode no longer streams live正文 replacement into the visible document. The preview renderer is bypassed for `.edit`, so the final patch applies once at completion instead of making the page jump while chunks arrive.
 

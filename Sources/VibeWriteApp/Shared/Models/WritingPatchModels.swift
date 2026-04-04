@@ -77,14 +77,25 @@ struct WritingEditPatch: Codable, Hashable {
         summary: String,
         createdAt: Date = .now
     ) {
+        VibeWriteLog.ai.notice(
+            "WritingEditPatch.init begin action=\(action.rawValue, privacy: .public) lockedSelectionText=\(lockedSelectionText?.vibewriteLogPreview(maxLength: 60) ?? "nil", privacy: .public) sourceText=\(sourceText?.vibewriteLogPreview(maxLength: 60) ?? "nil", privacy: .public) sourceRange=\(sourceRange?.nsRange.debugDescription ?? "nil", privacy: .public) replacementCount=\(replacementText.count, privacy: .public) userMessage=\(userMessage?.vibewriteLogPreview(maxLength: 60) ?? "nil", privacy: .public) summary=\(summary.vibewriteLogPreview(maxLength: 60), privacy: .public)"
+        )
         self.action = action
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned action")
         self.lockedSelectionText = lockedSelectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned lockedSelectionText")
         self.sourceText = sourceText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned sourceText")
         self.sourceRange = sourceRange
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned sourceRange")
         self.replacementText = replacementText
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned replacementText")
         self.userMessage = userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned userMessage")
         self.summary = summary
+        VibeWriteLog.ai.notice("WritingEditPatch.init assigned summary")
         self.createdAt = createdAt
+        VibeWriteLog.ai.notice("WritingEditPatch.init finished")
     }
 
     static func build(
@@ -100,6 +111,10 @@ struct WritingEditPatch: Codable, Hashable {
             guard !replacementText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw WritingEditPatchError.noPatchResult
             }
+
+            VibeWriteLog.ai.notice(
+                "WritingEditPatch.build startDraft beforeCount=\(before.documentText.count, privacy: .public) afterCount=\(after.documentText.count, privacy: .public) replacementCount=\(replacementText.count, privacy: .public)"
+            )
 
             return WritingEditPatch(
                 action: action,
@@ -119,6 +134,10 @@ struct WritingEditPatch: Codable, Hashable {
             guard !appendedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 throw WritingEditPatchError.noPatchResult
             }
+
+            VibeWriteLog.ai.notice(
+                "WritingEditPatch.build continueWriting beforeCount=\(before.documentText.count, privacy: .public) afterCount=\(after.documentText.count, privacy: .public) appendedCount=\(appendedText.count, privacy: .public)"
+            )
 
             return WritingEditPatch(
                 action: action,
@@ -154,6 +173,10 @@ struct WritingEditPatch: Codable, Hashable {
             let lowerBound = after.documentText.index(after.documentText.startIndex, offsetBy: prefix.count)
             let upperBound = after.documentText.index(after.documentText.endIndex, offsetBy: -suffix.count)
             let replacementText = String(after.documentText[lowerBound..<upperBound])
+
+            VibeWriteLog.ai.notice(
+                "WritingEditPatch.build edit beforeCount=\(before.documentText.count, privacy: .public) afterCount=\(after.documentText.count, privacy: .public) sourceRange=\(sourceRange.nsRange.debugDescription, privacy: .public) sourceTextPreview=\(sourceText.vibewriteLogPreview(maxLength: 60), privacy: .public) replacementCount=\(replacementText.count, privacy: .public)"
+            )
 
             return WritingEditPatch(
                 action: action,

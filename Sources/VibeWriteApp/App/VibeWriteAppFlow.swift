@@ -255,6 +255,9 @@ final class VibeWriteAppFlow: ObservableObject {
         do {
             let beforeSnapshot = project.aiSnapshot
             var liveProject = project
+            VibeWriteLog.ai.notice(
+                "Flow preparing patch action=\(action.rawValue, privacy: .public) beforeCount=\(beforeSnapshot.documentText.count, privacy: .public) selectionRange=\(selectionRange?.nsRange.debugDescription ?? "nil", privacy: .public) selectionPreview=\(normalizedSelectionText?.vibewriteLogPreview(maxLength: 80) ?? "nil", privacy: .public) requestMessagePreview=\(requestUserMessage?.vibewriteLogPreview(maxLength: 80) ?? "nil", privacy: .public)"
+            )
             let clientType = String(describing: type(of: aiClient))
             VibeWriteLog.ai.info(
                 "Flow sending AI request client=\(clientType, privacy: .public) action=\(action.rawValue, privacy: .public) projectTitle=\(project.title, privacy: .public) promptPreview=\(requestUserMessage?.vibewriteLogPreview(maxLength: 80) ?? "", privacy: .public)"
@@ -312,6 +315,9 @@ final class VibeWriteAppFlow: ObservableObject {
                 after: response.snapshotByApplyingDocumentText(response.documentText, to: beforeSnapshot),
                 selectionRange: selectionRange,
                 userMessage: requestUserMessage
+            )
+            VibeWriteLog.ai.notice(
+                "Flow patch built action=\(action.rawValue, privacy: .public) patchSummary=\(patch.summary.vibewriteLogPreview(maxLength: 100), privacy: .public) sourceTextPreview=\(patch.sourceText?.vibewriteLogPreview(maxLength: 60) ?? "nil", privacy: .public) replacementCount=\(patch.replacementText.count, privacy: .public) sourceRange=\(patch.sourceRange?.nsRange.debugDescription ?? "nil", privacy: .public)"
             )
             let updatedDocumentText = try patch.apply(
                 to: beforeSnapshot.documentText,
