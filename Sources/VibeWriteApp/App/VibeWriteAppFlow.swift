@@ -295,7 +295,8 @@ final class VibeWriteAppFlow: ObservableObject {
                                 baseDocumentText: beforeSnapshot.documentText,
                                 selectionRange: selectionRange,
                                 streamedText: streamedText
-                            )
+                            ),
+                            revealFromCharacterCount: action == .continueWriting ? beforeSnapshot.documentText.count : 0
                         )
                     }
 

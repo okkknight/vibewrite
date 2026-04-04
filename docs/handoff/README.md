@@ -32,11 +32,13 @@ This directory is the compact handoff layer for VibeWrite.
 
 ## Current state
 - V2 docs remain the source of truth; `docs/V1/` is archival only.
-- The latest repo commit is `9a35b2c`, which adds ignore rules for local Xcode artifacts and workspace state so they do not get staged by accident.
+- The latest repo commit before this update is `fc91b0f`, which refined the selection edit intent popover.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
 - The selection popover bridge was narrowed so update sync no longer clears a live NSTextView selection when the SwiftUI binding is nil, which lets the non-empty selection stabilize for popover display.
 - Streaming正文 preview now uses a dedicated playback renderer: the first visible chunk is emitted immediately, later deltas are revealed on a frame-paced cadence, and the editor auto-scrolls to the document end while AI is actively streaming.
 - The流式 cadence is code-configurable through `WritingStreamingConfiguration` plus the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`, so we can tune the feel without scattering constants through the app.
+- Remote AI metadata is now explicitly constrained to the current document language for Chinese writing tasks, which keeps `summary`, `nextFocus`, and `suggestionChips` aligned with the prose language instead of drifting into English.
+- Continue-writing streaming playback now reveals from the end of the current正文 instead of starting from character 0, so the visible stream stays anchored to the latest paragraph.
 - Local edit requests now preserve the selected正文 position as a stable `selectionRange`, and the edit/revision/mock/preview layers use that exact range instead of re-finding text by content. That prevents repeated local edits from drifting to earlier duplicate passages.
 - Edit mode no longer uses the streaming preview renderer to rewrite the正文 live. The final patch is applied once at completion so local edits do not visually flicker through chunk-by-chunk replacement.
 - The app now saves and opens user work as Markdown files with a compact metadata block. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad metadata never blocks正文 editing.

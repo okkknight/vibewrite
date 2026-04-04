@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-04-04
+- Remote AI metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay in Chinese instead of drifting into English.
+- Continue-writing streaming now reveals from the end of the current正文 instead of starting from character 0, so the streamed preview stays anchored to the latest paragraph.
+
+## 2026-04-04
 - The selection popover no longer fires an opaque one-click `润色此处` edit. It now exposes explicit preset intents (`更画面`, `更克制`, `更抓人`) plus `自定义`, while still routing preset clicks through the existing `.edit` action with concrete prompt text.
 - Composer-driven selection edits no longer fall back to an empty generic edit request. With an active selection, submitting without a typed instruction now activates the custom-input path and focuses the bottom composer instead of sending a black-box rewrite.
 - Added a targeted macOS UI test for the new selection-preset flow and updated the edit patch timing unit test so it matches the current completion-only local edit behavior.

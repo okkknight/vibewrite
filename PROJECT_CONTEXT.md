@@ -11,11 +11,13 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
-- The latest committed change is `9a35b2c`, which adds repo-level ignore rules for local Xcode artifacts and workspace state so those files do not get staged accidentally.
+- The latest committed change before this update is `fc91b0f`, which refined the selection edit intent popover.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
 - The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and the editor follows the document end during AI streaming so the output feels fast without turning into big bursty jumps.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
+- Remote AI completion metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay aligned with the document language instead of drifting into English.
+- Continue-writing playback now reveals from the end of the current正文 rather than from character 0, so the streamed preview stays anchored to the latest paragraph instead of replaying the whole document from the top.
 - Local edit requests now carry a stable `selectionRange`, and the patch/revision/mock/preview layers resolve edits from that exact range instead of re-matching by string content. That keeps repeated local edits anchored to the intended passage even when the same words appear elsewhere.
 - Edit responses no longer stream-replace the正文 while the model is still generating. The live preview renderer is bypassed for `.edit`, so local patch edits apply once at completion instead of causing jumpy chunk-by-chunk replacement.
 - The page header subtitle still surfaces `project.summary` when the body is non-empty, so if the text under the title looks off-topic the real bug is upstream in the model output or summary writeback path, not the subtitle component itself.

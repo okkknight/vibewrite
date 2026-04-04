@@ -30,6 +30,8 @@ struct WritingAIPromptBuilder {
         - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
         - The metadata JSON must contain: summary, nextFocus, suggestionChips.
         - Keep the metadata specific to the current正文 and actionable for the next step.
+        - Match the metadata language to the language of the current正文 and user request.
+        - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
         - The metadata block is not part of the正文 and must not be mixed into the prose.
         - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
@@ -73,6 +75,7 @@ struct WritingAIPromptBuilder {
 
         lines.append("Respond with only the writing text for the action above.")
         lines.append("After the prose, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a JSON object with summary, nextFocus, and suggestionChips.")
+        lines.append("Write the metadata in the same language as the current正文 and user request; for Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
         lines.append("Do not wrap the metadata JSON in markdown fences.")
 
         return lines.joined(separator: "\n")

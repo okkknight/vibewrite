@@ -128,11 +128,36 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(systemPrompt.contains("Output the writing text first"))
         XCTAssertTrue(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(systemPrompt.contains("summary, nextFocus, suggestionChips"))
+        XCTAssertTrue(systemPrompt.contains("Chinese writing tasks"))
         XCTAssertTrue(userPrompt.contains("Action: startDraft"))
         XCTAssertTrue(userPrompt.contains("User message: \(prompt)"))
         XCTAssertTrue(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(userPrompt.contains("summary, nextFocus, and suggestionChips"))
+        XCTAssertTrue(userPrompt.contains("Chinese writing tasks"))
         XCTAssertFalse(userPrompt.contains("assistantMessage"))
+    }
+
+    func testStreamingPreviewRendererStartsContinuationFromRevealOffset() {
+        let configuration = WritingStreamingConfiguration.configuration(
+            from: [
+                "VIBEWRITE_STREAMING_FRAME_INTERVAL_MS": "16",
+                "VIBEWRITE_STREAMING_CHARACTERS_PER_SECOND": "120",
+                "VIBEWRITE_STREAMING_INITIAL_BURST_CHARACTERS": "1",
+                "VIBEWRITE_STREAMING_MINIMUM_CHARACTERS_PER_TICK": "1",
+                "VIBEWRITE_STREAMING_MAXIMUM_CHARACTERS_PER_TICK": "1"
+            ]
+        )
+
+        var renders: [String] = []
+        let renderer = WritingStreamingPreviewRenderer(configuration: configuration) { renderedText in
+            renders.append(renderedText)
+        }
+
+        renderer.updateTargetText("abcdef", revealFromCharacterCount: 4)
+        renderer.flushRemaining()
+
+        XCTAssertEqual(renders.first, "abcde")
+        XCTAssertEqual(renders.last, "abcdef")
     }
 
     func testRemoteClientUsesAnthropicCompatibleRequestAndStreamsTextDeltas() async throws {
