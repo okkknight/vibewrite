@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>CFBundleDevelopmentRegion</key>
+	<string>$(DEVELOPMENT_LANGUAGE)</string>
+	<key>CFBundleExecutable</key>
+	<string>$(EXECUTABLE_NAME)</string>
+	<key>CFBundleIconFile</key>
+	<string>VibeWriteIcon</string>
+	<key>CFBundleIdentifier</key>
+	<string>$(PRODUCT_BUNDLE_IDENTIFIER)</string>
+	<key>CFBundleInfoDictionaryVersion</key>
+	<string>6.0</string>
+	<key>CFBundleName</key>
+	<string>$(PRODUCT_NAME)</string>
+	<key>CFBundlePackageType</key>
+	<string>APPL</string>
+	<key>CFBundleShortVersionString</key>
+	<string>$(MARKETING_VERSION)</string>
+	<key>CFBundleVersion</key>
+	<string>$(CURRENT_PROJECT_VERSION)</string>
+	<key>VIBEWRITE_AI_PROVIDER</key>
+	<string>$(VIBEWRITE_AI_PROVIDER)</string>
+	<key>VIBEWRITE_AI_DEFAULT_MODE</key>
+	<string>$(VIBEWRITE_AI_DEFAULT_MODE)</string>
+	<key>VIBEWRITE_STREAMING_FRAME_INTERVAL_MS</key>
+	<string>$(VIBEWRITE_STREAMING_FRAME_INTERVAL_MS)</string>
+	<key>VIBEWRITE_STREAMING_CHARACTERS_PER_SECOND</key>
+	<string>$(VIBEWRITE_STREAMING_CHARACTERS_PER_SECOND)</string>
+	<key>VIBEWRITE_STREAMING_INITIAL_BURST_CHARACTERS</key>
+	<string>$(VIBEWRITE_STREAMING_INITIAL_BURST_CHARACTERS)</string>
+	<key>VIBEWRITE_STREAMING_MINIMUM_CHARACTERS_PER_TICK</key>
+	<string>$(VIBEWRITE_STREAMING_MINIMUM_CHARACTERS_PER_TICK)</string>
+	<key>VIBEWRITE_STREAMING_MAXIMUM_CHARACTERS_PER_TICK</key>
+	<string>$(VIBEWRITE_STREAMING_MAXIMUM_CHARACTERS_PER_TICK)</string>
+	<key>MINIMAX_BASE_URL</key>
+	<string>https://api.minimaxi.com/anthropic</string>
+	<key>MINIMAX_MODEL</key>
+	<string>$(MINIMAX_MODEL)</string>
+	<key>MINIMAX_API_KEY</key>
+	<string>$(MINIMAX_API_KEY)</string>
+	<key>LSMinimumSystemVersion</key>
+	<string>$(MACOSX_DEPLOYMENT_TARGET)</string>
+</dict>
+</plist>

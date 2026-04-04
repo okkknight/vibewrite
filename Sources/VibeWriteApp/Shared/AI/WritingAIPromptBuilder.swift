@@ -19,31 +19,29 @@ struct WritingAIPromptBuilder {
     private func systemPrompt(provider: String, model: String) -> String {
         """
         You are VibeWrite, a calm macOS writing collaborator.
-        Output exactly one JSON object and nothing else.
-        Do not wrap the JSON in markdown fences.
-        Do not add commentary before or after the JSON.
+        Output the writing text first, then append a single metadata block for the app.
+        Do not output commentary outside the writing text and metadata block.
 
-        The JSON object must contain these keys:
-        - assistantMessage: string
-        - documentText: string
-        - summary: string
-        - intentSummary: string
-        - styleConstraints: array of strings
-        - currentGoal: string
-        - recentDecisions: array of strings
-        - workingMemory: array of strings
-        - nextFocus: string
-        - suggestionChips: array of strings
-        - mode: one of "discussion" or "collaboration"
+        - When the action is "startDraft", write a short opening paragraph or two.
+        - When the action is "continueWriting", continue with the next short paragraph or scene.
+        - When the action is "edit", return only the replacement text for the selected segment.
+        - Keep the output short enough to stream quickly.
+        - Stop as soon as the local change is complete.
+        - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
+        - The metadata JSON must contain: summary, nextFocus, suggestionChips.
+        - Keep the metadata specific to the current正文 and actionable for the next step.
+        - The metadata block is not part of the正文 and must not be mixed into the prose.
+        - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
+        - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
 
         Rules:
         - Keep the writing voice calm, precise, and native to a macOS writing app.
         - Preserve the current article's structure unless the action explicitly changes it.
-        - When the action is "startDraft", produce a full first draft in documentText.
-        - When the action is "selectionModify", rewrite the selected passage rather than the entire article whenever practical.
-        - When the action is "expand", "shorten", or "polish", adjust the current document accordingly.
-        - Keep suggestionChips short and action-oriented.
-        - Update the context fields so they reflect the current writing state.
+        - When the action is "startDraft", focus on the first usable opening rather than a full outline.
+        - When the action is "continueWriting", continue the existing正文 instead of restarting the article.
+        - When the action is "edit", rewrite only the selected passage or local region whenever practical.
+        - Keep the prose concise enough for streaming.
+        - The metadata JSON should stay concise and concrete, not templated.
 
         Provider: \(provider)
         Model: \(model)
@@ -51,19 +49,33 @@ struct WritingAIPromptBuilder {
     }
 
     private func userPrompt(for request: WritingAIRequest) -> String {
-        let encoder = JSONEncoder()
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
-        encoder.dateEncodingStrategy = .iso8601
+        let prompt = request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
 
-        guard let data = try? encoder.encode(request),
-              let json = String(data: data, encoding: .utf8) else {
-            return "Return a valid JSON response for the supplied request."
+        var lines: [String] = []
+        lines.append("Action: \(request.action.rawValue)")
+        lines.append("Project title: \(request.project.title)")
+        lines.append("Current document:")
+        lines.append(request.project.documentText.isEmpty ? "(empty)" : request.project.documentText)
+
+        if let prompt, !prompt.isEmpty {
+            lines.append("User message: \(prompt)")
         }
 
-        return """
-        Respond to this request as a JSON object:
-        \(json)
-        """
+        if let selection, !selection.isEmpty {
+            lines.append("Selection: \(selection)")
+        }
+
+        if request.action == .startDraft {
+            lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
+            lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
+        }
+
+        lines.append("Respond with only the writing text for the action above.")
+        lines.append("After the prose, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a JSON object with summary, nextFocus, and suggestionChips.")
+        lines.append("Do not wrap the metadata JSON in markdown fences.")
+
+        return lines.joined(separator: "\n")
     }
 
     private func sanitizedRequest(for request: WritingAIRequest) -> WritingAIRequest {
@@ -79,8 +91,6 @@ struct WritingAIPromptBuilder {
             if trimmedUserMessage != trimmedProjectPrompt {
                 sanitized.project.prompt = trimmedUserMessage
             }
-
-            sanitized.userMessage = nil
         }
 
         if let matchingIndex = sanitized.project.conversation.firstIndex(where: { message in

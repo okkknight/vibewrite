@@ -52,6 +52,10 @@ struct LocalProjectStore {
         }
     }
 
+    func reset() {
+        save(projects: [], lastOpenedProjectID: nil)
+    }
+
     private func ensureStorageDirectoryExists() throws {
         let parentDirectory = storageURL.deletingLastPathComponent()
         if fileManager.fileExists(atPath: parentDirectory.path) {

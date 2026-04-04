@@ -3,29 +3,247 @@ import XCTest
 
 @MainActor
 final class VibeWriteAppFlowTests: XCTestCase {
-    func testCreateNewProjectMovesToProjectScreenWithCollaborationDraft() {
+    func testCreateNewProjectOpensBlankCollaborationShell() {
         let flow = VibeWriteAppFlow()
 
         flow.createNewProject()
 
-        XCTAssertEqual(flow.screen, .project)
         XCTAssertEqual(flow.activeProject.mode, .collaboration)
-        XCTAssertFalse(flow.activeProject.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
-        XCTAssertEqual(flow.activeProject.automationKey, "project.quickstart.default")
+        XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+        XCTAssertTrue(flow.activeProject.prompt.isEmpty)
+        XCTAssertTrue(flow.activeProject.conversation.isEmpty)
+        XCTAssertEqual(flow.activeProject.summary, "等待起稿输入")
+        XCTAssertEqual(flow.activeProject.mode.stageTitle, "正文协作中")
+        XCTAssertEqual(flow.activeProject.automationKey, "project.new.blank")
     }
 
-    func testDiscussionQuickStartStartsDiscussionProjectWithEmptyDraft() {
+    func testBlankStartupDoesNotBootstrapSampleProjects() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+
+        XCTAssertTrue(flow.projects.isEmpty)
+        XCTAssertNil(flow.activeProjectID)
+        XCTAssertTrue(flow.recentProjects.isEmpty)
+    }
+
+    func testEmptyActiveProjectFallsBackToCollaborationShell() {
+        let flow = VibeWriteAppFlow(forceBlankStartup: true)
+
+        XCTAssertEqual(flow.activeProject.mode, .collaboration)
+        XCTAssertEqual(flow.activeProject.mode.stageTitle, "正文协作中")
+    }
+
+    func testProjectShellLayoutModeUsesCompactThreshold() {
+        XCTAssertTrue(ProjectShellLayoutMode(windowWidth: 1079).isCompact)
+        XCTAssertTrue(ProjectShellLayoutMode(windowWidth: 1080).isWide)
+    }
+
+    func testForceBlankStartupIgnoresPersistedProjectsAndResetsStore() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let persistedFlow = VibeWriteAppFlow(storageURL: storageURL)
+        persistedFlow.openProject(
+            WritingProject.entryShell(
+                prompt: "写一个雨夜重逢的小说场景",
+                mode: .collaboration,
+                automationKey: "project.forceblank.demo"
+            )
+        )
+
+        let blankFlow = VibeWriteAppFlow(storageURL: storageURL, forceBlankStartup: true)
+
+        XCTAssertTrue(blankFlow.projects.isEmpty)
+        XCTAssertNil(blankFlow.activeProjectID)
+        XCTAssertTrue(blankFlow.recentDocumentEntries.isEmpty)
+
+        let restoredFlow = VibeWriteAppFlow(storageURL: storageURL)
+        XCTAssertTrue(restoredFlow.projects.isEmpty)
+        XCTAssertTrue(restoredFlow.recentDocumentEntries.isEmpty)
+    }
+
+    func testDiscussionQuickStartStartsDiscussionProjectWithoutGeneratingDraft() async {
         let flow = VibeWriteAppFlow()
 
-        flow.startQuickDraft(prompt: "我想先聊清楚方向", mode: .discussion)
+        await flow.startQuickDraft(prompt: "我想先聊清楚方向", mode: .discussion)
 
-        XCTAssertEqual(flow.screen, .project)
         XCTAssertEqual(flow.activeProject.mode, .discussion)
         XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+        XCTAssertEqual(flow.activeProject.prompt, "我想先聊清楚方向")
+        XCTAssertEqual(flow.activeProject.mode.stageTitle, "起稿中")
         XCTAssertEqual(flow.activeProject.automationKey, "project.quickstart.discussion")
+        XCTAssertEqual(flow.activeProject.conversation.filter { $0.role == .user }.count, 1)
     }
 
-    func testFlowPersistsAndRestoresLastOpenedProject() throws {
+    func testDirectQuickStartCreatesRevisionHistoryAndCanUndoConsistently() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+
+        await flow.startQuickDraft(
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration
+        )
+
+        XCTAssertEqual(flow.activeProject.mode, .collaboration)
+        XCTAssertFalse(flow.activeProject.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        XCTAssertEqual(flow.activeProject.revisionHistory.count, 1)
+
+        let revision = flow.activeProject.revisionHistory.last
+        XCTAssertEqual(revision?.action, .startDraft)
+        XCTAssertEqual(revision?.patch.action, .startDraft)
+        XCTAssertTrue(revision?.before.documentText.isEmpty ?? false)
+        XCTAssertFalse(revision?.after.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty ?? true)
+
+        let undone = flow.undoLastRevision()
+        XCTAssertEqual(undone?.action, .startDraft)
+        XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+        XCTAssertEqual(flow.activeProject.summary, revision?.before.summary)
+        XCTAssertEqual(flow.activeProject.currentGoal, revision?.before.context.currentGoal)
+        XCTAssertEqual(flow.activeProject.suggestionChips, revision?.before.suggestionChips)
+    }
+
+    func testStartDraftStreamsIncrementallyBeforeCompletion() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        flow.openProject(
+            WritingProject.entryShell(
+                prompt: "写一篇关于成年人孤独感的公众号文章",
+                mode: .collaboration,
+                automationKey: "project.stream.start"
+            )
+        )
+
+        let initialText = flow.activeProject.documentText
+        let task = Task { @MainActor in
+            try await flow.performWritingAction(
+                .startDraft,
+                userMessage: "写一篇关于成年人孤独感的公众号文章",
+                selectionText: nil
+            )
+        }
+
+        let firstGrowthObserved = await waitUntil(timeout: 4) {
+            flow.activeProject.documentText.count > initialText.count
+        }
+        XCTAssertTrue(firstGrowthObserved)
+
+        let firstChunk = flow.activeProject.documentText
+        XCTAssertFalse(firstChunk.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        XCTAssertTrue(flow.isAIRequestInFlight)
+
+        let secondGrowthObserved = await waitUntil(timeout: 4) {
+            flow.activeProject.documentText.count > firstChunk.count
+        }
+        XCTAssertTrue(secondGrowthObserved)
+
+        let finalText = flow.activeProject.documentText
+        XCTAssertGreaterThan(finalText.count, firstChunk.count)
+
+        try await task.value
+        XCTAssertFalse(flow.isAIRequestInFlight)
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .startDraft)
+    }
+
+    func testContinueWritingStreamsIncrementallyBeforeCompletion() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        flow.openProject(project)
+
+        let initialText = flow.activeProject.documentText
+        let task = Task { @MainActor in
+            try await flow.performWritingAction(
+                .continueWriting,
+                userMessage: nil,
+                selectionText: nil
+            )
+        }
+
+        let continueGrowthObserved = await waitUntil(timeout: 4) {
+            flow.activeProject.documentText.count > initialText.count
+        }
+        XCTAssertTrue(continueGrowthObserved)
+
+        let firstChunk = flow.activeProject.documentText
+        XCTAssertTrue(firstChunk.hasPrefix(initialText))
+
+        let continueGrowthObservedAgain = await waitUntil(timeout: 4) {
+            flow.activeProject.documentText.count > firstChunk.count
+        }
+        XCTAssertTrue(continueGrowthObservedAgain)
+
+        let finalText = flow.activeProject.documentText
+        XCTAssertGreaterThan(finalText.count, firstChunk.count)
+        XCTAssertTrue(finalText.hasPrefix(initialText))
+
+        try await task.value
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+    }
+
+    func testEditStreamsIncrementallyWhilePreservingPatchBoundaries() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        flow.openProject(project)
+        let selection = project.documentText.components(separatedBy: "\n").first!
+
+        guard let targetRange = project.documentText.range(of: selection) else {
+            XCTFail("Expected the selected text to exist")
+            return
+        }
+
+        let prefix = String(project.documentText[..<targetRange.lowerBound])
+        let suffix = String(project.documentText[targetRange.upperBound...])
+
+        let task = Task { @MainActor in
+            try await flow.performWritingAction(
+                .edit,
+                userMessage: "请把这段改得更克制一点",
+                selectionText: selection
+            )
+        }
+
+        let editGrowthObserved = await waitUntil(timeout: 4) {
+            flow.activeProject.documentText != project.documentText
+        }
+        XCTAssertTrue(editGrowthObserved)
+
+        let interimText = flow.activeProject.documentText
+        XCTAssertTrue(interimText.hasPrefix(prefix))
+        XCTAssertTrue(interimText.hasSuffix(suffix))
+
+        try await task.value
+
+        let finalText = flow.activeProject.documentText
+        XCTAssertTrue(finalText.hasPrefix(prefix))
+        XCTAssertTrue(finalText.hasSuffix(suffix))
+        XCTAssertTrue(finalText.contains("留一点空白") || finalText.contains("不用说得太满"))
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .edit)
+    }
+
+    func testSavingAndReopeningMarkdownDocumentRestoresLatestContext() throws {
         let storageURL = try makeTempStorageURL()
         defer {
             try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
@@ -43,34 +261,112 @@ final class VibeWriteAppFlowTests: XCTestCase {
         updatedProject.currentGoal = "确认角色关系"
         updatedProject.recentDecisions = ["先说明场景", "再处理重逢"]
         initialFlow.activeProject = updatedProject
-        initialFlow.returnHome()
+
+        let documentURL = storageURL.deletingPathExtension().appendingPathExtension("md")
+        XCTAssertTrue(initialFlow.saveCurrentDocument(to: documentURL))
+
+        let reopenedFlow = VibeWriteAppFlow(storageURL: storageURL)
+        XCTAssertTrue(reopenedFlow.openDocument(at: documentURL))
+
+        XCTAssertEqual(reopenedFlow.activeProject.id, updatedProject.id)
+        XCTAssertEqual(reopenedFlow.activeProject.title, updatedProject.title)
+        XCTAssertEqual(reopenedFlow.activeProject.currentGoal, "确认角色关系")
+        XCTAssertTrue(reopenedFlow.activeProject.documentText.isEmpty)
+        XCTAssertTrue(reopenedFlow.recentDocumentEntries.contains(where: { $0.url == documentURL }))
+    }
+
+    func testResetLocalDataClearsProjectsAndPersistsBlankStore() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        let project = WritingProject.entryShell(
+            prompt: "写一个雨夜重逢的小说场景",
+            mode: .collaboration,
+            automationKey: "project.reset.demo"
+        )
+        flow.openProject(project)
+
+        flow.resetLocalData()
+
+        XCTAssertTrue(flow.projects.isEmpty)
+        XCTAssertNil(flow.activeProjectID)
+        XCTAssertTrue(flow.recentDocumentEntries.isEmpty)
+        XCTAssertNil(flow.currentDocumentURL)
 
         let restoredFlow = VibeWriteAppFlow(storageURL: storageURL)
+        XCTAssertTrue(restoredFlow.projects.isEmpty)
+        XCTAssertTrue(restoredFlow.recentDocumentEntries.isEmpty)
+    }
 
-        XCTAssertEqual(restoredFlow.screen, .project)
-        XCTAssertEqual(restoredFlow.activeProject.id, updatedProject.id)
-        XCTAssertEqual(restoredFlow.activeProject.currentGoal, "确认角色关系")
-        XCTAssertTrue(restoredFlow.recentProjects.contains(where: { $0.id == updatedProject.id }))
+    func testMarkdownDocumentFallsBackWhenMetadataIsMalformed() {
+        let rawText = """
+        <!-- vibe-write-metadata
+        { this is not valid json
+        -->
+
+        林校第一次注意到苏迟，是在图书馆三楼靠窗的位置。
+        """
+
+        let parsedDocument = VibeWriteMarkdownDocument.parse(
+            from: rawText,
+            fallbackTitle: "未命名写作",
+            fallbackAutomationKey: "project.fallback.demo"
+        )
+        let reopenedProject = parsedDocument.makeProject(
+            fallbackTitle: "未命名写作",
+            fallbackAutomationKey: "project.fallback.demo"
+        )
+
+        XCTAssertEqual(reopenedProject.title, "未命名写作")
+        XCTAssertTrue(reopenedProject.documentText.contains("林校第一次注意到苏迟"))
+        XCTAssertEqual(reopenedProject.context.currentGoal, "继续当前正文")
+        XCTAssertEqual(reopenedProject.suggestionChips, ["继续写", "编辑这段", "补一段"])
+    }
+
+    func testMarkdownDocumentRoundTripsProjectState() {
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        let document = VibeWriteMarkdownDocument(project: project)
+        let reopenedProject = VibeWriteMarkdownDocument.parse(from: document.renderedText())
+            .makeProject()
+
+        XCTAssertEqual(reopenedProject.id, project.id)
+        XCTAssertEqual(reopenedProject.title, project.title)
+        XCTAssertEqual(reopenedProject.prompt, project.prompt)
+        XCTAssertEqual(reopenedProject.mode, project.mode)
+        XCTAssertEqual(reopenedProject.documentText, project.documentText)
+        XCTAssertEqual(reopenedProject.context.currentGoal, project.context.currentGoal)
+        XCTAssertEqual(reopenedProject.suggestionChips, project.suggestionChips)
     }
 
     func testMockEngineRevisesSelectedAndWholeDocumentText() {
         let draft = MockWritingEngine.firstDraft(for: "写一篇关于成年人孤独感的公众号文章")
+        let continued = MockWritingEngine.revisedText(
+            for: draft,
+            selectedSegment: nil,
+            action: .continueWriting,
+            variant: .standard
+        )
         let revisedWhole = MockWritingEngine.revisedText(
             for: draft,
             selectedSegment: nil,
-            action: .expand,
+            action: .edit,
             variant: .standard
         )
         let revisedSelection = MockWritingEngine.revisedText(
             for: draft,
             selectedSegment: draft.components(separatedBy: "\n\n").first,
-            action: .selectionModify,
+            action: .edit,
             variant: .standard
         )
 
+        XCTAssertNotEqual(draft, continued)
         XCTAssertNotEqual(draft, revisedWhole)
         XCTAssertNotEqual(draft, revisedSelection)
         XCTAssertTrue(revisedSelection.contains("留一点空白") || revisedSelection.contains("不用说得太满"))
+        XCTAssertTrue(continued.contains("接下来") || continued.contains("继续"))
     }
 
     func testFailedAIRequestDoesNotMutateActiveProjectState() async throws {
@@ -91,7 +387,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
 
         do {
             try await flow.performWritingAction(
-                .submitMessage,
+                .continueWriting,
                 userMessage: "请把这段改得更克制一点",
                 selectionText: nil
             )
@@ -103,9 +399,205 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.documentText, before.documentText)
         XCTAssertEqual(flow.activeProject.conversation.count, before.conversation.count)
         XCTAssertEqual(flow.activeProject.updatedAt, before.updatedAt)
+        XCTAssertNil(flow.activeEditLock)
     }
 
-    func testStartDraftDoesNotDuplicateMatchingPrompt() async throws {
+    func testContinueWritingProducesWholeDocumentRevision() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        let originalDocumentText = project.documentText
+        flow.openProject(project)
+
+        try await flow.performWritingAction(.continueWriting, userMessage: nil, selectionText: nil)
+
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.patch.action, .continueWriting)
+        XCTAssertTrue(flow.activeProject.documentText.contains("推进") || flow.activeProject.documentText.contains("补一段"))
+        XCTAssertTrue(flow.activeProject.documentText.hasPrefix(originalDocumentText))
+        XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
+    }
+
+    func testUndoLastRevisionRestoresPreviousLinearPatchState() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        let originalDocumentText = project.documentText
+        flow.openProject(project)
+
+        try await flow.performWritingAction(.continueWriting, userMessage: nil, selectionText: nil)
+
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
+
+        let undone = flow.undoLastRevision()
+        XCTAssertEqual(undone?.action, .continueWriting)
+        XCTAssertEqual(flow.activeProject.documentText, originalDocumentText)
+        XCTAssertTrue(flow.activeProject.revisionHistory.isEmpty)
+
+        try await flow.performWritingAction(.continueWriting, userMessage: nil, selectionText: nil)
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
+    }
+
+    func testEditUsesSelectionAsPatchTarget() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        flow.openProject(project)
+        let selectedText = project.documentText.components(separatedBy: "\n").first!
+
+        try await flow.performWritingAction(.edit, userMessage: nil, selectionText: selectedText)
+
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .edit)
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.patch.action, .edit)
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.lockedSelectionText, selectedText)
+        XCTAssertTrue(flow.activeProject.documentText.contains("留一点空白") || flow.activeProject.documentText.contains("不用说得太满"))
+    }
+
+    func testPatchApplicationKeepsUnselectedPrefixAndSuffixIntact() throws {
+        let before = WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot
+        let targetText = before.documentText.components(separatedBy: "\n").first!
+        var afterDocument = before.documentText
+        let replacement = targetText + " 这里不用说得太满，留白会更好。"
+        guard let targetRange = afterDocument.range(of: targetText) else {
+            XCTFail("Expected the target selection to exist")
+            return
+        }
+        let prefix = String(before.documentText[..<targetRange.lowerBound])
+        let suffix = String(before.documentText[targetRange.upperBound...])
+        afterDocument.replaceSubrange(targetRange, with: replacement)
+        let after = before.withDocumentText(afterDocument)
+
+        let patch = try WritingEditPatch.build(
+            action: .edit,
+            before: before,
+            after: after,
+            selectionText: targetText,
+            userMessage: "请把这段改得更克制一点"
+        )
+
+        let updated = try patch.apply(
+            to: before.documentText,
+            lock: WritingEditLock(
+                action: .edit,
+                lockedSelectionText: targetText,
+                lockedDocumentText: before.documentText
+            )
+        )
+
+        XCTAssertTrue(updated.hasPrefix(prefix))
+        XCTAssertTrue(updated.hasSuffix(suffix))
+        XCTAssertTrue(updated.contains("留白会更好"))
+        XCTAssertTrue(updated.contains(targetText))
+        XCTAssertEqual(updated, afterDocument)
+    }
+
+    func testPatchApplicationRejectsLockMismatchWithoutMutatingDocument() throws {
+        let before = WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot
+        let targetText = before.documentText.components(separatedBy: "\n").first!
+        var afterDocument = before.documentText
+        let replacement = targetText + " 这里不用说得太满，留白会更好。"
+        guard let targetRange = afterDocument.range(of: targetText) else {
+            XCTFail("Expected the target selection to exist")
+            return
+        }
+        let prefix = String(before.documentText[..<targetRange.lowerBound])
+        let suffix = String(before.documentText[targetRange.upperBound...])
+        afterDocument.replaceSubrange(targetRange, with: replacement)
+        let after = before.withDocumentText(afterDocument)
+
+        let patch = try WritingEditPatch.build(
+            action: .edit,
+            before: before,
+            after: after,
+            selectionText: targetText,
+            userMessage: nil
+        )
+
+        let mismatchedLock = WritingEditLock(
+            action: .edit,
+            lockedSelectionText: targetText,
+            lockedDocumentText: "完全不同的正文"
+        )
+
+        do {
+            _ = try patch.apply(to: before.documentText, lock: mismatchedLock)
+            XCTFail("Expected the patch to reject the mismatched lock")
+        } catch let error as WritingEditPatchError {
+            XCTAssertEqual(error, .lockMismatch)
+        }
+
+        XCTAssertTrue(before.documentText.hasPrefix(prefix))
+        XCTAssertTrue(before.documentText.hasSuffix(suffix))
+    }
+
+    func testContinueWritingRejectsNonAppendingResponses() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: NonLocalWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        flow.openProject(project)
+
+        let before = flow.activeProject
+
+        do {
+            try await flow.performWritingAction(
+                .continueWriting,
+                userMessage: "继续往下写",
+                selectionText: nil
+            )
+            XCTFail("Expected the flow to reject the full-document rewrite")
+        } catch {
+            XCTAssertEqual(flow.activeProject.documentText, before.documentText)
+            XCTAssertEqual(flow.activeProject.revisionHistory.count, before.revisionHistory.count)
+            XCTAssertNil(flow.activeEditLock)
+        }
+    }
+
+    func testEditRejectsNonLocalRewriteResponses() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: NonLocalWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        flow.openProject(project)
+        let selectedText = project.documentText.components(separatedBy: "\n").first!
+
+        let before = flow.activeProject
+
+        do {
+            try await flow.performWritingAction(
+                .edit,
+                userMessage: "把这段改得更克制一点",
+                selectionText: selectedText
+            )
+            XCTFail("Expected the flow to reject the non-local patch")
+        } catch {
+            XCTAssertEqual(flow.activeProject.documentText, before.documentText)
+            XCTAssertEqual(flow.activeProject.revisionHistory.count, before.revisionHistory.count)
+            XCTAssertNil(flow.activeEditLock)
+        }
+    }
+
+    func testStartDraftKeepsMatchingPromptInRequestWithoutDuplicatingConversation() async throws {
         let storageURL = try makeTempStorageURL()
         defer {
             try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
@@ -131,7 +623,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         )
 
         let request = await recorder.lastRequest()
-        XCTAssertNil(request?.userMessage)
+        XCTAssertEqual(request?.userMessage, prompt)
 
         let matchingUserMessages = flow.activeProject.conversation.filter {
             $0.role == .user && $0.text == prompt
@@ -139,10 +631,58 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(matchingUserMessages.count, 1)
     }
 
+    func testRenameAndDeleteActiveProjectUseLocalFlowActions() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        let project = WritingProject.entryShell(
+            prompt: "写一个雨夜重逢的小说场景",
+            mode: .collaboration,
+            automationKey: "project.rename.delete"
+        )
+        flow.openProject(project)
+
+        flow.renameActiveProject(to: "雨夜重逢 · 重命名")
+        XCTAssertEqual(flow.activeProject.title, "雨夜重逢 · 重命名")
+        XCTAssertTrue(flow.recentProjects.contains(where: { $0.title == "雨夜重逢 · 重命名" }))
+
+        flow.deleteActiveProject()
+        XCTAssertFalse(flow.recentProjects.contains(where: { $0.id == project.id }))
+    }
+
     private func makeTempStorageURL() throws -> URL {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory.appendingPathComponent("local-project-store.json")
+    }
+
+    @MainActor
+    private func waitUntil(
+        timeout: TimeInterval,
+        pollIntervalNanoseconds: UInt64 = 25_000_000,
+        condition: @escaping () -> Bool
+    ) async -> Bool {
+        let deadline = Date().addingTimeInterval(timeout)
+        while Date() < deadline {
+            if condition() {
+                return true
+            }
+
+            try? await Task.sleep(nanoseconds: pollIntervalNanoseconds)
+        }
+
+        return condition()
+    }
+}
+
+private extension WritingProjectSnapshot {
+    func withDocumentText(_ documentText: String) -> WritingProjectSnapshot {
+        var copy = self
+        copy.documentText = documentText
+        return copy
     }
 }
 
@@ -170,5 +710,24 @@ private struct RecordingWritingAIClient: WritingAIClient {
 private struct ThrowingWritingAIClient: WritingAIClient {
     func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
         throw WritingAIClientError.requestFailed("AI request failed for test")
+    }
+}
+
+private struct NonLocalWritingAIClient: WritingAIClient {
+    func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
+        let snapshot = request.project
+        return WritingAIResponse(
+            assistantMessage: "我已经重新写了一版。",
+            documentText: "完全不同的正文",
+            summary: "整篇重写",
+            intentSummary: snapshot.context.intentSummary,
+            styleConstraints: snapshot.context.styleConstraints,
+            currentGoal: snapshot.context.currentGoal,
+            recentDecisions: snapshot.context.recentDecisions,
+            workingMemory: snapshot.context.workingMemory,
+            nextFocus: snapshot.context.nextFocus,
+            suggestionChips: snapshot.suggestionChips,
+            mode: snapshot.mode
+        )
     }
 }

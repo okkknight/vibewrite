@@ -9,8 +9,11 @@ struct ProjectContext: Codable, Hashable {
     var nextFocus: String
 
     static func discussion(prompt: String) -> ProjectContext {
-        ProjectContext(
-            intentSummary: "用户想先围绕“\(prompt)”达成写作共识，再开始起稿。",
+        let cleanedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let topic = cleanedPrompt.isEmpty ? "当前主题" : "“\(cleanedPrompt)”"
+
+        return ProjectContext(
+            intentSummary: "用户想先围绕\(topic)达成写作共识，再开始起稿。",
             styleConstraints: ["克制", "平静", "非鸡汤"],
             currentGoal: "澄清起稿意图",
             recentDecisions: ["先确认内容类型", "先把语气压低"],
@@ -20,13 +23,16 @@ struct ProjectContext: Codable, Hashable {
     }
 
     static func collaboration(prompt: String) -> ProjectContext {
-        ProjectContext(
-            intentSummary: "围绕“\(prompt)”持续协作，正文会直接写入文档而不是停留在聊天里。",
+        let cleanedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let topic = cleanedPrompt.isEmpty ? "当前写作需求" : "“\(cleanedPrompt)”"
+
+        return ProjectContext(
+            intentSummary: "围绕\(topic)持续协作，正文会直接写入文档而不是停留在聊天里。",
             styleConstraints: ["克制", "平静", "非鸡汤", "避免说教"],
-            currentGoal: "收紧开头",
-            recentDecisions: ["开头不要直白", "情绪不要起太快"],
-            workingMemory: ["当前重点是开头和第一段情绪节奏"],
-            nextFocus: "继续推进第一段"
+            currentGoal: cleanedPrompt.isEmpty ? "等待起稿需求" : "开始起稿",
+            recentDecisions: cleanedPrompt.isEmpty ? ["先输入一句写作需求"] : ["先生成第一稿", "把正文直接写进文档"],
+            workingMemory: cleanedPrompt.isEmpty ? ["当前还没有明确题目"] : ["正文还在生成中", "后续修改会继续围绕当前主线"],
+            nextFocus: cleanedPrompt.isEmpty ? "先补一个起稿需求" : "生成第一稿后继续收紧开头"
         )
     }
 }
@@ -42,6 +48,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
     var conversation: [ConversationMessage] { didSet { touch() } }
     var documentText: String { didSet { touch() } }
     var suggestionChips: [String] { didSet { touch() } }
+    var revisionHistory: [WritingProjectRevision] { didSet { touch() } }
     var updatedAt: Date
 
     init(
@@ -55,6 +62,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         conversation: [ConversationMessage],
         documentText: String,
         suggestionChips: [String],
+        revisionHistory: [WritingProjectRevision] = [],
         updatedAt: Date = .now
     ) {
         self.id = id
@@ -67,55 +75,150 @@ struct WritingProject: Identifiable, Hashable, Codable {
         self.conversation = conversation
         self.documentText = documentText
         self.suggestionChips = suggestionChips
+        self.revisionHistory = revisionHistory
         self.updatedAt = updatedAt
     }
 
+    enum CodingKeys: String, CodingKey {
+        case id
+        case automationKey
+        case title
+        case prompt
+        case mode
+        case summary
+        case context
+        case conversation
+        case documentText
+        case suggestionChips
+        case revisionHistory
+        case updatedAt
+    }
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        id = try container.decode(UUID.self, forKey: .id)
+        automationKey = try container.decode(String.self, forKey: .automationKey)
+        title = try container.decode(String.self, forKey: .title)
+        prompt = try container.decode(String.self, forKey: .prompt)
+        mode = try container.decode(WritingProjectMode.self, forKey: .mode)
+        summary = try container.decode(String.self, forKey: .summary)
+        context = try container.decode(ProjectContext.self, forKey: .context)
+        conversation = try container.decode([ConversationMessage].self, forKey: .conversation)
+        documentText = try container.decode(String.self, forKey: .documentText)
+        suggestionChips = try container.decode([String].self, forKey: .suggestionChips)
+        revisionHistory = try container.decodeIfPresent([WritingProjectRevision].self, forKey: .revisionHistory) ?? []
+        updatedAt = try container.decodeIfPresent(Date.self, forKey: .updatedAt) ?? .now
+    }
+
+    func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        try container.encode(id, forKey: .id)
+        try container.encode(automationKey, forKey: .automationKey)
+        try container.encode(title, forKey: .title)
+        try container.encode(prompt, forKey: .prompt)
+        try container.encode(mode, forKey: .mode)
+        try container.encode(summary, forKey: .summary)
+        try container.encode(context, forKey: .context)
+        try container.encode(conversation, forKey: .conversation)
+        try container.encode(documentText, forKey: .documentText)
+        try container.encode(suggestionChips, forKey: .suggestionChips)
+        try container.encode(revisionHistory, forKey: .revisionHistory)
+        try container.encode(updatedAt, forKey: .updatedAt)
+    }
+
     static func quickStart(prompt: String, mode: WritingProjectMode, automationKey: String? = nil) -> WritingProject {
-        let title = titleFromPrompt(prompt, fallback: mode.defaultTitle)
+        entryShell(prompt: prompt, mode: mode, automationKey: automationKey)
+    }
+
+    static func entryShell(prompt: String = "", mode: WritingProjectMode, automationKey: String? = nil) -> WritingProject {
+        let cleanedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
+        let title = titleFromPrompt(cleanedPrompt, fallback: mode.defaultTitle)
         let now = Date()
 
         switch mode {
         case .discussion:
+            let conversation: [ConversationMessage] = cleanedPrompt.isEmpty
+                ? [
+                    ConversationMessage(role: .assistant, text: "你想写什么类型的内容？", timestamp: "AI · 刚刚")
+                ]
+                : [
+                    ConversationMessage(role: .assistant, text: "你想写什么类型的内容？", timestamp: "AI · 刚刚"),
+                    ConversationMessage(role: .user, text: cleanedPrompt, timestamp: "用户 · 刚刚")
+                ]
+
             return WritingProject(
                 automationKey: automationKey,
                 title: title,
-                prompt: prompt,
+                prompt: cleanedPrompt,
                 mode: mode,
-                summary: "先把方向聊清楚，再生成第一稿",
-                context: .discussion(prompt: prompt),
-                conversation: [
-                    ConversationMessage(role: .assistant, text: "你想写什么类型的内容？", timestamp: "AI · 刚刚"),
-                    ConversationMessage(role: .user, text: prompt, timestamp: "用户 · 刚刚"),
-                    ConversationMessage(role: .assistant, text: "我会先帮你把方向收紧，再开始起稿。", timestamp: "AI · 刚刚")
-                ],
+                summary: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
+                context: .discussion(prompt: cleanedPrompt),
+                conversation: conversation,
                 documentText: "",
-                suggestionChips: ["明确主题", "确认语气", "开始起稿"],
+                suggestionChips: cleanedPrompt.isEmpty ? ["开始起稿", "确认方向", "确认语气"] : ["开始起稿", "确认方向", "确认语气"],
+                revisionHistory: [],
                 updatedAt: now
             )
 
         case .collaboration:
+            let conversation: [ConversationMessage] = cleanedPrompt.isEmpty
+                ? []
+                : [
+                    ConversationMessage(role: .user, text: cleanedPrompt, timestamp: "用户 · 刚刚")
+                ]
+
             return WritingProject(
                 automationKey: automationKey,
                 title: title,
-                prompt: prompt,
+                prompt: cleanedPrompt,
                 mode: mode,
-                summary: "已进入正文协作，正在收紧开头和语气",
-                context: .collaboration(prompt: prompt),
-                conversation: [
-                    ConversationMessage(role: .user, text: prompt, timestamp: "用户 · 刚刚"),
-                    ConversationMessage(role: .assistant, text: "我先把开头收紧一点，让情绪慢慢出来。", timestamp: "AI · 刚刚"),
-                    ConversationMessage(role: .assistant, text: "要不要我继续往下补下一段，也可以先把第二段压低一点。", timestamp: "AI · 刚刚")
-                ],
-                documentText: """
-                成年人真正感到孤独的时候，未必是在深夜。
-                更多时候，是在一个很普通的傍晚，手机亮了又暗，微信里有人说了几句不咸不淡的话，你礼貌地回完，然后突然意识到，自己已经很久没有真正想找谁说话。
-
-                这种孤独并不轰烈，也不尖锐。它不像失去那样有明确的边界，更像是生活在某一刻忽然空了一下，你很清楚它在那里，却又没法把它完整说出来。
-                """,
-                suggestionChips: ["调整语气", "继续展开", "收紧结尾", "降低解释感"],
+                summary: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
+                context: .collaboration(prompt: cleanedPrompt),
+                conversation: conversation,
+                documentText: "",
+                suggestionChips: cleanedPrompt.isEmpty ? ["开始起稿"] : ["继续写", "编辑这段", "补一段"],
+                revisionHistory: [],
                 updatedAt: now
             )
         }
+    }
+
+    mutating func apply(snapshot: WritingProjectSnapshot) {
+        automationKey = snapshot.automationKey
+        title = snapshot.title
+        prompt = snapshot.prompt
+        mode = snapshot.mode
+        summary = snapshot.summary
+        context = snapshot.context
+        conversation = snapshot.conversation
+        documentText = snapshot.documentText
+        suggestionChips = snapshot.suggestionChips
+        updatedAt = snapshot.updatedAt
+    }
+
+    mutating func recordRevision(
+        patch: WritingEditPatch,
+        before: WritingProjectSnapshot,
+        after: WritingProjectSnapshot
+    ) {
+        revisionHistory.append(
+            WritingProjectRevision(
+                patch: patch,
+                before: before,
+                after: after
+            )
+        )
+        touch()
+    }
+
+    mutating func undoLastRevision() -> WritingProjectRevision? {
+        guard let revision = revisionHistory.popLast() else {
+            return nil
+        }
+
+        apply(snapshot: revision.before)
+        touch()
+        return revision
     }
 
     var updatedLabel: String {
@@ -256,20 +359,44 @@ enum WritingProjectMode: String, Hashable, Codable {
 
     var stageTitle: String {
         switch self {
-        case .discussion: return "讨论起稿中"
+        case .discussion: return "起稿中"
         case .collaboration: return "正文协作中"
         }
     }
 
     var stageDescription: String {
         switch self {
-        case .discussion: return "先聊清楚，再生成第一稿"
-        case .collaboration: return "围绕当前正文持续导演"
+        case .discussion: return "正在生成第一稿"
+        case .collaboration: return "围绕灵感持续写作"
         }
     }
 }
 
+enum ProjectShellLayoutMode: Hashable, Codable {
+    case wide
+    case compact
+
+    static let compactThreshold: Double = 1080
+
+    init(windowWidth: Double, forceCompact: Bool = false) {
+        if forceCompact {
+            self = .compact
+        } else {
+            self = windowWidth < Self.compactThreshold ? .compact : .wide
+        }
+    }
+
+    var isCompact: Bool {
+        self == .compact
+    }
+
+    var isWide: Bool {
+        self == .wide
+    }
+}
+
 enum WorkspaceFixtures {
+    // Test/demo fixture only. The app should not bootstrap these projects at startup.
     static func bootstrapProjects(now: Date = .now) -> [WritingProject] {
         [
             WritingProject(
@@ -291,7 +418,7 @@ enum WorkspaceFixtures {
                     ConversationMessage(role: .assistant, text: "我先把开头收紧，并让情绪慢一点出来。", timestamp: "AI · 2 小时前")
                 ],
                 documentText: "成年人真正感到孤独的时候，未必是在深夜。\n更多时候，是在一个很普通的傍晚……",
-                suggestionChips: ["调整语气", "继续展开", "收紧结尾"],
+                suggestionChips: ["继续写", "编辑这段", "补一段"],
                 updatedAt: now.addingTimeInterval(-7200)
             ),
             WritingProject(
@@ -313,7 +440,7 @@ enum WorkspaceFixtures {
                     ConversationMessage(role: .assistant, text: "我会先把场景铺开，再让人物慢慢碰面。", timestamp: "AI · 昨天")
                 ],
                 documentText: "雨声落得很轻，像有人在窗外慢慢敲着什么。\n她站在门口的时候，外套上还沾着一点潮气。",
-                suggestionChips: ["继续展开", "压低情绪", "补一段对白"],
+                suggestionChips: ["继续写", "编辑这段", "补一段"],
                 updatedAt: now.addingTimeInterval(-86400)
             ),
             WritingProject(
@@ -335,12 +462,13 @@ enum WorkspaceFixtures {
                     ConversationMessage(role: .user, text: "更像整理后的表达，但不要太满。", timestamp: "用户 · 昨天")
                 ],
                 documentText: "",
-                suggestionChips: ["明确语气", "确认保留内容", "开始起稿"],
+                suggestionChips: ["开始起稿", "确认方向", "确认语气"],
                 updatedAt: now.addingTimeInterval(-90000)
             )
         ]
     }
 
+    // Test/demo fixture only. Keep the content out of the normal startup path.
     static let inspirationPrompts: [String] = [
         "写一篇关于成年人孤独感的公众号文章",
         "写一个雨夜重逢的小说场景",

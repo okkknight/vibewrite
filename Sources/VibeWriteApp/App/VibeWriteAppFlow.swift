@@ -1,52 +1,83 @@
 import Foundation
+import AppKit
+import UniformTypeIdentifiers
 import SwiftUI
 
 @MainActor
 final class VibeWriteAppFlow: ObservableObject {
-    @Published var screen: AppScreen
     @Published private(set) var projects: [WritingProject]
     @Published private(set) var activeProjectID: UUID?
     @Published private(set) var isAIRequestInFlight = false
+    @Published private(set) var activeEditLock: WritingEditLock?
     @Published private(set) var aiErrorMessage: String?
+    @Published private(set) var currentDocumentURL: URL?
+    @Published private(set) var recentDocumentEntries: [RecentDocumentEntry]
 
-    private let store: LocalProjectStore
+    private let recentDocumentStore: RecentDocumentStore
     private let aiClient: any WritingAIClient
+    private let streamingConfiguration: WritingStreamingConfiguration
+    private let emptyProjectShell: WritingProject
+    private var savedDocumentContents: String?
 
     init(
         storageURL: URL? = nil,
         fileManager: FileManager = .default,
-        now: @escaping () -> Date = Date.init,
         aiClient: (any WritingAIClient)? = nil,
-        aiConfiguration: WritingAIConfiguration = .current()
+        aiConfiguration: WritingAIConfiguration = .current(),
+        streamingConfiguration: WritingStreamingConfiguration = .current(),
+        forceBlankStartup: Bool = false
     ) {
-        let environmentStorageURL = ProcessInfo.processInfo.environment["VIBEWRITE_STORAGE_URL"].flatMap {
+        let environmentStorageURL = forceBlankStartup ? nil : ProcessInfo.processInfo.environment["VIBEWRITE_STORAGE_URL"].flatMap {
             URL(fileURLWithPath: $0)
         }
-        let resolvedStore = LocalProjectStore(
-            storageURL: storageURL ?? environmentStorageURL ?? LocalProjectStore.defaultStorageURL(fileManager: fileManager),
+        let shouldResetStorage = ProcessInfo.processInfo.environment["VIBEWRITE_UI_TEST_RESET_STORAGE"] == "1"
+        let resolvedStore = RecentDocumentStore(
+            storageURL: storageURL ?? environmentStorageURL ?? RecentDocumentStore.defaultStorageURL(fileManager: fileManager),
             fileManager: fileManager
         )
-        self.store = resolvedStore
+        self.recentDocumentStore = resolvedStore
         self.aiClient = aiClient ?? WritingAIClientFactory.makeDefaultClient(configuration: aiConfiguration)
+        self.streamingConfiguration = streamingConfiguration
+        self.emptyProjectShell = WritingProject.entryShell(mode: .collaboration)
+        self.recentDocumentEntries = resolvedStore.load()
 
-        if let snapshot = resolvedStore.load(), !snapshot.projects.isEmpty {
-            self.projects = snapshot.projects
-            let restoredProjectID = snapshot.lastOpenedProjectID.flatMap { candidate in
-                snapshot.projects.contains(where: { $0.id == candidate }) ? candidate : nil
-            }
-            self.activeProjectID = restoredProjectID ?? snapshot.projects.first?.id
-            self.screen = restoredProjectID == nil ? .home : .project
-        } else {
-            let seededProjects = WorkspaceFixtures.bootstrapProjects(now: now())
-            self.projects = seededProjects
+        if forceBlankStartup || shouldResetStorage {
+            self.projects = []
             self.activeProjectID = nil
-            self.screen = .home
-            resolvedStore.save(projects: seededProjects, lastOpenedProjectID: nil)
+            resolvedStore.clear()
+            self.recentDocumentEntries = []
+            self.savedDocumentContents = nil
+            self.currentDocumentURL = nil
+        } else {
+            self.projects = []
+            self.activeProjectID = nil
+            self.savedDocumentContents = nil
+            self.currentDocumentURL = nil
         }
     }
 
     var recentProjects: [WritingProject] {
         projects.sorted { $0.updatedAt > $1.updatedAt }
+    }
+
+    var currentDocumentFileText: String {
+        VibeWriteMarkdownDocument(project: activeProject).renderedText()
+    }
+
+    var isCurrentDocumentDirty: Bool {
+        if currentDocumentURL != nil {
+            return currentDocumentFileText != savedDocumentContents
+        }
+
+        guard !projects.isEmpty else {
+            return false
+        }
+
+        guard let savedDocumentContents else {
+            return true
+        }
+
+        return currentDocumentFileText != savedDocumentContents
     }
 
     var activeProject: WritingProject {
@@ -59,8 +90,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 return firstProject
             }
 
-            let fallbackProject = WorkspaceFixtures.bootstrapProjects(now: .now).first!
-            return fallbackProject
+            return emptyProjectShell
         }
         set {
             setActiveProject(newValue)
@@ -71,59 +101,103 @@ final class VibeWriteAppFlow: ObservableObject {
         Binding(
             get: { [weak self] in
                 guard let self else {
-                    return WorkspaceFixtures.bootstrapProjects(now: .now).first!
+                    return WritingProject.entryShell(mode: .collaboration)
                 }
                 return self.activeProject
             },
             set: { [weak self] updatedProject in
-                self?.setActiveProject(updatedProject)
+                self?.replaceActiveProject(updatedProject, persist: false)
             }
         )
     }
 
     func openProject(_ project: WritingProject) {
-        setActiveProject(project)
-        screen = .project
-        persist()
+        replaceActiveProject(project, persist: false)
     }
 
     func createNewProject() {
-        let project = WritingProject.quickStart(
-            prompt: "写一篇关于成年人孤独感的公众号文章",
-            mode: .collaboration,
-            automationKey: "project.quickstart.default"
-        )
-        openProject(project)
-        Task { [weak self] in
-            guard let self else { return }
-            try? await self.performWritingAction(
-                .startDraft,
-                userMessage: project.prompt,
-                selectionText: nil
-            )
+        guard confirmDiscardCurrentChangesIfNeeded() else {
+            return
         }
+
+        let project = WritingProject.entryShell(
+            prompt: "",
+            mode: .collaboration,
+            automationKey: "project.new.blank"
+        )
+        currentDocumentURL = nil
+        savedDocumentContents = VibeWriteMarkdownDocument(project: project).renderedText()
+        openProject(project)
     }
 
-    func startQuickDraft(prompt: String, mode: WritingProjectMode) {
-        let project = WritingProject.quickStart(
+    func startQuickDraft(prompt: String, mode: WritingProjectMode) async {
+        guard confirmDiscardCurrentChangesIfNeeded() else {
+            return
+        }
+
+        let project = WritingProject.entryShell(
             prompt: prompt,
             mode: mode,
             automationKey: "project.quickstart.\(mode.rawValue)"
         )
+        currentDocumentURL = nil
+        savedDocumentContents = VibeWriteMarkdownDocument(project: project).renderedText()
         openProject(project)
-        Task { [weak self] in
-            guard let self else { return }
-            try? await self.performWritingAction(
+        guard mode == .collaboration else { return }
+
+        do {
+            try await performWritingAction(
                 .startDraft,
                 userMessage: prompt,
                 selectionText: nil
             )
+        } catch {
+            return
         }
     }
 
-    func returnHome() {
-        screen = .home
-        persist()
+    func renameActiveProject(to newTitle: String) {
+        let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else { return }
+
+        var updatedProject = activeProject
+        updatedProject.title = trimmed
+        activeProject = updatedProject
+    }
+
+    func deleteActiveProject() {
+        guard let currentProjectID = activeProjectID,
+              let index = projects.firstIndex(where: { $0.id == currentProjectID }) else {
+            return
+        }
+
+        var updatedProjects = projects
+        updatedProjects.remove(at: index)
+        projects = updatedProjects
+        activeProjectID = nil
+    }
+
+    func resetLocalData() {
+        recentDocumentStore.clear()
+        recentDocumentEntries = []
+        projects = []
+        activeProjectID = nil
+        currentDocumentURL = nil
+        savedDocumentContents = nil
+        activeEditLock = nil
+        aiErrorMessage = nil
+        isAIRequestInFlight = false
+    }
+
+    @discardableResult
+    func undoLastRevision() -> WritingProjectRevision? {
+        var project = activeProject
+        guard let revision = project.undoLastRevision() else {
+            return nil
+        }
+
+        activeProject = project
+        return revision
     }
 
     func performWritingAction(
@@ -136,17 +210,40 @@ final class VibeWriteAppFlow: ObservableObject {
         }
 
         isAIRequestInFlight = true
+        activeEditLock = WritingEditLock(
+            action: action,
+            lockedSelectionText: selectionText,
+            lockedDocumentText: activeProject.documentText
+        )
         aiErrorMessage = nil
         defer {
             isAIRequestInFlight = false
+            activeEditLock = nil
         }
 
         let project = activeProject
         let requestUserMessage = requestUserMessage(
             for: action,
-            userMessage: userMessage,
-            project: project
+            userMessage: userMessage
         )
+
+        let normalizedSelectionText: String? = {
+            guard let trimmed = selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !trimmed.isEmpty else {
+                return nil
+            }
+
+            return trimmed
+        }()
+        if action == .edit {
+            guard let normalizedSelectionText else {
+                throw WritingEditPatchError.missingSelection
+            }
+
+            guard project.documentText.range(of: normalizedSelectionText) != nil else {
+                throw WritingEditPatchError.patchContextMismatch
+            }
+        }
 
         let request = WritingAIRequest(
             action: action,
@@ -156,19 +253,89 @@ final class VibeWriteAppFlow: ObservableObject {
         )
 
         do {
-            let response = try await aiClient.generateResponse(for: request)
-            var updatedProject = project
+            let beforeSnapshot = project.aiSnapshot
+            var liveProject = project
+            let clientType = String(describing: type(of: aiClient))
+            VibeWriteLog.ai.info(
+                "Flow sending AI request client=\(clientType, privacy: .public) action=\(action.rawValue, privacy: .public) projectTitle=\(project.title, privacy: .public) promptPreview=\(requestUserMessage?.vibewriteLogPreview(maxLength: 80) ?? "", privacy: .public)"
+            )
             if let requestUserMessage {
-                updatedProject.appendUserMessage(requestUserMessage)
+                let alreadyHasMatchingUserMessage = action == .startDraft && project.conversation.contains { message in
+                    message.role == .user && message.text.trimmingCharacters(in: .whitespacesAndNewlines) == requestUserMessage
+                }
+
+                if !alreadyHasMatchingUserMessage {
+                    liveProject.appendUserMessage(requestUserMessage)
+                }
+
                 if action == .startDraft {
-                    updatedProject.prompt = requestUserMessage
+                    liveProject.prompt = requestUserMessage
                 }
             }
-            updatedProject.apply(aiResponse: response)
-            activeProject = updatedProject
-            screen = .project
-            persist()
+            liveProject.summary = streamingSummary(for: action)
+            replaceActiveProject(liveProject, persist: false)
+
+            var streamedText = ""
+            let previewRenderer = WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
+                liveProject.documentText = renderedText
+                self.replaceActiveProject(liveProject, persist: false)
+            }
+            let revealFromCharacterCount = action == .continueWriting ? beforeSnapshot.documentText.count : 0
+            var finalResponse: WritingAIResponse?
+            for try await event in aiClient.streamResponse(for: request) {
+                switch event {
+                case .textDelta(let delta):
+                    streamedText += delta
+                    previewRenderer.updateTargetText(
+                        previewDocumentText(
+                            for: action,
+                            baseDocumentText: beforeSnapshot.documentText,
+                            selectionText: normalizedSelectionText,
+                            streamedText: streamedText
+                        ),
+                        revealFromCharacterCount: revealFromCharacterCount
+                    )
+
+                case .completed(let response):
+                    finalResponse = response
+                }
+            }
+
+            previewRenderer.flushRemaining()
+
+            guard let response = finalResponse else {
+                throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
+            }
+            let patch = try WritingEditPatch.build(
+                action: action,
+                before: beforeSnapshot,
+                after: response.snapshotByApplyingDocumentText(response.documentText, to: beforeSnapshot),
+                selectionText: normalizedSelectionText,
+                userMessage: requestUserMessage
+            )
+            let updatedDocumentText = try patch.apply(
+                to: beforeSnapshot.documentText,
+                lock: activeEditLock
+            )
+            liveProject.apply(aiResponse: response, documentText: updatedDocumentText)
+            liveProject.recordRevision(
+                patch: patch,
+                before: beforeSnapshot,
+                after: liveProject.aiSnapshot
+            )
+            VibeWriteLog.ai.notice(
+                "Flow completed AI request action=\(action.rawValue, privacy: .public) finalDocumentPreview=\(liveProject.documentText.vibewriteLogPreview(maxLength: 120), privacy: .public)"
+            )
+            replaceActiveProject(liveProject, persist: false)
+            if currentDocumentURL != nil {
+                savedDocumentContents = currentDocumentFileText
+                recordRecentDocument(url: currentDocumentURL!, title: liveProject.title)
+            }
         } catch {
+            VibeWriteLog.ai.error(
+                "Flow AI request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            replaceActiveProject(project, persist: false)
             aiErrorMessage = error.localizedDescription
             throw error
         }
@@ -176,48 +343,221 @@ final class VibeWriteAppFlow: ObservableObject {
 
     private func requestUserMessage(
         for action: WritingAIAction,
-        userMessage: String?,
-        project: WritingProject
+        userMessage: String?
     ) -> String? {
         let trimmedUserMessage = userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let trimmedUserMessage, !trimmedUserMessage.isEmpty else {
             return nil
         }
 
-        if action == .startDraft {
-            let trimmedProjectPrompt = project.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-            if trimmedUserMessage == trimmedProjectPrompt {
-                return nil
-            }
-        }
-
         return trimmedUserMessage
     }
 
     private func setActiveProject(_ project: WritingProject) {
-        upsert(project)
-        activeProjectID = project.id
-        persist()
+        replaceActiveProject(project, persist: false)
     }
 
-    private func upsert(_ project: WritingProject) {
-        if let index = projects.firstIndex(where: { $0.id == project.id }) {
-            projects[index] = project
-        } else {
-            projects.append(project)
+    private func replaceActiveProject(_ project: WritingProject, persist: Bool) {
+        if let currentProject = self.project(for: project.id), currentProject == project, activeProjectID == project.id {
+            return
         }
+
+        projects = [project]
+        activeProjectID = project.id
     }
 
     private func project(for id: UUID) -> WritingProject? {
         projects.first(where: { $0.id == id })
     }
 
-    private func persist() {
-        store.save(projects: projects, lastOpenedProjectID: activeProjectID)
-    }
-}
+    private func previewDocumentText(
+        for action: WritingAIAction,
+        baseDocumentText: String,
+        selectionText: String?,
+        streamedText: String
+    ) -> String {
+        switch action {
+        case .startDraft:
+            return streamedText
 
-enum AppScreen: Hashable {
-    case home
-    case project
+        case .continueWriting:
+            return baseDocumentText + streamedText
+
+        case .edit:
+            guard let selectionText,
+                  let targetRange = baseDocumentText.range(of: selectionText) else {
+                return baseDocumentText
+            }
+
+            var preview = baseDocumentText
+            preview.replaceSubrange(targetRange, with: streamedText)
+            return preview
+        }
+    }
+
+    private func streamingSummary(for action: WritingAIAction) -> String {
+        switch action {
+        case .startDraft:
+            return "正在生成第一稿"
+        case .continueWriting:
+            return "正在续写下一段"
+        case .edit:
+            return "正在局部 patch"
+        }
+    }
+
+    func saveCurrentDocument() -> Bool {
+        if let currentDocumentURL {
+            return saveCurrentDocument(to: currentDocumentURL)
+        }
+
+        return saveCurrentDocumentAs()
+    }
+
+    func saveCurrentDocumentAs() -> Bool {
+        let panel = NSSavePanel()
+        panel.canCreateDirectories = true
+        panel.nameFieldStringValue = saveFileNameSuggestion()
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "md") ?? .plainText,
+            UTType(filenameExtension: "markdown") ?? .plainText
+        ]
+        panel.title = "保存写作文件"
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return false
+        }
+
+        return saveCurrentDocument(to: url)
+    }
+
+    func saveCurrentDocument(to url: URL) -> Bool {
+        let document = VibeWriteMarkdownDocument(project: activeProject)
+        let renderedText = document.renderedText()
+
+        do {
+            try ensureDocumentParentDirectoryExists(for: url)
+            try renderedText.write(to: url, atomically: true, encoding: .utf8)
+            currentDocumentURL = url
+            savedDocumentContents = renderedText
+            recordRecentDocument(url: url, title: activeProject.title)
+            return true
+        } catch {
+            aiErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func openDocumentFromPanel() -> Bool {
+        guard confirmDiscardCurrentChangesIfNeeded() else {
+            return false
+        }
+
+        let panel = NSOpenPanel()
+        panel.canChooseFiles = true
+        panel.canChooseDirectories = false
+        panel.allowsMultipleSelection = false
+        panel.allowedContentTypes = [
+            UTType(filenameExtension: "md") ?? .plainText,
+            UTType(filenameExtension: "markdown") ?? .plainText
+        ]
+        panel.title = "打开写作文件"
+
+        guard panel.runModal() == .OK, let url = panel.url else {
+            return false
+        }
+
+        return openDocument(at: url)
+    }
+
+    func openDocument(at url: URL) -> Bool {
+        do {
+            let rawText = try String(contentsOf: url, encoding: .utf8)
+            let parsedDocument = VibeWriteMarkdownDocument.parse(
+                from: rawText,
+                fallbackTitle: url.deletingPathExtension().lastPathComponent,
+                fallbackAutomationKey: url.deletingPathExtension().lastPathComponent
+            )
+            let project = parsedDocument.makeProject(
+                fallbackTitle: url.deletingPathExtension().lastPathComponent,
+                fallbackAutomationKey: url.deletingPathExtension().lastPathComponent
+            )
+            currentDocumentURL = url
+            savedDocumentContents = rawText
+            openProject(project)
+            recordRecentDocument(url: url, title: project.title)
+            return true
+        } catch {
+            aiErrorMessage = error.localizedDescription
+            return false
+        }
+    }
+
+    func openRecentDocument(_ entry: RecentDocumentEntry) -> Bool {
+        guard confirmDiscardCurrentChangesIfNeeded() else {
+            return false
+        }
+
+        return openDocument(at: entry.url)
+    }
+
+    private func recordRecentDocument(url: URL, title: String) {
+        let entry = RecentDocumentEntry(
+            url: url,
+            title: title,
+            lastOpenedAt: .now
+        )
+
+        var updatedEntries = recentDocumentEntries.filter { $0.url != url }
+        updatedEntries.insert(entry, at: 0)
+        recentDocumentEntries = updatedEntries
+        recentDocumentStore.save(entries: updatedEntries)
+    }
+
+    private func saveFileNameSuggestion() -> String {
+        let cleanedTitle = activeProject.title
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .replacingOccurrences(of: "/", with: "-")
+
+        if cleanedTitle.isEmpty {
+            return "未命名写作.md"
+        }
+
+        if cleanedTitle.hasSuffix(".md") || cleanedTitle.hasSuffix(".markdown") {
+            return cleanedTitle
+        }
+
+        return cleanedTitle + ".md"
+    }
+
+    private func ensureDocumentParentDirectoryExists(for url: URL) throws {
+        let parentDirectory = url.deletingLastPathComponent()
+        if FileManager.default.fileExists(atPath: parentDirectory.path) {
+            return
+        }
+
+        try FileManager.default.createDirectory(at: parentDirectory, withIntermediateDirectories: true)
+    }
+
+    private func confirmDiscardCurrentChangesIfNeeded() -> Bool {
+        guard isCurrentDocumentDirty else {
+            return true
+        }
+
+        let alert = NSAlert()
+        alert.messageText = "要保存更改吗？"
+        alert.informativeText = "当前写作内容还没有保存。要先保存再继续吗？"
+        alert.addButton(withTitle: "保存")
+        alert.addButton(withTitle: "不保存")
+        alert.addButton(withTitle: "取消")
+
+        switch alert.runModal() {
+        case .alertFirstButtonReturn:
+            return saveCurrentDocument()
+        case .alertSecondButtonReturn:
+            return true
+        default:
+            return false
+        }
+    }
 }
