@@ -10,6 +10,7 @@ struct ProjectComposerBar: View {
     let isComposerLocked: Bool
     let isRequestInFlight: Bool
     let messageFieldFocused: FocusState<Bool>.Binding
+    let isMessageFieldHighlighted: Bool
     let accessibilityIdentifier: String
     let messageInputIdentifier: String
     let sendButtonIdentifier: String
@@ -56,13 +57,13 @@ struct ProjectComposerBar: View {
                     .padding(.trailing, 8)
                     .background {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.vibeCanvasLift.opacity(isComposerLocked ? 0.66 : 0.82))
+                            .fill(Color.vibeCanvasLift.opacity(backgroundOpacity))
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                                     .fill(
                                         LinearGradient(
                                             colors: [
-                                                Color.white.opacity(isComposerLocked ? 0.008 : 0.014),
+                                                Color.white.opacity(gradientOpacity),
                                                 .clear
                                             ],
                                             startPoint: .topLeading,
@@ -73,8 +74,9 @@ struct ProjectComposerBar: View {
                             )
                             .overlay(
                                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(Color.vibeCanvasStroke.opacity(isComposerLocked ? 0.48 : 0.68), lineWidth: 1)
+                                    .strokeBorder(Color.vibeCanvasStroke.opacity(strokeOpacity), lineWidth: 1)
                             )
+                            .shadow(color: highlightShadowColor, radius: highlightShadowRadius, x: 0, y: 0)
                     }
                     .foregroundStyle(isComposerLocked ? Color.vibeCanvasInkMuted : Color.vibeCanvasInk)
                     .disabled(isComposerLocked)
@@ -136,6 +138,38 @@ struct ProjectComposerBar: View {
                 .shadow(color: Color.black.opacity(0.20), radius: 16, x: 0, y: 9)
         }
         .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var backgroundOpacity: Double {
+        if isComposerLocked {
+            return 0.66
+        }
+
+        return isMessageFieldHighlighted ? 0.90 : 0.82
+    }
+
+    private var gradientOpacity: Double {
+        if isComposerLocked {
+            return 0.008
+        }
+
+        return isMessageFieldHighlighted ? 0.022 : 0.014
+    }
+
+    private var strokeOpacity: Double {
+        if isComposerLocked {
+            return 0.48
+        }
+
+        return isMessageFieldHighlighted ? 0.86 : 0.68
+    }
+
+    private var highlightShadowColor: Color {
+        isMessageFieldHighlighted && !isComposerLocked ? Color.vibeCanvasAccent.opacity(0.18) : .clear
+    }
+
+    private var highlightShadowRadius: CGFloat {
+        isMessageFieldHighlighted && !isComposerLocked ? 10 : 0
     }
 
     private var normalizedAssistantNextFocus: String? {

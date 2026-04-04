@@ -13,6 +13,7 @@ struct WritingProjectView: View {
     @State private var selectionPopoverOrigin: CGPoint?
     @State private var selectionPopoverPendingPreset: SelectionEditPreset?
     @State private var isSelectionCustomInputActive = false
+    @State private var isSelectionCustomInputHighlighted = false
     @State private var showComparison = false
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
@@ -55,6 +56,7 @@ struct WritingProjectView: View {
             selectionPopoverOrigin = nil
             selectionPopoverPendingPreset = nil
             isSelectionCustomInputActive = false
+            isSelectionCustomInputHighlighted = false
             showComparison = false
             showAssistantLayer = false
             showHistoryLayer = false
@@ -463,6 +465,7 @@ struct WritingProjectView: View {
             isComposerLocked: isComposerLocked,
             isRequestInFlight: flow.isAIRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
+            isMessageFieldHighlighted: isSelectionCustomInputHighlighted,
             accessibilityIdentifier: VibeWriteAutomationID.projectComposerBar,
             messageInputIdentifier: VibeWriteAutomationID.projectMessageInput,
             sendButtonIdentifier: VibeWriteAutomationID.projectSendButton,
@@ -583,6 +586,7 @@ struct WritingProjectView: View {
 
         selectionPopoverPendingPreset = nil
         isSelectionCustomInputActive = true
+        flashSelectionCustomInputHighlight()
         isComposerLocked = false
         DispatchQueue.main.async {
             messageFieldFocused = true
@@ -690,6 +694,16 @@ struct WritingProjectView: View {
     private func resetSelectionEditUIState() {
         selectionPopoverPendingPreset = nil
         isSelectionCustomInputActive = false
+        isSelectionCustomInputHighlighted = false
+    }
+
+    private func flashSelectionCustomInputHighlight() {
+        isSelectionCustomInputHighlighted = true
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.18) {
+            if isSelectionCustomInputActive {
+                isSelectionCustomInputHighlighted = false
+            }
+        }
     }
 
     private func retryLastChange() {
