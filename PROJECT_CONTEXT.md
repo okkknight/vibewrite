@@ -11,6 +11,9 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
+- The latest committed change is `9a35b2c`, which adds repo-level ignore rules for local Xcode artifacts and workspace state so those files do not get staged accidentally.
+- `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
+- The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and the editor follows the document end during AI streaming so the output feels fast without turning into big bursty jumps.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
 - The app has switched to a file-first document model: Markdown files carry a compact YAML-style metadata block plus正文, the header title is directly editable, `Cmd+O` / `Cmd+S` / `Cmd+Shift+S` now live in the File menu, and context recovery never blocks writing even if metadata is missing or malformed.
@@ -79,6 +82,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 ## Runtime notes
 - `VIBEWRITE_UI_TEST_RESET_STORAGE=1` resets the app's own container-local store for UI runs.
 - `--clean-launch` and `VIBEWRITE_FORCE_BLANK_STARTUP=1` still force a blank start for acceptance runs.
+- Keep local Xcode-generated files, `Config/VibeWrite.local.xcconfig`, and user workspace state out of commits; `.gitignore` now covers them, but double-check before staging if the repo status looks noisy.
 - Avoid adding UI-test waits that depend on app idle or repeated `exists` / snapshot polling around the editor bridge; that was the area that hid the real hang.
 - If you touch `SelectableTextEditor` or the AI writeback path, rerun the targeted UI test before assuming the post-submit flow is safe.
 - If you touch the start-draft request assembly again, make sure the prompt is still passed to the AI request once and is not silently dropped by dedup logic.

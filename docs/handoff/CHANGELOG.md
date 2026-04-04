@@ -1,6 +1,14 @@
 # Changelog
 
 ## 2026-04-04
+- The selection popover issue was narrowed to the AppKit bridge: `SelectableTextEditor` no longer writes a nil desired selection back into the text view during update sync, so a live user selection can stabilize instead of being cleared during layout churn.
+- The change keeps the rest of the selection/edit flow intact; only the selection-clearing branch in the bridge was removed.
+
+## 2026-04-04
+- The repo now ignores local Xcode artifacts, workspace user state, and `Config/VibeWrite.local.xcconfig` so those files stay out of future commits.
+- The local-only `Config/VibeWrite.local.xcconfig` still carries the real `MINIMAX_API_KEY`, which is intentionally not committed and should be treated as a machine-specific secret.
+
+## 2026-04-04
 - The selection edit popover now anchors to the selected正文 region instead of staying fixed in the upper-right corner of the page. The change only touches the selection-positioning path; the edit and continue actions keep their previous behavior.
 - Follow-up correction: selection changes now update the popover even when the editor is not currently editable, and the y-position math now uses the scroll-view's top-left coordinate system directly so the popover stays in view.
 - Root-cause follow-up: the popover was still not appearing because the AppKit bridge was clearing the user's live selection during layout/update sync when the binding was nil. The selection sync now only clears the editor selection after a real mirrored selection existed, which lets the non-empty selection stabilize.

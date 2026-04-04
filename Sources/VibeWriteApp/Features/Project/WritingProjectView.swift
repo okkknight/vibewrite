@@ -104,8 +104,8 @@ struct WritingProjectView: View {
         VStack(spacing: 0) {
             projectHeader
                 .padding(.horizontal, 22)
-                .padding(.top, 16)
-                .padding(.bottom, 12)
+                .padding(.top, 10)
+                .padding(.bottom, 8)
 
             writingBodyPane(topPadding: 26, bottomPadding: 18)
 
@@ -135,8 +135,8 @@ struct WritingProjectView: View {
         VStack(spacing: 0) {
             projectHeader
                 .padding(.horizontal, shellLayoutMode.isCompact ? 18 : 22)
-                .padding(.top, shellLayoutMode.isCompact ? 12 : 16)
-                .padding(.bottom, shellLayoutMode.isCompact ? 10 : 12)
+                .padding(.top, shellLayoutMode.isCompact ? 10 : 10)
+                .padding(.bottom, shellLayoutMode.isCompact ? 8 : 8)
 
             writingBodyPane(
                 topPadding: shellLayoutMode.isCompact ? 22 : 28,
@@ -178,7 +178,7 @@ struct WritingProjectView: View {
 
     private var projectHeader: some View {
         ZStack(alignment: .center) {
-            VStack(spacing: 2) {
+            VStack(spacing: 4) {
                 TextField("未命名写作", text: projectBinding.title)
                     .font(.system(size: 17, weight: .semibold, design: .default))
                     .foregroundStyle(Color.vibeCanvasInk)
@@ -227,7 +227,7 @@ struct WritingProjectView: View {
             }
         }
         .padding(.horizontal, shellLayoutMode.isCompact ? 12 : 16)
-        .padding(.vertical, shellLayoutMode.isCompact ? 5 : 6)
+        .padding(.vertical, 2)
     }
 
     private var statusSubtitle: some View {
@@ -235,8 +235,9 @@ struct WritingProjectView: View {
             Text(projectStatusSubtitleText)
                 .font(.system(size: 11.5, weight: .medium, design: .default))
                 .foregroundStyle(Color.vibeCanvasInkSoft)
-                .lineLimit(1)
+                .lineLimit(2)
                 .truncationMode(.tail)
+                .multilineTextAlignment(.center)
 
             if flow.isAIRequestInFlight {
                 ThinkingDots()
@@ -422,7 +423,7 @@ struct WritingProjectView: View {
         case .continueWriting:
             return "继续写"
         case .edit:
-            return "编辑这段"
+            return "润色此处"
         }
     }
 
@@ -714,7 +715,7 @@ private struct SelectionPopover: View {
 
             HStack(spacing: 8) {
                 ActionChip(
-                    "编辑这段",
+                    "润色此处",
                     tint: .vibeCanvasAccent,
                     accessibilityIdentifier: VibeWriteAutomationID.projectEditSelectionButton
                 ) {

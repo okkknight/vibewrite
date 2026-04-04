@@ -32,6 +32,9 @@ This directory is the compact handoff layer for VibeWrite.
 
 ## Current state
 - V2 docs remain the source of truth; `docs/V1/` is archival only.
+- The latest repo commit is `9a35b2c`, which adds ignore rules for local Xcode artifacts and workspace state so they do not get staged by accident.
+- `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
+- The selection popover bridge was narrowed so update sync no longer clears a live NSTextView selection when the SwiftUI binding is nil, which lets the non-empty selection stabilize for popover display.
 - Streaming正文 preview now uses a dedicated playback renderer: the first visible chunk is emitted immediately, later deltas are revealed on a frame-paced cadence, and the editor auto-scrolls to the document end while AI is actively streaming.
 - The流式 cadence is code-configurable through `WritingStreamingConfiguration` plus the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`, so we can tune the feel without scattering constants through the app.
 - The app now saves and opens user work as Markdown files with a compact metadata block. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad metadata never blocks正文 editing.
@@ -58,6 +61,7 @@ This directory is the compact handoff layer for VibeWrite.
 - `swift test` now passes with the file-based document flow and menu commands in place.
 - The remaining open issues are the later UI-test rail assertion and the layout/semantics work that still needs review outside this prompt-loss fix.
 - The latest resize regression is now handled at the editor bridge: the正文 editor keeps a stable identity across compact/wide shell switches and refreshes its AppKit layout geometry so shrinking and re-expanding the window does not leave the document visually blank.
+- Local Xcode-generated files and user workspace state are now ignored in git; double-check that only source, docs, and intended assets are staged before committing.
 - Keep `PROJECT_CONTEXT.md` as the primary source of truth and `CHANGELOG.md` as the append-only history.
 - The app no longer synthesizes fallback next-step suggestions when the model omits metadata: `summary`, `nextFocus`, and `suggestionChips` now stay empty unless the remote response provides them, and the sidebar/composer render only real model output.
 - Runtime AI logs now record whether completion metadata was actually parsed, along with the parsed summary/next-focus/suggestion counts, so the next real request can confirm whether the remote model is returning suggestions or the UI is simply receiving an empty block.
