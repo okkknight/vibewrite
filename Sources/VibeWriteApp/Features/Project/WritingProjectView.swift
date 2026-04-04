@@ -827,29 +827,28 @@ private struct SelectionPopover: View {
                 }
             }
 
-            LazyVGrid(
-                columns: [GridItem(.adaptive(minimum: 72), spacing: 8, alignment: .leading)],
-                alignment: .leading,
-                spacing: 8
-            ) {
-                ForEach(SelectionEditPreset.allCases, id: \.self) { preset in
-                    SelectionPopoverChip(
-                        title: preset.title,
-                        isActive: pendingPreset == preset,
-                        isDisabled: isRequestInFlight,
-                        accessibilityIdentifier: preset.accessibilityIdentifier
-                    ) {
-                        onPresetTap(preset)
+            ScrollView(.horizontal, showsIndicators: false) {
+                HStack(alignment: .center, spacing: 8) {
+                    ForEach(SelectionEditPreset.allCases, id: \.self) { preset in
+                        SelectionPopoverChip(
+                            title: preset.title,
+                            isActive: pendingPreset == preset,
+                            isDisabled: isRequestInFlight,
+                            accessibilityIdentifier: preset.accessibilityIdentifier
+                        ) {
+                            onPresetTap(preset)
+                        }
                     }
-                }
 
-                SelectionPopoverChip(
-                    title: "自定义",
-                    isActive: isCustomInputActive,
-                    isDisabled: isRequestInFlight,
-                    accessibilityIdentifier: VibeWriteAutomationID.projectSelectionCustomButton,
-                    action: onCustomTap
-                )
+                    SelectionPopoverChip(
+                        title: "自定义",
+                        isActive: isCustomInputActive,
+                        isDisabled: isRequestInFlight,
+                        accessibilityIdentifier: VibeWriteAutomationID.projectSelectionCustomButton,
+                        action: onCustomTap
+                    )
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
             }
         }
         .padding(.vertical, 8)
@@ -899,20 +898,16 @@ private struct SelectionPopoverChip: View {
     var body: some View {
         Button(action: action) {
             Text(title)
-                .font(.system(size: 12, weight: .semibold, design: .default))
+                .font(.system(size: 11.2, weight: .medium, design: .default))
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: true, vertical: false)
                 .foregroundStyle(foregroundColor)
-                .padding(.vertical, 7)
-                .padding(.horizontal, 12)
+                .padding(.vertical, 6)
+                .padding(.horizontal, 10)
                 .background {
                     Capsule(style: .continuous)
                         .fill(backgroundColor)
-                }
-                .overlay {
-                    Capsule(style: .continuous)
-                        .strokeBorder(borderColor, lineWidth: 1)
                 }
         }
         .buttonStyle(.plain)
@@ -922,15 +917,11 @@ private struct SelectionPopoverChip: View {
     }
 
     private var foregroundColor: Color {
-        isActive ? .vibeCanvasInk : .vibeCanvasAccent
+        isActive ? Color.vibeCanvasInk.opacity(0.92) : Color.vibeCanvasInkSoft.opacity(0.86)
     }
 
     private var backgroundColor: Color {
-        isActive ? Color.vibeCanvasAccent.opacity(0.22) : Color.vibeCanvasAccent.opacity(0.12)
-    }
-
-    private var borderColor: Color {
-        isActive ? Color.vibeCanvasAccent.opacity(0.52) : Color.vibeCanvasAccent.opacity(0.22)
+        isActive ? Color.vibeCanvasInk.opacity(0.10) : Color.vibeCanvasInk.opacity(0.06)
     }
 }
 @MainActor
