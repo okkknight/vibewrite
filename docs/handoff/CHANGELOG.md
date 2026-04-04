@@ -6,6 +6,10 @@
 # Changelog
 
 ## 2026-04-05
+- `自定义` now brings the selected text into a same-width context capsule above the composer, keeps the input focused/highlighted, and hides the selection popover while the custom-edit flow stays active.
+- Dismissing the custom-edit context now clears the capsule when the user leaves the editing area, while selection changes keep the capsule text in sync.
+
+## 2026-04-05
 - Non-`edit` streaming preview now finishes character by character after the upstream stream ends instead of calling a one-shot flush that instantly appends the remaining tail.
 - The renderer now has an explicit completed state, so the flow waits for the preview to catch up before applying the final document result.
 

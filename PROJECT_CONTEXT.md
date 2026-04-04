@@ -12,7 +12,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
 - The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset and lets the scroll bar sit in a right-side gutter so both edges stay exactly aligned with the composer.
-- Clicking selection-popover `自定义` now only focuses the bottom composer input and briefly highlights the input field itself, instead of flashing the whole composer.
+- Clicking selection-popover `自定义` now reveals a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the old popover while the user stays in the custom-edit flow.
 - The latest committed change before this update is `fc91b0f`, which refined the selection edit intent popover.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
 - The document storage model has been redesigned so the Markdown file carries only正文 plus a hidden identity marker, while the collaboration metadata lives in an app-side metadata store keyed by `docID`. `xattr` owns the primary identity marker, the body marker is a fallback, Save As generates a fresh `docID`, and malformed metadata always degrades to正文-only editing.
