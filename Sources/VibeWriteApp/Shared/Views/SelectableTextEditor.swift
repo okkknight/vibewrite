@@ -512,23 +512,32 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let localEditFlashOverlayView else { return }
 
             guard let localEditFlash else {
+                logSelectionEvent("local flash sync cleared overlay")
                 clearLocalEditFlash(in: localEditFlashOverlayView)
                 return
             }
 
             guard lastAppliedLocalEditFlashID != localEditFlash.id else {
+                logSelectionEvent("local flash sync skipped duplicate id=\(localEditFlash.id.uuidString)")
                 return
             }
 
             clearLocalEditFlash(in: localEditFlashOverlayView)
 
+            logSelectionEvent(
+                "local flash sync incoming id=\(localEditFlash.id.uuidString) sourceRange=\(localEditFlash.range.nsRange.debugDescription) textCount=\(textView.string.utf16.count)"
+            )
             guard let flashRange = localEditFlash.range.range(in: textView.string),
                   flashRange.lowerBound < flashRange.upperBound else {
+                logSelectionEvent("local flash sync invalid range id=\(localEditFlash.id.uuidString)")
                 lastAppliedLocalEditFlashID = nil
                 return
             }
 
             let highlightRange = NSRange(flashRange, in: textView.string)
+            logSelectionEvent(
+                "local flash sync apply id=\(localEditFlash.id.uuidString) highlightRange=\(highlightRange.debugDescription)"
+            )
             localEditFlashOverlayView.applyFlash(range: highlightRange, in: textView)
             lastAppliedLocalEditFlashID = localEditFlash.id
         }
@@ -555,6 +564,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             overlayView.attach(to: textView)
             scrollView.contentView.addSubview(overlayView, positioned: .above, relativeTo: textView)
             localEditFlashOverlayView = overlayView
+            logSelectionEvent("local flash overlay created frame=\(debugRect(overlayView.frame))")
         }
 
         func textDidChange(_ notification: Notification) {
@@ -862,6 +872,7 @@ struct SelectableTextEditor: NSViewRepresentable {
 private final class LocalEditFlashOverlayView: NSView {
     private weak var textView: NSTextView?
     private var flashRange: NSRange?
+    private var lastLoggedDrawSignature: String?
 
     var hasActiveFlash: Bool {
         flashRange != nil
@@ -893,10 +904,14 @@ private final class LocalEditFlashOverlayView: NSView {
     func applyFlash(range: NSRange, in textView: NSTextView) {
         self.textView = textView
         flashRange = range
+        lastLoggedDrawSignature = nil
         isHidden = false
         layer?.removeAllAnimations()
         alphaValue = 1
         needsDisplay = true
+        VibeWriteDebugTrace.append(
+            "local edit flash overlay apply range=\(NSStringFromRange(range)) textLength=\(textView.string.utf16.count) frame=\(NSStringFromRect(frame))"
+        )
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 1.8
@@ -907,7 +922,11 @@ private final class LocalEditFlashOverlayView: NSView {
 
     func clearFlash() {
         layer?.removeAllAnimations()
+        VibeWriteDebugTrace.append(
+            "local edit flash overlay clear hadRange=\(flashRange.map { NSStringFromRange($0) } ?? "nil")"
+        )
         flashRange = nil
+        lastLoggedDrawSignature = nil
         alphaValue = 0
         isHidden = true
         needsDisplay = true
@@ -930,12 +949,14 @@ private final class LocalEditFlashOverlayView: NSView {
         let paddingY: CGFloat = 1.5
         let radius: CGFloat = 6
         let fillColor = NSColor.systemYellow.withAlphaComponent(0.10)
+        var enclosingRectCount = 0
 
         layoutManager.enumerateEnclosingRects(
             forGlyphRange: glyphRange,
             withinSelectedGlyphRange: NSRange(location: 0, length: 0),
             in: textContainer
         ) { rect, _ in
+            enclosingRectCount += 1
             var adjustedRect = rect.offsetBy(dx: textOrigin.x, dy: textOrigin.y)
             adjustedRect = adjustedRect.insetBy(dx: -paddingX, dy: -paddingY)
             adjustedRect = textView.convert(adjustedRect, to: self)
@@ -946,6 +967,18 @@ private final class LocalEditFlashOverlayView: NSView {
             fillColor.setFill()
             roundedPath.fill()
         }
+
+        let signature = [
+            "range=\(NSStringFromRange(flashRange))",
+            "glyph=\(NSStringFromRange(glyphRange))",
+            "rectCount=\(enclosingRectCount)",
+            "alpha=\(String(format: "%.2f", Double(alphaValue)))",
+            "frame=\(NSStringFromRect(frame))"
+        ].joined(separator: " | ")
+
+        guard signature != lastLoggedDrawSignature else { return }
+        lastLoggedDrawSignature = signature
+        VibeWriteDebugTrace.append("local edit flash overlay draw \(signature)")
     }
 }
 

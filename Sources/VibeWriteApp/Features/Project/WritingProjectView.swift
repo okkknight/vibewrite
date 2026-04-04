@@ -748,8 +748,12 @@ struct WritingProjectView: View {
         let flash = latestRevision?.patch.replacementHighlightRange.map {
             WritingLocalEditFlash(range: $0)
         }
+        let flashRangePreview = latestRevision?.patch.replacementHighlightRange?.nsRange.debugDescription ?? "nil"
 
         DispatchQueue.main.async {
+            VibeWriteDebugTrace.append(
+                "local edit cleanup action=\(action.rawValue) shouldFlash=\(shouldFlashLocalEdit) flashRange=\(flashRangePreview) presetPending=\(selectionPopoverPendingPreset?.title ?? "nil")"
+            )
             isComposerLocked = false
             if shouldClearSelection {
                 selectedText = nil
@@ -770,16 +774,23 @@ struct WritingProjectView: View {
             }
 
             if shouldFlashLocalEdit, let flash {
+                VibeWriteDebugTrace.append(
+                    "local edit flash scheduled id=\(flash.id.uuidString) range=\(flash.range.nsRange.debugDescription)"
+                )
                 localEditFlash = flash
                 isLocalEditViewportLocked = true
 
                 DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
                     if localEditFlash?.id == flash.id {
+                        VibeWriteDebugTrace.append(
+                            "local edit flash cleared id=\(flash.id.uuidString)"
+                        )
                         localEditFlash = nil
                         isLocalEditViewportLocked = false
                     }
                 }
             } else if action == .edit {
+                VibeWriteDebugTrace.append("local edit flash skipped action=edit reason=missing-range")
                 localEditFlash = nil
                 isLocalEditViewportLocked = false
             } else {
