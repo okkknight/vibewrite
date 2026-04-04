@@ -1011,7 +1011,7 @@ private final class LocalEditFlashOverlayView: NSView {
     }
 
     private func startFlashFade(duration: TimeInterval, stepInterval: TimeInterval) {
-        guard flashRange != nil else { return }
+        guard let flashRange = flashRange else { return }
         cancelFlashFade(keepLog: false)
 
         let startTime = CACurrentMediaTime()
