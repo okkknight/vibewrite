@@ -9,14 +9,12 @@ enum WritingProjectResponseBuilder {
     ) -> WritingAIResponse {
         let action = request.action
         let currentDocument = request.project.documentText
-        let selection = request.selectionText
         let prompt = request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
             ?? request.project.prompt
         let resolvedDocumentText = documentText ?? fallbackDocumentText(
             for: request,
             prompt: prompt,
-            currentDocument: currentDocument,
-            selection: selection
+            currentDocument: currentDocument
         )
         let resolvedAssistantMessage = assistantMessage ?? MockWritingEngine.assistantLine(
             for: action.toMockAction,
@@ -50,7 +48,7 @@ enum WritingProjectResponseBuilder {
             return request.project.documentText + streamedText
 
         case .edit:
-            guard let targetRange = selectedTargetRange(in: request.project.documentText, request: request) else {
+            guard let targetRange = request.selectionRange?.range(in: request.project.documentText) else {
                 return request.project.documentText
             }
 
@@ -69,8 +67,7 @@ enum WritingProjectResponseBuilder {
             for: request,
             prompt: request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
                 ?? request.project.prompt,
-            currentDocument: request.project.documentText,
-            selection: request.selectionText
+            currentDocument: request.project.documentText
         )
 
         switch request.action {
@@ -81,7 +78,7 @@ enum WritingProjectResponseBuilder {
             return String(finalDocumentText.dropFirst(request.project.documentText.count))
 
         case .edit:
-            guard let targetRange = selectedTargetRange(in: request.project.documentText, request: request) else {
+            guard let targetRange = request.selectionRange?.range(in: request.project.documentText) else {
                 return finalDocumentText
             }
 
@@ -100,8 +97,7 @@ enum WritingProjectResponseBuilder {
     private static func fallbackDocumentText(
         for request: WritingAIRequest,
         prompt: String,
-        currentDocument: String,
-        selection: String?
+        currentDocument: String
     ) -> String {
         switch request.action {
         case .startDraft:
@@ -110,7 +106,6 @@ enum WritingProjectResponseBuilder {
         case .continueWriting:
             return MockWritingEngine.revisedText(
                 for: currentDocument,
-                selectedSegment: selection,
                 selectedRange: request.selectionRange,
                 action: .continueWriting,
                 variant: .standard
@@ -119,7 +114,6 @@ enum WritingProjectResponseBuilder {
         case .edit:
             return MockWritingEngine.revisedText(
                 for: currentDocument,
-                selectedSegment: selection,
                 selectedRange: request.selectionRange,
                 action: .edit,
                 variant: .standard
@@ -195,22 +189,6 @@ enum WritingProjectResponseBuilder {
             .filter { seen.insert($0).inserted }
     }
 
-    private static func selectedTargetRange(
-        in documentText: String,
-        request: WritingAIRequest
-    ) -> Range<String.Index>? {
-        if let selectionRange = request.selectionRange,
-           let exactRange = selectionRange.range(in: documentText) {
-            return exactRange
-        }
-
-        guard let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !selection.isEmpty else {
-            return nil
-        }
-
-        return documentText.range(of: selection)
-    }
 }
 
 private extension WritingAIAction {

@@ -51,12 +51,22 @@ enum MockWritingEngine {
 
     static func revisedText(
         for document: String,
-        selectedSegment: String?,
         selectedRange: WritingTextSelectionRange? = nil,
         action: MockWritingAction,
         variant: MockWritingVariant
     ) -> String {
-        if let targetRange = selectedTargetRange(in: document, selectedSegment: selectedSegment, selectedRange: selectedRange) {
+        switch action {
+        case .startDraft:
+            return document
+
+        case .continueWriting:
+            return reviseWholeDocument(document, action: action, variant: variant)
+
+        case .edit:
+            guard let targetRange = selectedRange?.range(in: document) else {
+                return document
+            }
+
             let selectedSegment = String(document[targetRange])
             return replaceSelectedSegment(
                 in: document,
@@ -64,8 +74,6 @@ enum MockWritingEngine {
                 with: revisedSegment(selectedSegment, action: action, variant: variant)
             )
         }
-
-        return reviseWholeDocument(document, action: action, variant: variant)
     }
 
     static func streamedDocumentText(for request: WritingAIRequest) -> String {
@@ -77,7 +85,6 @@ enum MockWritingEngine {
         case .continueWriting:
             return revisedText(
                 for: request.project.documentText,
-                selectedSegment: request.selectionText,
                 selectedRange: request.selectionRange,
                 action: .continueWriting,
                 variant: .standard
@@ -86,7 +93,6 @@ enum MockWritingEngine {
         case .edit:
             return revisedText(
                 for: request.project.documentText,
-                selectedSegment: request.selectionText,
                 selectedRange: request.selectionRange,
                 action: .edit,
                 variant: .standard
@@ -103,11 +109,7 @@ enum MockWritingEngine {
             return request.project.documentText + streamedText
 
         case .edit:
-            guard let targetRange = selectedTargetRange(
-                in: request.project.documentText,
-                selectedSegment: request.selectionText,
-                selectedRange: request.selectionRange
-            ) else {
+            guard let targetRange = request.selectionRange?.range(in: request.project.documentText) else {
                 return request.project.documentText
             }
 
@@ -128,11 +130,7 @@ enum MockWritingEngine {
             return String(finalDocumentText.dropFirst(request.project.documentText.count))
 
         case .edit:
-            guard let targetRange = selectedTargetRange(
-                in: request.project.documentText,
-                selectedSegment: request.selectionText,
-                selectedRange: request.selectionRange
-            ) else {
+            guard let targetRange = request.selectionRange?.range(in: request.project.documentText) else {
                 return finalDocumentText
             }
 
@@ -284,20 +282,4 @@ enum MockWritingEngine {
         return copy
     }
 
-    private static func selectedTargetRange(
-        in document: String,
-        selectedSegment: String?,
-        selectedRange: WritingTextSelectionRange?
-    ) -> Range<String.Index>? {
-        if let selectedRange, let exactRange = selectedRange.range(in: document) {
-            return exactRange
-        }
-
-        guard let selectedSegment = selectedSegment?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !selectedSegment.isEmpty else {
-            return nil
-        }
-
-        return document.range(of: selectedSegment)
-    }
 }

@@ -62,8 +62,6 @@ struct WritingEditPatch: Codable, Hashable {
     let lockedSelectionText: String?
     let sourceText: String?
     let sourceRange: WritingTextSelectionRange?
-    let leadingContext: String?
-    let trailingContext: String?
     let replacementText: String
     let userMessage: String?
     let summary: String
@@ -74,8 +72,6 @@ struct WritingEditPatch: Codable, Hashable {
         lockedSelectionText: String?,
         sourceText: String?,
         sourceRange: WritingTextSelectionRange? = nil,
-        leadingContext: String? = nil,
-        trailingContext: String? = nil,
         replacementText: String,
         userMessage: String?,
         summary: String,
@@ -85,8 +81,6 @@ struct WritingEditPatch: Codable, Hashable {
         self.lockedSelectionText = lockedSelectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.sourceText = sourceText?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.sourceRange = sourceRange
-        self.leadingContext = leadingContext
-        self.trailingContext = trailingContext
         self.replacementText = replacementText
         self.userMessage = userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.summary = summary
@@ -97,7 +91,6 @@ struct WritingEditPatch: Codable, Hashable {
         action: WritingAIAction,
         before: WritingProjectSnapshot,
         after: WritingProjectSnapshot,
-        selectionText: String?,
         selectionRange: WritingTextSelectionRange? = nil,
         userMessage: String?
     ) throws -> WritingEditPatch {
@@ -137,11 +130,7 @@ struct WritingEditPatch: Codable, Hashable {
             )
 
         case .edit:
-            guard let sourceTextRange = resolvedSelectionRange(
-                in: before.documentText,
-                selectionText: selectionText,
-                selectionRange: selectionRange
-            ) else {
+            guard let sourceTextRange = selectionRange?.range(in: before.documentText) else {
                 throw WritingEditPatchError.missingSelection
             }
 
@@ -155,19 +144,6 @@ struct WritingEditPatch: Codable, Hashable {
             guard let targetRange = sourceRange.range(in: before.documentText) else {
                 throw WritingEditPatchError.patchContextMismatch
             }
-
-            let leadingContext = localContext(
-                in: before.documentText,
-                around: targetRange.lowerBound,
-                limit: 72,
-                direction: .leading
-            )
-            let trailingContext = localContext(
-                in: before.documentText,
-                around: targetRange.upperBound,
-                limit: 72,
-                direction: .trailing
-            )
 
             let prefix = String(before.documentText[..<targetRange.lowerBound])
             let suffix = String(before.documentText[targetRange.upperBound...])
@@ -184,8 +160,6 @@ struct WritingEditPatch: Codable, Hashable {
                 lockedSelectionText: sourceText,
                 sourceText: sourceText,
                 sourceRange: sourceRange,
-                leadingContext: leadingContext,
-                trailingContext: trailingContext,
                 replacementText: replacementText,
                 userMessage: userMessage,
                 summary: summaryText(for: action, sourceText: sourceText)
@@ -244,71 +218,14 @@ struct WritingEditPatch: Codable, Hashable {
                 throw WritingEditPatchError.missingSelection
             }
 
-            if let sourceRange, let targetRange = sourceRange.range(in: documentText) {
-                var updated = documentText
-                updated.replaceSubrange(targetRange, with: replacementText)
-                return updated
-            }
-
-            let targetContext = (leadingContext ?? "") + sourceText + (trailingContext ?? "")
-            guard let targetRange = documentText.range(of: targetContext) else {
+            guard let sourceRange, let targetRange = sourceRange.range(in: documentText) else {
                 throw WritingEditPatchError.patchContextMismatch
             }
 
-            let sourceStart = documentText.index(targetRange.lowerBound, offsetBy: leadingContext?.count ?? 0)
-            let sourceEnd = documentText.index(sourceStart, offsetBy: sourceText.count)
             var updated = documentText
-            updated.replaceSubrange(sourceStart..<sourceEnd, with: replacementText)
+            updated.replaceSubrange(targetRange, with: replacementText)
             return updated
         }
-    }
-
-    private static func resolvedSelectionRange(
-        in documentText: String,
-        selectionText: String?,
-        selectionRange: WritingTextSelectionRange?
-    ) -> Range<String.Index>? {
-        if let selectionRange, let exactRange = selectionRange.range(in: documentText) {
-            return exactRange
-        }
-
-        guard let selectionText = selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !selectionText.isEmpty else {
-            return nil
-        }
-
-        return documentText.range(of: selectionText)
-    }
-}
-
-private enum WritingEditContextDirection {
-    case leading
-    case trailing
-}
-
-private func localContext(
-    in text: String,
-    around index: String.Index,
-    limit: Int,
-    direction: WritingEditContextDirection
-) -> String {
-    switch direction {
-    case .leading:
-        let startIndex = text.index(
-            index,
-            offsetBy: -min(limit, text.distance(from: text.startIndex, to: index)),
-            limitedBy: text.startIndex
-        ) ?? text.startIndex
-        return String(text[startIndex..<index])
-
-    case .trailing:
-        let remaining = text.distance(from: index, to: text.endIndex)
-        let endIndex = text.index(
-            index,
-            offsetBy: min(limit, remaining),
-            limitedBy: text.endIndex
-        ) ?? text.endIndex
-        return String(text[index..<endIndex])
     }
 }
 

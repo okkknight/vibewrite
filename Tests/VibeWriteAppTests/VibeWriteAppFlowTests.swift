@@ -343,28 +343,30 @@ final class VibeWriteAppFlowTests: XCTestCase {
 
     func testMockEngineRevisesSelectedAndWholeDocumentText() {
         let draft = MockWritingEngine.firstDraft(for: "写一篇关于成年人孤独感的公众号文章")
+        let draftParagraph = draft.components(separatedBy: "\n\n").first!
+        let draftParagraphRange = draft.range(of: draftParagraph)!
+        let selectionRange = WritingTextSelectionRange(NSRange(draftParagraphRange, in: draft))
+
         let continued = MockWritingEngine.revisedText(
             for: draft,
-            selectedSegment: nil,
             action: .continueWriting,
-            variant: .standard
-        )
-        let revisedWhole = MockWritingEngine.revisedText(
-            for: draft,
-            selectedSegment: nil,
-            action: .edit,
             variant: .standard
         )
         let revisedSelection = MockWritingEngine.revisedText(
             for: draft,
-            selectedSegment: draft.components(separatedBy: "\n\n").first,
+            selectedRange: selectionRange,
+            action: .edit,
+            variant: .standard
+        )
+        let revisedNoSelection = MockWritingEngine.revisedText(
+            for: draft,
             action: .edit,
             variant: .standard
         )
 
         XCTAssertNotEqual(draft, continued)
-        XCTAssertNotEqual(draft, revisedWhole)
         XCTAssertNotEqual(draft, revisedSelection)
+        XCTAssertEqual(draft, revisedNoSelection)
         XCTAssertTrue(revisedSelection.contains("留一点空白") || revisedSelection.contains("不用说得太满"))
         XCTAssertTrue(continued.contains("接下来") || continued.contains("继续"))
     }
@@ -458,8 +460,9 @@ final class VibeWriteAppFlowTests: XCTestCase {
         let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
         flow.openProject(project)
         let selectedText = project.documentText.components(separatedBy: "\n").first!
+        let selectedRange = WritingTextSelectionRange(NSRange(project.documentText.range(of: selectedText)!, in: project.documentText))
 
-        try await flow.performWritingAction(.edit, userMessage: nil, selectionText: selectedText)
+        try await flow.performWritingAction(.edit, userMessage: nil, selectionText: selectedText, selectionRange: selectedRange)
 
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .edit)
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.patch.action, .edit)
@@ -485,7 +488,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
             action: .edit,
             before: before,
             after: after,
-            selectionText: targetText,
+            selectionRange: WritingTextSelectionRange(NSRange(targetRange, in: before.documentText)),
             userMessage: "请把这段改得更克制一点"
         )
 
@@ -523,7 +526,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
             action: .edit,
             before: before,
             after: after,
-            selectionText: targetText,
+            selectionRange: WritingTextSelectionRange(NSRange(targetRange, in: before.documentText)),
             userMessage: nil
         )
 
@@ -580,6 +583,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
         flow.openProject(project)
         let selectedText = project.documentText.components(separatedBy: "\n").first!
+        let selectedRange = WritingTextSelectionRange(NSRange(project.documentText.range(of: selectedText)!, in: project.documentText))
 
         let before = flow.activeProject
 
@@ -587,7 +591,8 @@ final class VibeWriteAppFlowTests: XCTestCase {
             try await flow.performWritingAction(
                 .edit,
                 userMessage: "把这段改得更克制一点",
-                selectionText: selectedText
+                selectionText: selectedText,
+                selectionRange: selectedRange
             )
             XCTFail("Expected the flow to reject the non-local patch")
         } catch {

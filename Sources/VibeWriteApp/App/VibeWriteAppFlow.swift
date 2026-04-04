@@ -210,10 +210,11 @@ final class VibeWriteAppFlow: ObservableObject {
             throw WritingAIClientError.requestFailed("已有请求正在进行，请稍后再试。")
         }
 
+        let project = activeProject
         isAIRequestInFlight = true
         activeEditLock = WritingEditLock(
             action: action,
-            lockedSelectionText: selectionText,
+            lockedSelectionText: selectionRange.flatMap { $0.substring(in: project.documentText)?.trimmingCharacters(in: .whitespacesAndNewlines) } ?? selectionText,
             lockedDocumentText: activeProject.documentText
         )
         aiErrorMessage = nil
@@ -222,34 +223,24 @@ final class VibeWriteAppFlow: ObservableObject {
             activeEditLock = nil
         }
 
-        let project = activeProject
         let requestUserMessage = requestUserMessage(
             for: action,
             userMessage: userMessage
         )
 
         let normalizedSelectionText: String? = {
-            guard let trimmed = selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !trimmed.isEmpty else {
+            guard let selectionRange,
+                  let exactSelection = selectionRange.substring(in: project.documentText)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !exactSelection.isEmpty else {
                 return nil
             }
 
-            return trimmed
+            return exactSelection
         }()
-        if action == .edit {
-            guard let normalizedSelectionText else {
-                throw WritingEditPatchError.missingSelection
-            }
 
-            if let selectionRange {
-                guard let exactSelection = selectionRange.substring(in: project.documentText),
-                      exactSelection.trimmingCharacters(in: .whitespacesAndNewlines) == normalizedSelectionText else {
-                    throw WritingEditPatchError.patchContextMismatch
-                }
-            } else {
-                guard project.documentText.range(of: normalizedSelectionText) != nil else {
-                    throw WritingEditPatchError.patchContextMismatch
-                }
+        if action == .edit {
+            guard normalizedSelectionText != nil else {
+                throw WritingEditPatchError.missingSelection
             }
         }
 
@@ -257,7 +248,7 @@ final class VibeWriteAppFlow: ObservableObject {
             action: action,
             project: project.aiSnapshot,
             userMessage: requestUserMessage,
-            selectionText: selectionText,
+            selectionText: normalizedSelectionText ?? selectionText,
             selectionRange: selectionRange
         )
 
@@ -299,7 +290,7 @@ final class VibeWriteAppFlow: ObservableObject {
                             previewDocumentText(
                                 for: action,
                                 baseDocumentText: beforeSnapshot.documentText,
-                                selectionText: normalizedSelectionText,
+                                selectionRange: selectionRange,
                                 streamedText: streamedText
                             )
                         )
@@ -319,7 +310,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 action: action,
                 before: beforeSnapshot,
                 after: response.snapshotByApplyingDocumentText(response.documentText, to: beforeSnapshot),
-                selectionText: normalizedSelectionText,
                 selectionRange: selectionRange,
                 userMessage: requestUserMessage
             )
@@ -383,7 +373,7 @@ final class VibeWriteAppFlow: ObservableObject {
     private func previewDocumentText(
         for action: WritingAIAction,
         baseDocumentText: String,
-        selectionText: String?,
+        selectionRange: WritingTextSelectionRange?,
         streamedText: String
     ) -> String {
         switch action {
@@ -394,8 +384,8 @@ final class VibeWriteAppFlow: ObservableObject {
             return baseDocumentText + streamedText
 
         case .edit:
-            guard let selectionText,
-                  let targetRange = baseDocumentText.range(of: selectionText) else {
+            guard let selectionRange,
+                  let targetRange = selectionRange.range(in: baseDocumentText) else {
                 return baseDocumentText
             }
 
