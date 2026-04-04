@@ -28,6 +28,7 @@ struct SelectableTextEditor: NSViewRepresentable {
     var localEditFlash: WritingLocalEditFlash?
     var isViewportLockedDuringLocalEdit: Bool = false
     var shouldPreserveSelectionOverlayDuringPendingLocalEdit: Bool = false
+    var onScrollViewReady: ((NSScrollView) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -65,6 +66,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         textView.isAutomaticTextCompletionEnabled = false
         textView.isContinuousSpellCheckingEnabled = false
         textView.usesFindBar = false
+        textView.postsFrameChangedNotifications = true
         textView.textContainerInset = textContainerInset
         textView.textContainer?.widthTracksTextView = false
         textView.textContainer?.containerSize = NSSize(
@@ -78,10 +80,9 @@ struct SelectableTextEditor: NSViewRepresentable {
         textView.setAccessibilityValue(textView.string as NSString)
 
         let scrollView = NSScrollView(frame: .zero)
-        scrollView.hasVerticalScroller = true
+        scrollView.hasVerticalScroller = false
         scrollView.hasHorizontalScroller = false
         scrollView.autohidesScrollers = true
-        scrollView.scrollerStyle = .overlay
         scrollView.drawsBackground = false
         scrollView.borderType = .noBorder
         scrollView.contentView.postsBoundsChangedNotifications = true
@@ -129,6 +130,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd,
             isViewportLockedDuringLocalEdit: isViewportLockedDuringLocalEdit
         )
+        context.coordinator.reportScrollViewIfNeeded(scrollView, onScrollViewReady: onScrollViewReady)
         if didMutateText {
             context.coordinator.syncSelectionOverlayState(from: textView)
         }
@@ -150,6 +152,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         @Binding private var selectionPopoverOrigin: CGPoint?
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
+        weak var reportedScrollView: NSScrollView?
         private var programmaticChangeDepth = 0
         private var lastAppliedIsEditable: Bool?
         private var lastAppliedFont: NSFont?
@@ -208,6 +211,18 @@ struct SelectableTextEditor: NSViewRepresentable {
                 name: NSTextView.didChangeSelectionNotification,
                 object: textView
             )
+        }
+
+        func reportScrollViewIfNeeded(
+            _ scrollView: NSScrollView,
+            onScrollViewReady: ((NSScrollView) -> Void)?
+        ) {
+            guard reportedScrollView !== scrollView else { return }
+            reportedScrollView = scrollView
+            guard let onScrollViewReady else { return }
+            DispatchQueue.main.async {
+                onScrollViewReady(scrollView)
+            }
         }
 
         @objc
@@ -873,6 +888,13 @@ private final class LocalEditFlashOverlayView: NSView {
     private weak var textView: NSTextView?
     private var flashRange: NSRange?
     private var lastLoggedDrawSignature: String?
+    private var flashOpacity: CGFloat = 0 {
+        didSet {
+            needsDisplay = true
+        }
+    }
+    private var flashFadeWorkItem: DispatchWorkItem?
+    private var flashFadeTimer: DispatchSourceTimer?
 
     var hasActiveFlash: Bool {
         flashRange != nil
@@ -906,27 +928,34 @@ private final class LocalEditFlashOverlayView: NSView {
         flashRange = range
         lastLoggedDrawSignature = nil
         isHidden = false
-        layer?.removeAllAnimations()
+        cancelFlashFade()
         alphaValue = 1
+        flashOpacity = 1
         needsDisplay = true
         VibeWriteDebugTrace.append(
             "local edit flash overlay apply range=\(NSStringFromRange(range)) textLength=\(textView.string.utf16.count) frame=\(NSStringFromRect(frame))"
         )
 
-        NSAnimationContext.runAnimationGroup { context in
-            context.duration = 1.8
-            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
-            self.animator().alphaValue = 0
+        let fadeDelay: TimeInterval = 0.12
+        let fadeDuration: TimeInterval = 1.68
+        let fadeStepInterval: TimeInterval = 1.0 / 30.0
+
+        let fadeWorkItem = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            self.startFlashFade(duration: fadeDuration, stepInterval: fadeStepInterval)
         }
+        flashFadeWorkItem = fadeWorkItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + fadeDelay, execute: fadeWorkItem)
     }
 
     func clearFlash() {
-        layer?.removeAllAnimations()
+        cancelFlashFade()
         VibeWriteDebugTrace.append(
             "local edit flash overlay clear hadRange=\(flashRange.map { NSStringFromRange($0) } ?? "nil")"
         )
         flashRange = nil
         lastLoggedDrawSignature = nil
+        flashOpacity = 0
         alphaValue = 0
         isHidden = true
         needsDisplay = true
@@ -948,7 +977,7 @@ private final class LocalEditFlashOverlayView: NSView {
         let paddingX: CGFloat = 2
         let paddingY: CGFloat = 1.5
         let radius: CGFloat = 6
-        let fillColor = NSColor.systemYellow.withAlphaComponent(0.10)
+        let fillColor = NSColor.systemYellow.withAlphaComponent(0.10 * flashOpacity)
         var enclosingRectCount = 0
 
         layoutManager.enumerateEnclosingRects(
@@ -972,13 +1001,56 @@ private final class LocalEditFlashOverlayView: NSView {
             "range=\(NSStringFromRange(flashRange))",
             "glyph=\(NSStringFromRange(glyphRange))",
             "rectCount=\(enclosingRectCount)",
-            "alpha=\(String(format: "%.2f", Double(alphaValue)))",
+            "opacity=\(String(format: "%.2f", Double(flashOpacity)))",
             "frame=\(NSStringFromRect(frame))"
         ].joined(separator: " | ")
 
         guard signature != lastLoggedDrawSignature else { return }
         lastLoggedDrawSignature = signature
         VibeWriteDebugTrace.append("local edit flash overlay draw \(signature)")
+    }
+
+    private func startFlashFade(duration: TimeInterval, stepInterval: TimeInterval) {
+        guard flashRange != nil else { return }
+        cancelFlashFade(keepLog: false)
+
+        let startTime = CACurrentMediaTime()
+        let timer = DispatchSource.makeTimerSource(queue: .main)
+        timer.schedule(deadline: .now(), repeating: stepInterval, leeway: .milliseconds(8))
+        timer.setEventHandler { [weak self] in
+            guard let self else { return }
+            guard let flashRange = self.flashRange else {
+                self.cancelFlashFade(keepLog: false)
+                return
+            }
+
+            let elapsed = CACurrentMediaTime() - startTime
+            let progress = min(max(elapsed / duration, 0), 1)
+            let remainingOpacity = 1 - progress
+            self.flashOpacity = remainingOpacity
+
+            if progress >= 1 {
+                VibeWriteDebugTrace.append(
+                    "local edit flash overlay fade completed range=\(NSStringFromRange(flashRange))"
+                )
+                self.cancelFlashFade(keepLog: false)
+            }
+        }
+        flashFadeTimer = timer
+        VibeWriteDebugTrace.append(
+            "local edit flash overlay fade started range=\(NSStringFromRange(flashRange)) duration=\(String(format: "%.2f", duration))"
+        )
+        timer.resume()
+    }
+
+    private func cancelFlashFade(keepLog: Bool = true) {
+        flashFadeWorkItem?.cancel()
+        flashFadeWorkItem = nil
+        flashFadeTimer?.cancel()
+        flashFadeTimer = nil
+        if keepLog {
+            flashOpacity = 0
+        }
     }
 }
 
@@ -1021,5 +1093,211 @@ private final class StyledTextView: NSTextView {
         if let scrollView = enclosingScrollView {
             scrollView.reflectScrolledClipView(scrollView.contentView)
         }
+    }
+}
+
+struct ExternalVerticalScroller: NSViewRepresentable {
+    let scrollView: NSScrollView?
+
+    func makeNSView(context: Context) -> ExternalVerticalScrollerView {
+        let view = ExternalVerticalScrollerView()
+        view.scrollView = scrollView
+        return view
+    }
+
+    func updateNSView(_ nsView: ExternalVerticalScrollerView, context: Context) {
+        nsView.scrollView = scrollView
+    }
+}
+
+final class ExternalVerticalScrollerView: NSView {
+    private let trackInset: CGFloat = 2
+    private let verticalInset: CGFloat = 12
+    private let minimumKnobHeight: CGFloat = 30
+    private let trackWidth: CGFloat = 5
+    private let knobWidth: CGFloat = 5
+    private let trackColor = NSColor.vibeCanvasInk.withAlphaComponent(0.06)
+    private let knobColor = NSColor.vibeCanvasInk.withAlphaComponent(0.42)
+    private let knobHoverColor = NSColor.vibeCanvasInk.withAlphaComponent(0.60)
+    private var dragAnchorOffsetY: CGFloat?
+
+    weak var scrollView: NSScrollView? {
+        didSet {
+            guard oldValue !== scrollView else { return }
+            resetObservers()
+            installObservers()
+            needsDisplay = true
+            isHidden = shouldHideScroller
+        }
+    }
+
+    override var isFlipped: Bool { true }
+
+    deinit {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private var shouldHideScroller: Bool {
+        guard let scrollView,
+              let documentView = scrollView.documentView else {
+            return true
+        }
+
+        let visibleHeight = max(scrollView.contentView.bounds.height, 1)
+        let documentHeight = max(documentView.bounds.height, 1)
+        return documentHeight <= visibleHeight + 1
+    }
+
+    private var trackRect: CGRect {
+        bounds.insetBy(dx: trackInset, dy: verticalInset)
+    }
+
+    private func knobMetrics() -> (thumbRect: CGRect, maxOffset: CGFloat)? {
+        guard let scrollView,
+              let documentView = scrollView.documentView else {
+            return nil
+        }
+
+        let visibleHeight = max(scrollView.contentView.bounds.height, 1)
+        let documentHeight = max(documentView.bounds.height, 1)
+        guard documentHeight > visibleHeight + 1 else { return nil }
+
+        let track = trackRect
+        let knobProportion = min(1, visibleHeight / documentHeight)
+        let thumbHeight = max(track.height * knobProportion, minimumKnobHeight)
+        let travel = max(track.height - thumbHeight, 1)
+        let maxOffset = max(documentHeight - visibleHeight, 1)
+        let offsetY = min(max(scrollView.contentView.bounds.origin.y, 0), maxOffset)
+        let progress = offsetY / maxOffset
+        let thumbY = track.minY + (travel * (1 - progress))
+        let thumbRect = CGRect(
+            x: bounds.midX - (knobWidth / 2),
+            y: thumbY,
+            width: knobWidth,
+            height: thumbHeight
+        )
+        return (thumbRect, maxOffset)
+    }
+
+    private func resetObservers() {
+        NotificationCenter.default.removeObserver(self)
+    }
+
+    private func installObservers() {
+        guard let scrollView else { return }
+
+        scrollView.contentView.postsBoundsChangedNotifications = true
+        scrollView.documentView?.postsFrameChangedNotifications = true
+
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(handleScrollViewBoundsDidChange(_:)),
+            name: NSView.boundsDidChangeNotification,
+            object: scrollView.contentView
+        )
+        if let documentView = scrollView.documentView {
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleDocumentViewFrameDidChange(_:)),
+                name: NSView.frameDidChangeNotification,
+                object: documentView
+            )
+        }
+    }
+
+    @MainActor
+    private func refreshScrollerVisibility() {
+        needsDisplay = true
+        isHidden = shouldHideScroller
+    }
+
+    @objc
+    private func handleScrollViewBoundsDidChange(_ notification: Notification) {
+        Task { @MainActor [weak self] in
+            self?.refreshScrollerVisibility()
+        }
+    }
+
+    @objc
+    private func handleDocumentViewFrameDidChange(_ notification: Notification) {
+        Task { @MainActor [weak self] in
+            self?.refreshScrollerVisibility()
+        }
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard shouldHideScroller == false,
+              let metrics = knobMetrics() else { return }
+
+        let track = trackRect
+        let thumb = metrics.thumbRect.integral
+        let thumbRadius = min(thumb.width / 2, thumb.height / 2)
+        let knobAppearance = knobAnchorColor(for: thumb)
+
+        let trackPath = NSBezierPath(roundedRect: track, xRadius: track.width / 2, yRadius: track.width / 2)
+        trackColor.setFill()
+        trackPath.fill()
+
+        let thumbPath = NSBezierPath(roundedRect: thumb, xRadius: thumbRadius, yRadius: thumbRadius)
+        knobAppearance.setFill()
+        thumbPath.fill()
+    }
+
+    private func knobAnchorColor(for thumb: CGRect) -> NSColor {
+        let currentMouseLocation = window.map { convert($0.mouseLocationOutsideOfEventStream, from: nil) }
+        if let currentMouseLocation, thumb.contains(currentMouseLocation) {
+            return knobHoverColor
+        }
+        return knobColor
+    }
+
+    override func mouseDown(with event: NSEvent) {
+        guard shouldHideScroller == false,
+              let metrics = knobMetrics() else { return }
+
+        let location = convert(event.locationInWindow, from: nil)
+        let thumb = metrics.thumbRect
+
+        if thumb.contains(location) {
+            dragAnchorOffsetY = location.y - thumb.minY
+        } else {
+            let currentOffset = scrollView?.contentView.bounds.origin.y ?? 0
+            let targetOffset = location.y > thumb.maxY
+                ? currentOffset - max(bounds.height * 0.85, 1)
+                : currentOffset + max(bounds.height * 0.85, 1)
+            scroll(to: targetOffset, maxOffset: metrics.maxOffset)
+            return
+        }
+
+        window?.makeFirstResponder(self)
+    }
+
+    override func mouseDragged(with event: NSEvent) {
+        guard let dragAnchorOffsetY else { return }
+        guard shouldHideScroller == false,
+              let metrics = knobMetrics() else { return }
+
+        let location = convert(event.locationInWindow, from: nil)
+        let track = trackRect
+        let thumbHeight = metrics.thumbRect.height
+        let travel = max(track.height - thumbHeight, 1)
+        let desiredThumbMinY = min(max(location.y - dragAnchorOffsetY, track.minY), track.minY + travel)
+        let progress = 1 - ((desiredThumbMinY - track.minY) / travel)
+        let targetOffset = metrics.maxOffset * progress
+        scroll(to: targetOffset, maxOffset: metrics.maxOffset)
+    }
+
+    override func mouseUp(with event: NSEvent) {
+        dragAnchorOffsetY = nil
+    }
+
+    private func scroll(to targetOffset: CGFloat, maxOffset: CGFloat) {
+        guard let scrollView else { return }
+
+        let clampedOffset = min(max(targetOffset, 0), maxOffset)
+        let clipBounds = scrollView.contentView.bounds
+        scrollView.contentView.scroll(to: CGPoint(x: clipBounds.origin.x, y: clampedOffset))
+        scrollView.reflectScrolledClipView(scrollView.contentView)
+        needsDisplay = true
     }
 }

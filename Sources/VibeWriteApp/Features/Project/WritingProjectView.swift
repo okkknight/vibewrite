@@ -20,6 +20,7 @@ struct WritingProjectView: View {
     @State private var isSelectionPopoverTemporarilyHidden = false
     @State private var localEditFlash: WritingLocalEditFlash?
     @State private var isLocalEditViewportLocked = false
+    @State private var bodyEditorScrollView: NSScrollView?
     @State private var showComparison = false
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
@@ -73,6 +74,7 @@ struct WritingProjectView: View {
             isSelectionPopoverTemporarilyHidden = false
             localEditFlash = nil
             isLocalEditViewportLocked = false
+            bodyEditorScrollView = nil
             showComparison = false
             showAssistantLayer = false
             showHistoryLayer = false
@@ -110,6 +112,15 @@ struct WritingProjectView: View {
     private var projectWorkspace: some View {
         wideWorkspace
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .overlay(alignment: .trailing) {
+            if let bodyEditorScrollView {
+                ExternalVerticalScroller(scrollView: bodyEditorScrollView)
+                    .frame(width: 12)
+                    .frame(maxHeight: .infinity)
+                    .padding(.trailing, 2)
+                    .accessibilityHidden(true)
+            }
+        }
         .accessibilityIdentifier(VibeWriteAutomationID.projectPaperShell)
     }
 
@@ -317,7 +328,10 @@ struct WritingProjectView: View {
                     textContainerInset: writingBodyTextContainerInset,
                     localEditFlash: localEditFlash,
                     isViewportLockedDuringLocalEdit: isLocalEditViewportLocked,
-                    shouldPreserveSelectionOverlayDuringPendingLocalEdit: selectionPopoverPendingPreset != nil || isComposerLocked
+                    shouldPreserveSelectionOverlayDuringPendingLocalEdit: selectionPopoverPendingPreset != nil || isComposerLocked,
+                    onScrollViewReady: { scrollView in
+                        bodyEditorScrollView = scrollView
+                    }
                 )
                 .id(project.id)
                 .frame(

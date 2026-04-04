@@ -11,7 +11,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
-- The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset and lets the scroll bar sit in a right-side gutter so both edges stay exactly aligned with the composer.
+- The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset while the visible vertical scroll bar is rendered as a separate overlay at the far right edge of the app so the正文 width itself stays unchanged.
 - Clicking selection-popover `自定义` now reveals a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the old popover while the user stays in the custom-edit flow.
 - The latest committed change before this update is `fc91b0f`, which refined the selection edit intent popover.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
@@ -50,6 +50,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Composer-triggered selection edits no longer fall back to an empty black-box rewrite. When there is an active selection, submitting without text now activates the custom-input path instead of firing `.edit` with no explicit instruction.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the update.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle fixes.
+- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after moving the正文 scroll indicator out to the app's right edge.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle restore.
 - The document split is covered by targeted tests for save/reopen, malformed metadata fallback, and xattr precedence, so the new storage path has direct coverage instead of depending on the old embedded-metadata flow.
 - `swift test` now passes with the file-based document flow and menu commands in place.

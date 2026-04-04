@@ -1,4 +1,8 @@
 ## 2026-04-05
+- The正文 scroll indicator is now rendered as a separate overlay at the far right edge of the app instead of inside the正文 editing column, so the正文 width itself stays unchanged while the chrome moves outward.
+- Verified with `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+## 2026-04-05
 - Local edit flash now uses a rounded overlay highlight instead of a flat text background. The yellow is lighter, the flash appears immediately and fades out gradually, and the viewport stays anchored after the flash finishes instead of snapping to the document end.
 - The selection-preset loading state is now treated as a real busy/disabled state in the chips, and the targeted UI test waits for the preset button to disable rather than probing a fragile accessibility spinner node.
 - Verification for this refinement passed with `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
