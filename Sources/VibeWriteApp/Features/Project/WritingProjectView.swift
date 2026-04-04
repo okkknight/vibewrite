@@ -14,6 +14,8 @@ struct WritingProjectView: View {
     @State private var selectionPopoverPendingPreset: SelectionEditPreset?
     @State private var isSelectionCustomInputActive = false
     @State private var isSelectionCustomInputHighlighted = false
+    @State private var localEditFlash: WritingLocalEditFlash?
+    @State private var isLocalEditViewportLocked = false
     @State private var showComparison = false
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
@@ -61,6 +63,8 @@ struct WritingProjectView: View {
             selectionPopoverPendingPreset = nil
             isSelectionCustomInputActive = false
             isSelectionCustomInputHighlighted = false
+            localEditFlash = nil
+            isLocalEditViewportLocked = false
             showComparison = false
             showAssistantLayer = false
             showHistoryLayer = false
@@ -294,7 +298,9 @@ struct WritingProjectView: View {
                     textColor: NSColor.vibeCanvasInk,
                     insertionPointColor: NSColor.vibeAccent,
                     selectedTextBackgroundColor: NSColor.vibeAccent.withAlphaComponent(0.30),
-                    textContainerInset: writingBodyTextContainerInset
+                    textContainerInset: writingBodyTextContainerInset,
+                    localEditFlash: localEditFlash,
+                    isViewportLockedDuringLocalEdit: isLocalEditViewportLocked
                 )
                 .id(project.id)
                 .frame(
@@ -559,6 +565,7 @@ struct WritingProjectView: View {
                 return
             }
             beginComposerThinking()
+            beginLocalEditPresentation()
             applyRevision(
                 .edit,
                 selectionText: selection,
@@ -576,6 +583,7 @@ struct WritingProjectView: View {
         resetSelectionEditUIState()
         selectionPopoverPendingPreset = preset
         beginComposerThinking()
+        beginLocalEditPresentation()
         applyRevision(
             .edit,
             selectionText: selection,
@@ -620,7 +628,11 @@ struct WritingProjectView: View {
         Task { @MainActor in
             do {
                 try await flow.performWritingAction(.startDraft, userMessage: trigger, selectionText: nil)
-                schedulePostActionCleanup(clearDraftOnSuccess: true, keepHistoryDrawerOpen: false)
+                schedulePostActionCleanup(
+                    action: .startDraft,
+                    clearDraftOnSuccess: true,
+                    keepHistoryDrawerOpen: false
+                )
             } catch {
                 unlockComposerAfterRequest()
             }
@@ -644,6 +656,7 @@ struct WritingProjectView: View {
                     selectionRange: selectionRange
                 )
                 schedulePostActionCleanup(
+                    action: action,
                     clearDraftOnSuccess: clearDraftOnSuccess,
                     keepHistoryDrawerOpen: keepHistoryDrawerOpen
                 )
@@ -659,6 +672,7 @@ struct WritingProjectView: View {
     }
 
     private func schedulePostActionCleanup(
+        action: WritingAIAction,
         clearDraftOnSuccess: Bool,
         keepHistoryDrawerOpen: Bool
     ) {
@@ -667,6 +681,11 @@ struct WritingProjectView: View {
         let shouldUpdateHistoryDrawer = shouldShowHistorySidebar && showHistoryLayer != keepHistoryDrawerOpen
         let shouldClearDraft = clearDraftOnSuccess && !messageDraft.isEmpty
         let shouldReleaseFocus = clearDraftOnSuccess && messageFieldFocused
+        let latestRevision = flow.activeProject.revisionHistory.last
+        let shouldFlashLocalEdit = action == .edit && latestRevision?.patch.replacementHighlightRange != nil
+        let flash = latestRevision?.patch.replacementHighlightRange.map {
+            WritingLocalEditFlash(range: $0)
+        }
 
         DispatchQueue.main.async {
             isComposerLocked = false
@@ -688,12 +707,37 @@ struct WritingProjectView: View {
             if shouldReleaseFocus {
                 messageFieldFocused = false
             }
+
+            if shouldFlashLocalEdit, let flash {
+                localEditFlash = flash
+                isLocalEditViewportLocked = true
+
+                DispatchQueue.main.asyncAfter(deadline: .now() + 2.0) {
+                    if localEditFlash?.id == flash.id {
+                        localEditFlash = nil
+                        isLocalEditViewportLocked = false
+                    }
+                }
+            } else if action == .edit {
+                localEditFlash = nil
+                isLocalEditViewportLocked = false
+            } else {
+                localEditFlash = nil
+                isLocalEditViewportLocked = false
+            }
         }
     }
 
     private func unlockComposerAfterRequest() {
         isComposerLocked = false
         selectionPopoverPendingPreset = nil
+        localEditFlash = nil
+        isLocalEditViewportLocked = false
+    }
+
+    private func beginLocalEditPresentation() {
+        isLocalEditViewportLocked = true
+        localEditFlash = nil
     }
 
     private func resetSelectionEditUIState() {
@@ -721,6 +765,11 @@ struct WritingProjectView: View {
         showComparison = false
         if shouldShowHistorySidebar {
             showHistoryLayer = true
+        }
+
+        if revision.action == .edit {
+            beginComposerThinking()
+            beginLocalEditPresentation()
         }
 
         applyRevision(

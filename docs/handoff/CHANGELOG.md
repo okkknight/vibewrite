@@ -1,8 +1,14 @@
 # Changelog
 
+## 2026-04-05
+- Local edit completion now has a dedicated transient presentation state: the正文 viewport is locked while the replacement lands, then the newly replaced range flashes briefly so users can see exactly what changed without the page jumping away from the edited passage.
+- The flash is driven from the edit patch itself via the replacement range, so the effect stays scoped to the local edit path instead of becoming a general-purpose document animation.
+- Verification for this update passed with `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
+
 ## 2026-04-04
 - The file/document model was redesigned around a split between正文 and collaboration metadata. Markdown files now keep正文 plus a hidden identity marker, `xattr` owns the primary `docID`, the app-side metadata store keeps the latest conversation history and short summary snapshot, and Save As generates a fresh `docID` instead of inheriting the old one.
 - Open/save now treat collaboration metadata as optional附属信息: if `xattr` and the hidden marker both fail or the stored metadata is malformed, the app falls back to正文-only editing instead of blocking the document.
+- Independent review on 2026-04-04 passed the metadata-storage acceptance checks: `swift test --filter VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`, `swift test --filter VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`, `swift test --filter VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` all succeeded.
 
 ## 2026-04-04
 - Conversation history is now capped to the latest 20 rounds, and the sidebars preview that cap by showing the latest 40 messages. A very short summary snapshot is stored alongside the conversation so the collaboration context can recover without carrying the entire history forever.

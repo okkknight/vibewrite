@@ -597,6 +597,35 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(updated, afterDocument)
     }
 
+    func testEditPatchExposesReplacementHighlightRangeForLocalFlash() throws {
+        let before = WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot
+        let targetText = before.documentText.components(separatedBy: "\n").first!
+        var afterDocument = before.documentText
+        let replacement = targetText + " 这里不用说得太满，留白会更好。"
+        guard let targetRange = afterDocument.range(of: targetText) else {
+            XCTFail("Expected the target selection to exist")
+            return
+        }
+        afterDocument.replaceSubrange(targetRange, with: replacement)
+        let after = before.withDocumentText(afterDocument)
+
+        let patch = try WritingEditPatch.build(
+            action: .edit,
+            before: before,
+            after: after,
+            selectionRange: WritingTextSelectionRange(NSRange(targetRange, in: before.documentText)),
+            userMessage: "请把这段改得更克制一点"
+        )
+
+        XCTAssertEqual(
+            patch.replacementHighlightRange?.nsRange,
+            NSRange(
+                location: NSRange(targetRange, in: before.documentText).location,
+                length: replacement.utf16.count
+            )
+        )
+    }
+
     func testPatchApplicationRejectsLockMismatchWithoutMutatingDocument() throws {
         let before = WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot
         let targetText = before.documentText.components(separatedBy: "\n").first!

@@ -1,6 +1,16 @@
 import AppKit
 import SwiftUI
 
+struct WritingLocalEditFlash: Equatable, Hashable {
+    let id: UUID
+    let range: WritingTextSelectionRange
+
+    init(id: UUID = UUID(), range: WritingTextSelectionRange) {
+        self.id = id
+        self.range = range
+    }
+}
+
 @MainActor
 struct SelectableTextEditor: NSViewRepresentable {
     @Binding var text: String
@@ -15,6 +25,8 @@ struct SelectableTextEditor: NSViewRepresentable {
     var insertionPointColor: NSColor = .vibeAccent
     var selectedTextBackgroundColor: NSColor = NSColor.vibeAccent.withAlphaComponent(0.22)
     var textContainerInset: NSSize = NSSize(width: 18, height: 18)
+    var localEditFlash: WritingLocalEditFlash?
+    var isViewportLockedDuringLocalEdit: Bool = false
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -110,7 +122,8 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView,
             scrollView: scrollView,
             prefersSelectionVisibility: didMutateText == false,
-            shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd
+            shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd,
+            isViewportLockedDuringLocalEdit: isViewportLockedDuringLocalEdit
         )
         if didMutateText {
             context.coordinator.syncSelectionOverlayState(from: textView)
@@ -118,6 +131,11 @@ struct SelectableTextEditor: NSViewRepresentable {
         if didMutateText {
             context.coordinator.ensureReadableTextAttributes(in: textView)
         }
+        context.coordinator.syncLocalEditFlash(
+            localEditFlash,
+            in: textView,
+            scrollView: scrollView
+        )
     }
 
     @MainActor
@@ -140,6 +158,9 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var isPerformingLayoutSync = false
         private var selectionOverlayUpdateGeneration = 0
         private var needsSelectionOverlaySyncAfterLayout = false
+        private var lockedViewportOrigin: CGPoint?
+        private var lastAppliedLocalEditFlashID: UUID?
+        private var highlightedLocalEditRange: NSRange?
 
         private var isApplyingProgrammaticChange: Bool {
             programmaticChangeDepth > 0
@@ -188,7 +209,8 @@ struct SelectableTextEditor: NSViewRepresentable {
                 in: textView,
                 scrollView: scrollView,
                 prefersSelectionVisibility: false,
-                shouldAutoScrollToDocumentEnd: false
+                shouldAutoScrollToDocumentEnd: false,
+                isViewportLockedDuringLocalEdit: false
             )
             syncSelectionOverlayState(from: textView)
             logSelectionEvent("scroll bounds changed selection=\(debugRange(textView.selectedRange())) origin=\(debugPoint(selectionPopoverOrigin))")
@@ -375,7 +397,8 @@ struct SelectableTextEditor: NSViewRepresentable {
             in textView: NSTextView,
             scrollView: NSScrollView,
             prefersSelectionVisibility: Bool,
-            shouldAutoScrollToDocumentEnd: Bool
+            shouldAutoScrollToDocumentEnd: Bool,
+            isViewportLockedDuringLocalEdit: Bool
         ) {
             guard let textContainer = textView.textContainer,
                   let layoutManager = textView.layoutManager else { return }
@@ -389,6 +412,14 @@ struct SelectableTextEditor: NSViewRepresentable {
             let containerWidth = max(visibleWidth - (textInsetX * 2), 1)
 
             guard visibleWidth > 1, visibleHeight > 1 else { return }
+
+            if isViewportLockedDuringLocalEdit {
+                if lockedViewportOrigin == nil {
+                    lockedViewportOrigin = clipBounds.origin
+                }
+            } else {
+                lockedViewportOrigin = nil
+            }
 
             isPerformingLayoutSync = true
             defer {
@@ -425,7 +456,9 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             textView.needsDisplay = true
 
-            if shouldAutoScrollToDocumentEnd {
+            if isViewportLockedDuringLocalEdit, let lockedViewportOrigin {
+                scrollView.contentView.scroll(to: lockedViewportOrigin)
+            } else if shouldAutoScrollToDocumentEnd {
                 let endRange = NSRange(location: textView.string.utf16.count, length: 0)
                 textView.scrollRangeToVisible(endRange)
             } else if prefersSelectionVisibility {
@@ -444,8 +477,56 @@ struct SelectableTextEditor: NSViewRepresentable {
                 contentHeight: contentHeight,
                 usedHeight: usedHeight,
                 shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd,
+                isViewportLockedDuringLocalEdit: isViewportLockedDuringLocalEdit,
                 prefersSelectionVisibility: prefersSelectionVisibility
             )
+        }
+
+        func syncLocalEditFlash(
+            _ localEditFlash: WritingLocalEditFlash?,
+            in textView: NSTextView,
+            scrollView: NSScrollView
+        ) {
+            guard let layoutManager = textView.layoutManager else { return }
+
+            guard let localEditFlash else {
+                clearLocalEditFlash(in: layoutManager)
+                return
+            }
+
+            guard lastAppliedLocalEditFlashID != localEditFlash.id else {
+                return
+            }
+
+            clearLocalEditFlash(in: layoutManager)
+
+            guard let flashRange = localEditFlash.range.range(in: textView.string),
+                  flashRange.lowerBound < flashRange.upperBound else {
+                lastAppliedLocalEditFlashID = nil
+                highlightedLocalEditRange = nil
+                return
+            }
+
+            let highlightRange = NSRange(flashRange, in: textView.string)
+            let highlightColor = NSColor.systemYellow.withAlphaComponent(0.22)
+            layoutManager.addTemporaryAttribute(.backgroundColor, value: highlightColor, forCharacterRange: highlightRange)
+            layoutManager.invalidateDisplay(forCharacterRange: highlightRange)
+            lastAppliedLocalEditFlashID = localEditFlash.id
+            highlightedLocalEditRange = highlightRange
+            textView.needsDisplay = true
+            scrollView.reflectScrolledClipView(scrollView.contentView)
+        }
+
+        private func clearLocalEditFlash(in layoutManager: NSLayoutManager) {
+            guard let highlightedLocalEditRange else {
+                lastAppliedLocalEditFlashID = nil
+                return
+            }
+
+            layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: highlightedLocalEditRange)
+            layoutManager.invalidateDisplay(forCharacterRange: highlightedLocalEditRange)
+            self.highlightedLocalEditRange = nil
+            lastAppliedLocalEditFlashID = nil
         }
 
         func textDidChange(_ notification: Notification) {
@@ -700,6 +781,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             contentHeight: CGFloat,
             usedHeight: CGFloat,
             shouldAutoScrollToDocumentEnd: Bool,
+            isViewportLockedDuringLocalEdit: Bool,
             prefersSelectionVisibility: Bool
         ) {
             let contentBounds = scrollView.contentView.bounds
@@ -714,6 +796,7 @@ struct SelectableTextEditor: NSViewRepresentable {
                 "used=\(safeDimensionString(usedHeight))",
                 "content=\(safeDimensionString(contentHeight))",
                 "autoScroll=\(shouldAutoScrollToDocumentEnd)",
+                "viewportLock=\(isViewportLockedDuringLocalEdit)",
                 "prefersSelection=\(prefersSelectionVisibility)",
                 "selection=\(selection.location),\(selection.length)"
             ].joined(separator: " | ")

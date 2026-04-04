@@ -194,6 +194,18 @@ struct WritingEditPatch: Codable, Hashable {
         action == .edit
     }
 
+    var replacementHighlightRange: WritingTextSelectionRange? {
+        guard action == .edit,
+              let sourceRange else {
+            return nil
+        }
+
+        return WritingTextSelectionRange(
+            location: sourceRange.location,
+            length: replacementText.utf16.count
+        )
+    }
+
     var scopeLabel: String {
         switch action {
         case .startDraft:
