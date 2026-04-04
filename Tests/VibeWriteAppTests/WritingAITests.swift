@@ -185,7 +185,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(userPrompt.contains("should follow the current正文 naturally"))
     }
 
-    func testStreamingPreviewRendererStartsContinuationFromRevealOffset() {
+    func testStreamingPreviewRendererStartsContinuationFromRevealOffset() async {
         let configuration = WritingStreamingConfiguration.configuration(
             from: [
                 "VIBEWRITE_STREAMING_FRAME_INTERVAL_MS": "16",
@@ -202,10 +202,34 @@ final class WritingAITests: XCTestCase {
         }
 
         renderer.updateTargetText("abcdef", revealFromCharacterCount: 4)
-        renderer.flushRemaining()
+        renderer.markStreamCompleted()
+        await renderer.waitForCompletion()
 
         XCTAssertEqual(renders.first, "abcde")
         XCTAssertEqual(renders.last, "abcdef")
+    }
+
+    func testStreamingPreviewRendererKeepsFinishingOneCharacterAtATime() async {
+        let configuration = WritingStreamingConfiguration.configuration(
+            from: [
+                "VIBEWRITE_STREAMING_FRAME_INTERVAL_MS": "16",
+                "VIBEWRITE_STREAMING_CHARACTERS_PER_SECOND": "60",
+                "VIBEWRITE_STREAMING_INITIAL_BURST_CHARACTERS": "1",
+                "VIBEWRITE_STREAMING_MINIMUM_CHARACTERS_PER_TICK": "1",
+                "VIBEWRITE_STREAMING_MAXIMUM_CHARACTERS_PER_TICK": "1"
+            ]
+        )
+
+        var renders: [String] = []
+        let renderer = WritingStreamingPreviewRenderer(configuration: configuration) { renderedText in
+            renders.append(renderedText)
+        }
+
+        renderer.updateTargetText("abcd")
+        renderer.markStreamCompleted()
+        await renderer.waitForCompletion()
+
+        XCTAssertEqual(renders, ["a", "ab", "abc", "abcd"])
     }
 
     func testRemoteClientUsesAnthropicCompatibleRequestAndStreamsTextDeltas() async throws {

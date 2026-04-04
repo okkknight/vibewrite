@@ -9,6 +9,9 @@ final class WritingStreamingPreviewRenderer {
     private var playbackTask: Task<Void, Never>?
     private var didShowInitialBurst = false
     private var revealStartCharacterCount = 0
+    private var isStreamCompleted = false
+    private var didSignalCompletion = false
+    private var completionContinuation: CheckedContinuation<Void, Never>?
 
     init(
         configuration: WritingStreamingConfiguration,
@@ -38,9 +41,21 @@ final class WritingStreamingPreviewRenderer {
         startPlaybackIfNeeded()
     }
 
-    func flushRemaining() {
-        render(targetText)
-        cancelPlayback()
+    func markStreamCompleted() {
+        isStreamCompleted = true
+        startPlaybackIfNeeded()
+        resolveCompletionIfNeeded()
+    }
+
+    func waitForCompletion() async {
+        guard didSignalCompletion == false else {
+            return
+        }
+
+        await withCheckedContinuation { continuation in
+            completionContinuation = continuation
+            resolveCompletionIfNeeded()
+        }
     }
 
     func cancelPlayback() {
@@ -65,6 +80,7 @@ final class WritingStreamingPreviewRenderer {
 
         while !Task.isCancelled {
             guard renderedText.count < targetText.count else {
+                resolveCompletionIfNeeded()
                 break
             }
 
@@ -78,11 +94,14 @@ final class WritingStreamingPreviewRenderer {
             render(nextRenderedText)
 
             if renderedText.count >= targetText.count {
+                resolveCompletionIfNeeded()
                 break
             }
 
             try? await Task.sleep(nanoseconds: configuration.frameIntervalNanoseconds)
         }
+
+        resolveCompletionIfNeeded()
     }
 
     private func revealInitialBurst() {
@@ -104,6 +123,22 @@ final class WritingStreamingPreviewRenderer {
 
         renderedText = newText
         applyRenderedText(newText)
+        resolveCompletionIfNeeded()
+    }
+
+    private func resolveCompletionIfNeeded() {
+        guard isStreamCompleted, renderedText.count >= targetText.count else {
+            return
+        }
+
+        guard didSignalCompletion == false else {
+            return
+        }
+
+        didSignalCompletion = true
+        let continuation = completionContinuation
+        completionContinuation = nil
+        continuation?.resume()
     }
 
     private func prefix(of text: String, characterCount: Int) -> String {

@@ -1,7 +1,12 @@
 # Changelog
 
 ## 2026-04-05
+- Non-`edit` streaming preview now finishes character by character after the upstream stream ends instead of calling a one-shot flush that instantly appends the remaining tail.
+- The renderer now has an explicit completed state, so the flow waits for the preview to catch up before applying the final document result.
+
+## 2026-04-05
 - `continueWriting` now consumes a persisted `continuationSummary` plus a trimmed document tail instead of the full正文, which keeps the continuation prompt compact and makes the model-facing summary separate from the UI-facing summary.
+- Independent review on 2026-04-05 passed the continuation-summary acceptance checks: `WritingAITests/testContinueWritingPromptRequestsConcreteSuggestionChips`, `VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`, `VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`, `VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` all succeeded.
 
 ## 2026-04-05
 - Local edit completion now has a dedicated transient presentation state: the正文 viewport is locked while the replacement lands, then the newly replaced range flashes briefly so users can see exactly what changed without the page jumping away from the edited passage.

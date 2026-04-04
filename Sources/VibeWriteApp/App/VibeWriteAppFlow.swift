@@ -322,7 +322,10 @@ final class VibeWriteAppFlow: ObservableObject {
                 }
             }
 
-            previewRenderer?.flushRemaining()
+            if let previewRenderer {
+                previewRenderer.markStreamCompleted()
+                await previewRenderer.waitForCompletion()
+            }
 
             guard let response = finalResponse else {
                 throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
