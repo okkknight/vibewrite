@@ -9,6 +9,7 @@ struct WritingProjectView: View {
 
     @State private var messageDraft = ""
     @State private var selectedText: String?
+    @State private var selectedTextRange: WritingTextSelectionRange?
     @State private var selectionPopoverOrigin: CGPoint?
     @State private var showComparison = false
     @State private var showAssistantLayer = false
@@ -49,6 +50,7 @@ struct WritingProjectView: View {
         }
         .onChange(of: project.id) { _, _ in
             selectedText = nil
+            selectedTextRange = nil
             selectionPopoverOrigin = nil
             showComparison = false
             showAssistantLayer = false
@@ -266,6 +268,7 @@ struct WritingProjectView: View {
                 SelectableTextEditor(
                     text: projectBinding.documentText,
                     selectedText: $selectedText,
+                    selectedTextRange: $selectedTextRange,
                     selectionPopoverOrigin: $selectionPopoverOrigin,
                     isEditable: !flow.isAIRequestInFlight && flow.activeEditLock == nil,
                     accessibilityIdentifier: VibeWriteAutomationID.projectBodyEditor,
@@ -297,6 +300,7 @@ struct WritingProjectView: View {
                             applyRevision(
                                 .edit,
                                 selectionText: selectedText,
+                                selectionRange: selectedTextRange,
                                 userMessage: draftInstructionText(),
                                 clearDraftOnSuccess: true
                             )
@@ -534,11 +538,13 @@ struct WritingProjectView: View {
             )
 
         case .edit:
-            guard let selection = normalizedSelectedText else { return }
+            guard let selection = selectedText,
+                  !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
             beginComposerThinking()
             applyRevision(
                 .edit,
                 selectionText: selection,
+                selectionRange: selectedTextRange,
                 userMessage: draftInstructionText(),
                 clearDraftOnSuccess: true
             )
@@ -577,6 +583,7 @@ struct WritingProjectView: View {
     private func applyRevision(
         _ action: WritingAIAction,
         selectionText: String?,
+        selectionRange: WritingTextSelectionRange? = nil,
         userMessage: String? = nil,
         clearDraftOnSuccess: Bool = false,
         keepHistoryDrawerOpen: Bool = false
@@ -586,7 +593,8 @@ struct WritingProjectView: View {
                 try await flow.performWritingAction(
                     action,
                     userMessage: userMessage,
-                    selectionText: selectionText
+                    selectionText: selectionText,
+                    selectionRange: selectionRange
                 )
                 schedulePostActionCleanup(
                     clearDraftOnSuccess: clearDraftOnSuccess,
@@ -617,6 +625,7 @@ struct WritingProjectView: View {
             isComposerLocked = false
             if shouldClearSelection {
                 selectedText = nil
+                selectedTextRange = nil
             }
             if shouldCloseComparison {
                 showComparison = false
@@ -643,6 +652,7 @@ struct WritingProjectView: View {
 
         _ = flow.undoLastRevision()
         selectedText = revision.lockedSelectionText
+        selectedTextRange = revision.lockedSelectionRange
         showComparison = false
         if shouldShowHistorySidebar {
             showHistoryLayer = true
@@ -651,6 +661,7 @@ struct WritingProjectView: View {
         applyRevision(
             revision.action,
             selectionText: revision.lockedSelectionText,
+            selectionRange: revision.lockedSelectionRange,
             userMessage: revision.patch.userMessage,
             clearDraftOnSuccess: revision.patch.userMessage != nil || revision.action == .startDraft,
             keepHistoryDrawerOpen: true
@@ -662,6 +673,7 @@ struct WritingProjectView: View {
         guard flow.undoLastRevision() != nil else { return }
 
         selectedText = nil
+        selectedTextRange = nil
         showComparison = false
         if shouldShowHistorySidebar {
             showHistoryLayer = true

@@ -50,9 +50,7 @@ enum WritingProjectResponseBuilder {
             return request.project.documentText + streamedText
 
         case .edit:
-            guard let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !selection.isEmpty,
-                  let targetRange = request.project.documentText.range(of: selection) else {
+            guard let targetRange = selectedTargetRange(in: request.project.documentText, request: request) else {
                 return request.project.documentText
             }
 
@@ -83,9 +81,7 @@ enum WritingProjectResponseBuilder {
             return String(finalDocumentText.dropFirst(request.project.documentText.count))
 
         case .edit:
-            guard let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !selection.isEmpty,
-                  let targetRange = request.project.documentText.range(of: selection) else {
+            guard let targetRange = selectedTargetRange(in: request.project.documentText, request: request) else {
                 return finalDocumentText
             }
 
@@ -115,6 +111,7 @@ enum WritingProjectResponseBuilder {
             return MockWritingEngine.revisedText(
                 for: currentDocument,
                 selectedSegment: selection,
+                selectedRange: request.selectionRange,
                 action: .continueWriting,
                 variant: .standard
             )
@@ -123,6 +120,7 @@ enum WritingProjectResponseBuilder {
             return MockWritingEngine.revisedText(
                 for: currentDocument,
                 selectedSegment: selection,
+                selectedRange: request.selectionRange,
                 action: .edit,
                 variant: .standard
             )
@@ -195,6 +193,23 @@ enum WritingProjectResponseBuilder {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
+    }
+
+    private static func selectedTargetRange(
+        in documentText: String,
+        request: WritingAIRequest
+    ) -> Range<String.Index>? {
+        if let selectionRange = request.selectionRange,
+           let exactRange = selectionRange.range(in: documentText) {
+            return exactRange
+        }
+
+        guard let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !selection.isEmpty else {
+            return nil
+        }
+
+        return documentText.range(of: selection)
     }
 }
 

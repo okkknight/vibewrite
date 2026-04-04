@@ -15,6 +15,7 @@ struct WritingAIRequest: Codable, Hashable {
     var project: WritingProjectSnapshot
     var userMessage: String?
     var selectionText: String?
+    var selectionRange: WritingTextSelectionRange? = nil
 }
 
 struct WritingProjectSnapshot: Codable, Hashable {

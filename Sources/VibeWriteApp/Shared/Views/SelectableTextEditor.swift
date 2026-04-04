@@ -5,6 +5,7 @@ import SwiftUI
 struct SelectableTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var selectedText: String?
+    @Binding var selectedTextRange: WritingTextSelectionRange?
     @Binding var selectionPopoverOrigin: CGPoint?
     var isEditable: Bool = true
     var accessibilityIdentifier: String?
@@ -19,6 +20,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         Coordinator(
             text: $text,
             selectedText: $selectedText,
+            selectedTextRange: $selectedTextRange,
             selectionPopoverOrigin: $selectionPopoverOrigin,
             readableContentWidth: readableContentWidth
         )
@@ -126,6 +128,7 @@ struct SelectableTextEditor: NSViewRepresentable {
     final class Coordinator: NSObject, NSTextViewDelegate {
         @Binding private var text: String
         @Binding private var selectedText: String?
+        @Binding private var selectedTextRange: WritingTextSelectionRange?
         @Binding private var selectionPopoverOrigin: CGPoint?
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
@@ -150,11 +153,13 @@ struct SelectableTextEditor: NSViewRepresentable {
         init(
             text: Binding<String>,
             selectedText: Binding<String?>,
+            selectedTextRange: Binding<WritingTextSelectionRange?>,
             selectionPopoverOrigin: Binding<CGPoint?>,
             readableContentWidth: CGFloat?
         ) {
             _text = text
             _selectedText = selectedText
+            _selectedTextRange = selectedTextRange
             _selectionPopoverOrigin = selectionPopoverOrigin
             self.readableContentWidth = readableContentWidth
         }
@@ -343,7 +348,7 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             let range = textView.selectedRange()
             guard let snapshot = selectionSnapshot(from: textView, selection: range) else {
-                enqueueSelectionOverlayUpdate(selectedText: nil, origin: nil)
+                enqueueSelectionOverlayUpdate(selectedText: nil, selectedTextRange: nil, origin: nil)
                 if range.length == 0 {
                     logSelectionEvent("selection cleared selection=\(debugRange(range))")
                     logSelectionEvent("popover origin cleared empty selection=\(debugRange(range))")
@@ -351,7 +356,11 @@ struct SelectableTextEditor: NSViewRepresentable {
                 return
             }
 
-            enqueueSelectionOverlayUpdate(selectedText: snapshot.selectedText, origin: snapshot.origin)
+            enqueueSelectionOverlayUpdate(
+                selectedText: snapshot.selectedText,
+                selectedTextRange: snapshot.selectionRange,
+                origin: snapshot.origin
+            )
             logSelectionEvent(
                 "selection updated selection=\(debugRange(range)) preview=\(snapshot.selectedText.vibewriteLogPreview(maxLength: 60))"
             )
@@ -477,7 +486,19 @@ struct SelectableTextEditor: NSViewRepresentable {
         }
 
         private func enqueueSelectionOverlayUpdate(selectedText newSelectedText: String?, origin newOrigin: CGPoint?) {
-            guard selectedText != newSelectedText || selectionPopoverOrigin != newOrigin else { return }
+            enqueueSelectionOverlayUpdate(
+                selectedText: newSelectedText,
+                selectedTextRange: nil,
+                origin: newOrigin
+            )
+        }
+
+        private func enqueueSelectionOverlayUpdate(
+            selectedText newSelectedText: String?,
+            selectedTextRange newSelectedTextRange: WritingTextSelectionRange?,
+            origin newOrigin: CGPoint?
+        ) {
+            guard selectedText != newSelectedText || selectedTextRange != newSelectedTextRange || selectionPopoverOrigin != newOrigin else { return }
 
             selectionOverlayUpdateGeneration += 1
             let generation = selectionOverlayUpdateGeneration
@@ -488,6 +509,9 @@ struct SelectableTextEditor: NSViewRepresentable {
                 if self.selectedText != newSelectedText {
                     self.selectedText = newSelectedText
                 }
+                if self.selectedTextRange != newSelectedTextRange {
+                    self.selectedTextRange = newSelectedTextRange
+                }
                 if self.selectionPopoverOrigin != newOrigin {
                     self.selectionPopoverOrigin = newOrigin
                 }
@@ -497,7 +521,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         private func selectionSnapshot(
             from textView: NSTextView,
             selection: NSRange
-        ) -> (selectedText: String, origin: CGPoint, rectInScrollView: CGRect, visibleWidth: CGFloat, visibleHeight: CGFloat)? {
+        ) -> (selectedText: String, selectionRange: WritingTextSelectionRange, origin: CGPoint, rectInScrollView: CGRect, visibleWidth: CGFloat, visibleHeight: CGFloat)? {
             guard selection.length > 0 else { return nil }
 
             let string = textView.string as NSString
@@ -566,6 +590,7 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             return (
                 selectedText: selectedText,
+                selectionRange: WritingTextSelectionRange(selection),
                 origin: CGPoint(x: clampedX, y: clampedY),
                 rectInScrollView: selectionRectInScrollView,
                 visibleWidth: visibleWidth,

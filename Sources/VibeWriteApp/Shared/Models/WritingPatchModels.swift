@@ -61,6 +61,7 @@ struct WritingEditPatch: Codable, Hashable {
     let action: WritingAIAction
     let lockedSelectionText: String?
     let sourceText: String?
+    let sourceRange: WritingTextSelectionRange?
     let leadingContext: String?
     let trailingContext: String?
     let replacementText: String
@@ -72,6 +73,7 @@ struct WritingEditPatch: Codable, Hashable {
         action: WritingAIAction,
         lockedSelectionText: String?,
         sourceText: String?,
+        sourceRange: WritingTextSelectionRange? = nil,
         leadingContext: String? = nil,
         trailingContext: String? = nil,
         replacementText: String,
@@ -82,6 +84,7 @@ struct WritingEditPatch: Codable, Hashable {
         self.action = action
         self.lockedSelectionText = lockedSelectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
         self.sourceText = sourceText?.trimmingCharacters(in: .whitespacesAndNewlines)
+        self.sourceRange = sourceRange
         self.leadingContext = leadingContext
         self.trailingContext = trailingContext
         self.replacementText = replacementText
@@ -95,11 +98,9 @@ struct WritingEditPatch: Codable, Hashable {
         before: WritingProjectSnapshot,
         after: WritingProjectSnapshot,
         selectionText: String?,
+        selectionRange: WritingTextSelectionRange? = nil,
         userMessage: String?
     ) throws -> WritingEditPatch {
-        let trimmedSelection = selectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let normalizedSelection = trimmedSelection.flatMap { $0.isEmpty ? nil : $0 }
-
         switch action {
         case .startDraft:
             let replacementText = after.documentText
@@ -136,11 +137,22 @@ struct WritingEditPatch: Codable, Hashable {
             )
 
         case .edit:
-            guard let sourceText = normalizedSelection else {
+            guard let sourceTextRange = resolvedSelectionRange(
+                in: before.documentText,
+                selectionText: selectionText,
+                selectionRange: selectionRange
+            ) else {
                 throw WritingEditPatchError.missingSelection
             }
 
-            guard let targetRange = before.documentText.range(of: sourceText) else {
+            let sourceRange = WritingTextSelectionRange(NSRange(sourceTextRange, in: before.documentText))
+
+            guard let sourceText = sourceRange.substring(in: before.documentText)?.trimmingCharacters(in: .whitespacesAndNewlines),
+                  !sourceText.isEmpty else {
+                throw WritingEditPatchError.missingSelection
+            }
+
+            guard let targetRange = sourceRange.range(in: before.documentText) else {
                 throw WritingEditPatchError.patchContextMismatch
             }
 
@@ -171,6 +183,7 @@ struct WritingEditPatch: Codable, Hashable {
                 action: action,
                 lockedSelectionText: sourceText,
                 sourceText: sourceText,
+                sourceRange: sourceRange,
                 leadingContext: leadingContext,
                 trailingContext: trailingContext,
                 replacementText: replacementText,
@@ -231,6 +244,12 @@ struct WritingEditPatch: Codable, Hashable {
                 throw WritingEditPatchError.missingSelection
             }
 
+            if let sourceRange, let targetRange = sourceRange.range(in: documentText) {
+                var updated = documentText
+                updated.replaceSubrange(targetRange, with: replacementText)
+                return updated
+            }
+
             let targetContext = (leadingContext ?? "") + sourceText + (trailingContext ?? "")
             guard let targetRange = documentText.range(of: targetContext) else {
                 throw WritingEditPatchError.patchContextMismatch
@@ -242,6 +261,23 @@ struct WritingEditPatch: Codable, Hashable {
             updated.replaceSubrange(sourceStart..<sourceEnd, with: replacementText)
             return updated
         }
+    }
+
+    private static func resolvedSelectionRange(
+        in documentText: String,
+        selectionText: String?,
+        selectionRange: WritingTextSelectionRange?
+    ) -> Range<String.Index>? {
+        if let selectionRange, let exactRange = selectionRange.range(in: documentText) {
+            return exactRange
+        }
+
+        guard let selectionText = selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !selectionText.isEmpty else {
+            return nil
+        }
+
+        return documentText.range(of: selectionText)
     }
 }
 
@@ -303,6 +339,10 @@ struct WritingProjectRevision: Identifiable, Hashable, Codable {
 
     var lockedSelectionText: String? {
         patch.lockedSelectionText
+    }
+
+    var lockedSelectionRange: WritingTextSelectionRange? {
+        patch.sourceRange
     }
 
     var title: String {

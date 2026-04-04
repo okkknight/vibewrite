@@ -37,6 +37,40 @@ struct ProjectContext: Codable, Hashable {
     }
 }
 
+struct WritingTextSelectionRange: Codable, Hashable {
+    var location: Int
+    var length: Int
+
+    init(location: Int, length: Int) {
+        self.location = max(location, 0)
+        self.length = max(length, 0)
+    }
+
+    init(_ range: NSRange) {
+        self.init(location: range.location, length: range.length)
+    }
+
+    var isEmpty: Bool {
+        length <= 0
+    }
+
+    var nsRange: NSRange {
+        NSRange(location: location, length: length)
+    }
+
+    func range(in text: String) -> Range<String.Index>? {
+        Range(nsRange, in: text)
+    }
+
+    func substring(in text: String) -> String? {
+        guard let range = range(in: text) else {
+            return nil
+        }
+
+        return String(text[range])
+    }
+}
+
 struct WritingProject: Identifiable, Hashable, Codable {
     let id: UUID
     var automationKey: String { didSet { touch() } }

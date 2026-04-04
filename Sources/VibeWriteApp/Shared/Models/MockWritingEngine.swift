@@ -52,13 +52,15 @@ enum MockWritingEngine {
     static func revisedText(
         for document: String,
         selectedSegment: String?,
+        selectedRange: WritingTextSelectionRange? = nil,
         action: MockWritingAction,
         variant: MockWritingVariant
     ) -> String {
-        if let selectedSegment {
+        if let targetRange = selectedTargetRange(in: document, selectedSegment: selectedSegment, selectedRange: selectedRange) {
+            let selectedSegment = String(document[targetRange])
             return replaceSelectedSegment(
                 in: document,
-                target: selectedSegment,
+                targetRange: targetRange,
                 with: revisedSegment(selectedSegment, action: action, variant: variant)
             )
         }
@@ -76,6 +78,7 @@ enum MockWritingEngine {
             return revisedText(
                 for: request.project.documentText,
                 selectedSegment: request.selectionText,
+                selectedRange: request.selectionRange,
                 action: .continueWriting,
                 variant: .standard
             )
@@ -84,6 +87,7 @@ enum MockWritingEngine {
             return revisedText(
                 for: request.project.documentText,
                 selectedSegment: request.selectionText,
+                selectedRange: request.selectionRange,
                 action: .edit,
                 variant: .standard
             )
@@ -99,14 +103,16 @@ enum MockWritingEngine {
             return request.project.documentText + streamedText
 
         case .edit:
-            guard let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !selection.isEmpty,
-                  let range = request.project.documentText.range(of: selection) else {
+            guard let targetRange = selectedTargetRange(
+                in: request.project.documentText,
+                selectedSegment: request.selectionText,
+                selectedRange: request.selectionRange
+            ) else {
                 return request.project.documentText
             }
 
             var revised = request.project.documentText
-            revised.replaceSubrange(range, with: streamedText)
+            revised.replaceSubrange(targetRange, with: streamedText)
             return revised
         }
     }
@@ -122,9 +128,11 @@ enum MockWritingEngine {
             return String(finalDocumentText.dropFirst(request.project.documentText.count))
 
         case .edit:
-            guard let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines),
-                  !selection.isEmpty,
-                  let targetRange = request.project.documentText.range(of: selection) else {
+            guard let targetRange = selectedTargetRange(
+                in: request.project.documentText,
+                selectedSegment: request.selectionText,
+                selectedRange: request.selectionRange
+            ) else {
                 return finalDocumentText
             }
 
@@ -266,13 +274,30 @@ enum MockWritingEngine {
         }
     }
 
-    private static func replaceSelectedSegment(in document: String, target: String, with replacement: String) -> String {
-        guard let range = document.range(of: target) else {
-            return document
+    private static func replaceSelectedSegment(
+        in document: String,
+        targetRange: Range<String.Index>,
+        with replacement: String
+    ) -> String {
+        var copy = document
+        copy.replaceSubrange(targetRange, with: replacement)
+        return copy
+    }
+
+    private static func selectedTargetRange(
+        in document: String,
+        selectedSegment: String?,
+        selectedRange: WritingTextSelectionRange?
+    ) -> Range<String.Index>? {
+        if let selectedRange, let exactRange = selectedRange.range(in: document) {
+            return exactRange
         }
 
-        var copy = document
-        copy.replaceSubrange(range, with: replacement)
-        return copy
+        guard let selectedSegment = selectedSegment?.trimmingCharacters(in: .whitespacesAndNewlines),
+              !selectedSegment.isEmpty else {
+            return nil
+        }
+
+        return document.range(of: selectedSegment)
     }
 }

@@ -203,7 +203,8 @@ final class VibeWriteAppFlow: ObservableObject {
     func performWritingAction(
         _ action: WritingAIAction,
         userMessage: String? = nil,
-        selectionText: String? = nil
+        selectionText: String? = nil,
+        selectionRange: WritingTextSelectionRange? = nil
     ) async throws {
         guard !isAIRequestInFlight else {
             throw WritingAIClientError.requestFailed("已有请求正在进行，请稍后再试。")
@@ -240,8 +241,15 @@ final class VibeWriteAppFlow: ObservableObject {
                 throw WritingEditPatchError.missingSelection
             }
 
-            guard project.documentText.range(of: normalizedSelectionText) != nil else {
-                throw WritingEditPatchError.patchContextMismatch
+            if let selectionRange {
+                guard let exactSelection = selectionRange.substring(in: project.documentText),
+                      exactSelection.trimmingCharacters(in: .whitespacesAndNewlines) == normalizedSelectionText else {
+                    throw WritingEditPatchError.patchContextMismatch
+                }
+            } else {
+                guard project.documentText.range(of: normalizedSelectionText) != nil else {
+                    throw WritingEditPatchError.patchContextMismatch
+                }
             }
         }
 
@@ -249,7 +257,8 @@ final class VibeWriteAppFlow: ObservableObject {
             action: action,
             project: project.aiSnapshot,
             userMessage: requestUserMessage,
-            selectionText: selectionText
+            selectionText: selectionText,
+            selectionRange: selectionRange
         )
 
         do {
@@ -276,44 +285,32 @@ final class VibeWriteAppFlow: ObservableObject {
             replaceActiveProject(liveProject, persist: false)
 
             var streamedText = ""
-            let previewRenderer = WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
+            let previewRenderer: WritingStreamingPreviewRenderer? = action == .edit ? nil : WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
                 liveProject.documentText = renderedText
                 self.replaceActiveProject(liveProject, persist: false)
             }
-            let revealFromCharacterCount: Int = {
-                switch action {
-                case .startDraft:
-                    return 0
-                case .continueWriting:
-                    return beforeSnapshot.documentText.count
-                case .edit:
-                    return selectionRevealStartCharacterCount(
-                        in: beforeSnapshot.documentText,
-                        selectionText: normalizedSelectionText
-                    )
-                }
-            }()
             var finalResponse: WritingAIResponse?
             for try await event in aiClient.streamResponse(for: request) {
                 switch event {
                 case .textDelta(let delta):
                     streamedText += delta
-                    previewRenderer.updateTargetText(
-                        previewDocumentText(
-                            for: action,
-                            baseDocumentText: beforeSnapshot.documentText,
-                            selectionText: normalizedSelectionText,
-                            streamedText: streamedText
-                        ),
-                        revealFromCharacterCount: revealFromCharacterCount
-                    )
+                    if let previewRenderer {
+                        previewRenderer.updateTargetText(
+                            previewDocumentText(
+                                for: action,
+                                baseDocumentText: beforeSnapshot.documentText,
+                                selectionText: normalizedSelectionText,
+                                streamedText: streamedText
+                            )
+                        )
+                    }
 
                 case .completed(let response):
                     finalResponse = response
                 }
             }
 
-            previewRenderer.flushRemaining()
+            previewRenderer?.flushRemaining()
 
             guard let response = finalResponse else {
                 throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
@@ -323,6 +320,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 before: beforeSnapshot,
                 after: response.snapshotByApplyingDocumentText(response.documentText, to: beforeSnapshot),
                 selectionText: normalizedSelectionText,
+                selectionRange: selectionRange,
                 userMessage: requestUserMessage
             )
             let updatedDocumentText = try patch.apply(
@@ -405,18 +403,6 @@ final class VibeWriteAppFlow: ObservableObject {
             preview.replaceSubrange(targetRange, with: streamedText)
             return preview
         }
-    }
-
-    private func selectionRevealStartCharacterCount(
-        in documentText: String,
-        selectionText: String?
-    ) -> Int {
-        guard let selectionText,
-              let targetRange = documentText.range(of: selectionText) else {
-            return 0
-        }
-
-        return documentText.distance(from: documentText.startIndex, to: targetRange.lowerBound)
     }
 
     private func streamingSummary(for action: WritingAIAction) -> String {
