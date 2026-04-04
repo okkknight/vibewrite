@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-04-04
+- The latest selection-popover regression was traced to the AppKit bridge missing direct non-empty selection changes and only recomputing the overlay once the scroll view bounds moved. `SelectableTextEditor` now observes `NSTextView.didChangeSelectionNotification` directly and flushes any selection sync that arrived during layout as soon as layout completes, so the popover does not have to wait for a manual scroll.
+
+## 2026-04-04
 - The selection popover issue was narrowed to the AppKit bridge: `SelectableTextEditor` no longer writes a nil desired selection back into the text view during update sync, so a live user selection can stabilize instead of being cleared during layout churn.
 - The change keeps the rest of the selection/edit flow intact; only the selection-clearing branch in the bridge was removed.
 

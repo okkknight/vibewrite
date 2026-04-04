@@ -75,7 +75,7 @@ struct SelectableTextEditor: NSViewRepresentable {
 
         context.coordinator.textView = textView
         context.coordinator.readableContentWidth = readableContentWidth
-        context.coordinator.installLayoutObserver(for: scrollView)
+        context.coordinator.installObservers(for: scrollView, textView: textView)
         context.coordinator.syncTypography(
             isEditable: isEditable,
             font: textFont,
@@ -141,6 +141,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var lastLoggedLayoutSignature: String?
         private var isPerformingLayoutSync = false
         private var selectionOverlayUpdateGeneration = 0
+        private var needsSelectionOverlaySyncAfterLayout = false
 
         private var isApplyingProgrammaticChange: Bool {
             programmaticChangeDepth > 0
@@ -162,14 +163,21 @@ struct SelectableTextEditor: NSViewRepresentable {
             NotificationCenter.default.removeObserver(self)
         }
 
-        func installLayoutObserver(for scrollView: NSScrollView) {
+        func installObservers(for scrollView: NSScrollView, textView: NSTextView) {
             self.scrollView = scrollView
+            self.textView = textView
             NotificationCenter.default.removeObserver(self)
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(handleScrollViewBoundsDidChange(_:)),
                 name: NSView.boundsDidChangeNotification,
                 object: scrollView.contentView
+            )
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleTextViewSelectionDidChange(_:)),
+                name: NSTextView.didChangeSelectionNotification,
+                object: textView
             )
         }
 
@@ -187,6 +195,24 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             syncSelectionOverlayState(from: textView)
             logSelectionEvent("scroll bounds changed selection=\(debugRange(textView.selectedRange())) origin=\(debugPoint(selectionPopoverOrigin))")
+        }
+
+        @objc
+        private func handleTextViewSelectionDidChange(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else {
+                return
+            }
+
+            guard !isApplyingProgrammaticChange else { return }
+
+            if isPerformingLayoutSync {
+                needsSelectionOverlaySyncAfterLayout = true
+                logSelectionEvent("selection change deferred during layout selection=\(debugRange(textView.selectedRange())) editable=\(textView.isEditable)")
+                return
+            }
+
+            logSelectionEvent("selection notification changed selection=\(debugRange(textView.selectedRange())) editable=\(textView.isEditable)")
+            syncSelectionOverlayState(from: textView)
         }
 
         func syncTypography(
@@ -367,7 +393,10 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard visibleWidth > 1, visibleHeight > 1 else { return }
 
             isPerformingLayoutSync = true
-            defer { isPerformingLayoutSync = false }
+            defer {
+                isPerformingLayoutSync = false
+                flushDeferredSelectionOverlaySyncIfNeeded(for: textView)
+            }
 
             let desiredContainerSize = NSSize(
                 width: containerWidth,
@@ -434,21 +463,17 @@ struct SelectableTextEditor: NSViewRepresentable {
             syncSelectionOverlayState(from: textView)
         }
 
-        func textViewDidChangeSelection(_ notification: Notification) {
-            guard let textView = notification.object as? NSTextView else {
-                return
-            }
-
-            guard !isApplyingProgrammaticChange else { return }
-            guard !isPerformingLayoutSync else { return }
-
-            logSelectionEvent("delegate selection changed selection=\(debugRange(textView.selectedRange())) editable=\(textView.isEditable)")
-            syncSelectionOverlayState(from: textView)
-        }
-
         private func setTextIfNeeded(_ newText: String) {
             guard text != newText else { return }
             text = newText
+        }
+
+        private func flushDeferredSelectionOverlaySyncIfNeeded(for textView: NSTextView) {
+            guard needsSelectionOverlaySyncAfterLayout else { return }
+            needsSelectionOverlaySyncAfterLayout = false
+
+            logSelectionEvent("selection change flushed after layout selection=\(debugRange(textView.selectedRange())) editable=\(textView.isEditable)")
+            syncSelectionOverlayState(from: textView)
         }
 
         private func enqueueSelectionOverlayUpdate(selectedText newSelectedText: String?, origin newOrigin: CGPoint?) {
