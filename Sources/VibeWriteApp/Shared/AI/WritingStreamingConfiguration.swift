@@ -25,27 +25,27 @@ struct WritingStreamingConfiguration {
             for: "VIBEWRITE_STREAMING_FRAME_INTERVAL_MS",
             in: info,
             environment: environment
-        ) ?? 16
+        ) ?? 28
         let charactersPerSecond = resolvedDouble(
             for: "VIBEWRITE_STREAMING_CHARACTERS_PER_SECOND",
             in: info,
             environment: environment
-        ) ?? 540
+        ) ?? 260
         let initialBurstCharacters = resolvedInt(
             for: "VIBEWRITE_STREAMING_INITIAL_BURST_CHARACTERS",
             in: info,
             environment: environment
-        ) ?? 18
+        ) ?? 12
         let minimumCharactersPerTick = resolvedInt(
             for: "VIBEWRITE_STREAMING_MINIMUM_CHARACTERS_PER_TICK",
             in: info,
             environment: environment
-        ) ?? 2
+        ) ?? 1
         let maximumCharactersPerTick = resolvedInt(
             for: "VIBEWRITE_STREAMING_MAXIMUM_CHARACTERS_PER_TICK",
             in: info,
             environment: environment
-        ) ?? 12
+        ) ?? 7
 
         let sanitizedMinimumCharactersPerTick = max(1, minimumCharactersPerTick)
         let sanitizedMaximumCharactersPerTick = max(sanitizedMinimumCharactersPerTick, maximumCharactersPerTick)
