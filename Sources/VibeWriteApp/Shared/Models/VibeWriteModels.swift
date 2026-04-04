@@ -78,6 +78,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
     var prompt: String { didSet { touch() } }
     var mode: WritingProjectMode { didSet { touch() } }
     var summary: String { didSet { touch() } }
+    var continuationSummary: String { didSet { touch() } }
     var context: ProjectContext { didSet { touch() } }
     var conversation: [ConversationMessage] { didSet { touch() } }
     var documentText: String { didSet { touch() } }
@@ -92,6 +93,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         prompt: String,
         mode: WritingProjectMode,
         summary: String,
+        continuationSummary: String = "",
         context: ProjectContext,
         conversation: [ConversationMessage],
         documentText: String,
@@ -105,6 +107,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         self.prompt = prompt
         self.mode = mode
         self.summary = summary
+        self.continuationSummary = Self.normalizedContinuationSummary(continuationSummary, fallback: summary)
         self.context = context
         self.conversation = conversation
         self.documentText = documentText
@@ -120,6 +123,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         case prompt
         case mode
         case summary
+        case continuationSummary
         case context
         case conversation
         case documentText
@@ -136,6 +140,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         prompt = try container.decode(String.self, forKey: .prompt)
         mode = try container.decode(WritingProjectMode.self, forKey: .mode)
         summary = try container.decode(String.self, forKey: .summary)
+        continuationSummary = try container.decode(String.self, forKey: .continuationSummary)
         context = try container.decode(ProjectContext.self, forKey: .context)
         conversation = try container.decode([ConversationMessage].self, forKey: .conversation)
         documentText = try container.decode(String.self, forKey: .documentText)
@@ -152,6 +157,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         try container.encode(prompt, forKey: .prompt)
         try container.encode(mode, forKey: .mode)
         try container.encode(summary, forKey: .summary)
+        try container.encode(continuationSummary, forKey: .continuationSummary)
         try container.encode(context, forKey: .context)
         try container.encode(conversation, forKey: .conversation)
         try container.encode(documentText, forKey: .documentText)
@@ -186,6 +192,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
                 prompt: cleanedPrompt,
                 mode: mode,
                 summary: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
+                continuationSummary: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
                 context: .discussion(prompt: cleanedPrompt),
                 conversation: conversation,
                 documentText: "",
@@ -207,6 +214,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
                 prompt: cleanedPrompt,
                 mode: mode,
                 summary: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
+                continuationSummary: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
                 context: .collaboration(prompt: cleanedPrompt),
                 conversation: conversation,
                 documentText: "",
@@ -223,6 +231,7 @@ struct WritingProject: Identifiable, Hashable, Codable {
         prompt = snapshot.prompt
         mode = snapshot.mode
         summary = snapshot.summary
+        continuationSummary = snapshot.continuationSummary
         context = snapshot.context
         conversation = snapshot.conversation
         documentText = snapshot.documentText
@@ -313,6 +322,11 @@ struct WritingProject: Identifiable, Hashable, Codable {
 
     private mutating func touch() {
         updatedAt = .now
+    }
+
+    private static func normalizedContinuationSummary(_ value: String, fallback: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
     }
 
     private static func titleFromPrompt(_ prompt: String, fallback: String) -> String {

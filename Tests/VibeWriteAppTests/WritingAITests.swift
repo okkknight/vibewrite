@@ -138,7 +138,25 @@ final class WritingAITests: XCTestCase {
     }
 
     func testContinueWritingPromptRequestsConcreteSuggestionChips() {
-        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot
+        let headParagraphs = (1...30).map { index in
+            "前文第\(index)段用来铺陈背景和细节，保证总长度足够长以触发尾部截取窗口，并且让更早的内容必须被裁掉。"
+        }
+        let tailParagraphs = [
+            "尾部第一段需要把节奏慢下来，并留下余味。",
+            "尾部第二段要真正作为继续写的起点。"
+        ]
+        let documentText = (headParagraphs + tailParagraphs).joined(separator: "\n\n")
+        let project = WritingProject(
+            title: "续写测试",
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration,
+            summary: "给人看的摘要可以保留原样",
+            continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
+            context: ProjectContext.collaboration(prompt: "写一篇关于成年人孤独感的公众号文章"),
+            conversation: [],
+            documentText: documentText,
+            suggestionChips: ["继续写", "编辑这段", "补一段"]
+        ).aiSnapshot
         let request = WritingAIRequest(
             action: .continueWriting,
             project: project,
@@ -157,6 +175,12 @@ final class WritingAITests: XCTestCase {
 
         XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\""))
         XCTAssertTrue(systemPrompt.contains("prefer 3 concise chips"))
+        XCTAssertTrue(userPrompt.contains("Document summary:"))
+        XCTAssertTrue(userPrompt.contains("Document tail:"))
+        XCTAssertTrue(userPrompt.contains("给模型看的压缩摘要要更短、更偏状态"))
+        XCTAssertTrue(userPrompt.contains("尾部第二段要真正作为继续写的起点。"))
+        XCTAssertFalse(userPrompt.contains("前文第1段用来铺陈背景和细节"))
+        XCTAssertFalse(userPrompt.contains("Current document:"))
         XCTAssertTrue(userPrompt.contains("For continueWriting, return 3 concise suggestion chips"))
         XCTAssertTrue(userPrompt.contains("should follow the current正文 naturally"))
     }

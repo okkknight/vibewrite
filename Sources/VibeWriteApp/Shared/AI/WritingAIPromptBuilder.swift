@@ -37,6 +37,7 @@ struct WritingAIPromptBuilder {
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
         - When the action is "continueWriting", still return a complete metadata block and make suggestionChips describe the most useful next steps after this continuation, not generic continuation prompts.
         - For "continueWriting", prefer 3 concise chips that follow the current正文 naturally and help the app suggest what to do next.
+        - When the action is "continueWriting", treat the document summary as global context and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
 
         Rules:
         - Keep the writing voice calm, precise, and native to a macOS writing app.
@@ -59,8 +60,18 @@ struct WritingAIPromptBuilder {
         var lines: [String] = []
         lines.append("Action: \(request.action.rawValue)")
         lines.append("Project title: \(request.project.title)")
-        lines.append("Current document:")
-        lines.append(request.project.documentText.isEmpty ? "(empty)" : request.project.documentText)
+
+        switch request.action {
+        case .continueWriting:
+            lines.append("Document summary:")
+            lines.append(nonEmptyText(request.project.continuationSummary, fallback: "(empty)"))
+            lines.append("Document tail:")
+            lines.append(documentTail(for: request.project.documentText))
+
+        case .startDraft, .edit:
+            lines.append("Current document:")
+            lines.append(request.project.documentText.isEmpty ? "(empty)" : request.project.documentText)
+        }
 
         if let prompt, !prompt.isEmpty {
             lines.append("User message: \(prompt)")
@@ -74,6 +85,8 @@ struct WritingAIPromptBuilder {
             lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
         } else if request.action == .continueWriting {
+            lines.append("For continueWriting, use the document summary as global context and the document tail as the continuation anchor.")
+            lines.append("Do not restart from the beginning of the article.")
             lines.append("For continueWriting, return 3 concise suggestion chips that describe the most useful next steps after this continuation.")
             lines.append("Those chips should follow the current正文 naturally and should not be generic continuation prompts.")
         }
@@ -119,5 +132,44 @@ struct WritingAIPromptBuilder {
         case .collaboration:
             return "围绕当前主题持续协作，正文会直接写入文档而不是停留在聊天里。"
         }
+    }
+
+    private func nonEmptyText(_ value: String, fallback: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func documentTail(for text: String, maximumCharacterCount: Int = 1200) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "(empty)"
+        }
+
+        let paragraphs = trimmed
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !paragraphs.isEmpty else {
+            return String(trimmed.suffix(maximumCharacterCount))
+        }
+
+        var selected: [String] = []
+        var characterCount = 0
+
+        for paragraph in paragraphs.reversed() {
+            selected.insert(paragraph, at: 0)
+            characterCount += paragraph.count
+            if characterCount >= maximumCharacterCount && selected.count >= 2 {
+                break
+            }
+        }
+
+        let joined = selected.joined(separator: "\n\n")
+        if joined.count <= maximumCharacterCount {
+            return joined
+        }
+
+        return String(joined.suffix(maximumCharacterCount))
     }
 }

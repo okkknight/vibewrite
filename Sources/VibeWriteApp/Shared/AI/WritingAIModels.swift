@@ -25,6 +25,7 @@ struct WritingProjectSnapshot: Codable, Hashable {
     var prompt: String
     var mode: WritingProjectMode
     var summary: String
+    var continuationSummary: String = ""
     var context: ProjectContext
     var conversation: [ConversationMessage]
     var documentText: String
@@ -176,6 +177,7 @@ extension WritingProject {
             prompt: prompt,
             mode: mode,
             summary: summary,
+            continuationSummary: continuationSummary,
             context: context,
             conversation: conversation,
             documentText: documentText,
@@ -191,6 +193,7 @@ extension WritingProject {
 
         self.documentText = documentText
         summary = response.summary
+        continuationSummary = response.summary
         intentSummary = response.intentSummary
         styleConstraints = response.styleConstraints
         currentGoal = response.currentGoal

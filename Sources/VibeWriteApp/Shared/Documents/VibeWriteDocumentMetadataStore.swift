@@ -5,10 +5,9 @@ import Darwin
 #endif
 
 enum VibeWriteDocumentMetadataPolicy {
-    static let schemaVersion = 1
+    static let schemaVersion = 2
     static let conversationRoundLimit = 20
     static let conversationMessageLimit = conversationRoundLimit * 2
-    static let summarySnapshotLimit = 160
     static let xattrKey = "com.vibewrite.document-identity"
 }
 
@@ -20,7 +19,7 @@ struct VibeWriteDocumentMetadataRecord: Codable, Hashable {
     var prompt: String
     var mode: WritingProjectMode
     var summary: String
-    var summarySnapshot: String
+    var continuationSummary: String
     var context: ProjectContext
     var conversation: [ConversationMessage]
     var revisionHistory: [WritingProjectRevision]
@@ -81,7 +80,7 @@ struct VibeWriteDocumentMetadataStore {
             prompt: project.prompt,
             mode: project.mode,
             summary: project.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            summarySnapshot: project.collaborationSummarySnapshot(maxLength: VibeWriteDocumentMetadataPolicy.summarySnapshotLimit),
+            continuationSummary: project.continuationSummary.trimmingCharacters(in: .whitespacesAndNewlines),
             context: project.context,
             conversation: Array(project.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit)),
             revisionHistory: project.revisionHistory,
@@ -151,7 +150,7 @@ struct VibeWriteDocumentMetadataStore {
             prompt: record.prompt.trimmingCharacters(in: .whitespacesAndNewlines),
             mode: record.mode,
             summary: record.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            summarySnapshot: record.summarySnapshot.trimmingCharacters(in: .whitespacesAndNewlines),
+            continuationSummary: record.continuationSummary.trimmingCharacters(in: .whitespacesAndNewlines),
             context: record.context,
             conversation: Array(record.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit)),
             revisionHistory: record.revisionHistory,
@@ -254,11 +253,12 @@ extension VibeWriteDocumentMetadataRecord {
         let cleanedTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedTitle = cleanedTitle.ifEmpty(fallbackTitle) ?? mode.defaultTitle
         let cleanedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let cleanedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let summarySnapshot = self.summarySnapshot.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedSummary = cleanedSummary.ifEmpty(summarySnapshot)
-            ?? VibeWriteMarkdownDocument.defaultSummary(prompt: cleanedPrompt, body: documentText, mode: mode)
         let resolvedAutomationKey = automationKey.trimmingCharacters(in: .whitespacesAndNewlines).ifEmpty(fallbackAutomationKey) ?? documentID.uuidString.lowercased()
+        let defaultSummary = VibeWriteMarkdownDocument.defaultSummary(prompt: cleanedPrompt, body: documentText, mode: mode)
+        let cleanedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedSummary = cleanedSummary.ifEmpty(defaultSummary) ?? defaultSummary
+        let cleanedContinuationSummary = continuationSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedContinuationSummary = cleanedContinuationSummary.ifEmpty(resolvedSummary) ?? resolvedSummary
 
         return WritingProject(
             id: documentID,
@@ -267,6 +267,7 @@ extension VibeWriteDocumentMetadataRecord {
             prompt: cleanedPrompt,
             mode: mode,
             summary: resolvedSummary,
+            continuationSummary: resolvedContinuationSummary,
             context: context,
             conversation: Array(conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit)),
             documentText: documentText,
@@ -286,28 +287,6 @@ extension VibeWriteDocumentMetadataRecord {
 }
 
 extension WritingProject {
-    func collaborationSummarySnapshot(maxLength: Int = VibeWriteDocumentMetadataPolicy.summarySnapshotLimit) -> String {
-        let parts = [
-            summary,
-            context.intentSummary,
-            context.currentGoal,
-            context.nextFocus,
-            context.recentDecisions.first
-        ]
-        .compactMap { $0?.trimmingCharacters(in: .whitespacesAndNewlines) }
-        .filter { !$0.isEmpty }
-
-        let fallback = mode.stageDescription
-        let joined = parts.prefix(4).joined(separator: " · ")
-        let resolved = joined.isEmpty ? fallback : joined
-
-        if resolved.count <= maxLength {
-            return resolved
-        }
-
-        return String(resolved.prefix(maxLength))
-    }
-
     func forkedSaveAsCopy() -> WritingProject {
         let newID = UUID()
         return WritingProject(
@@ -317,6 +296,7 @@ extension WritingProject {
             prompt: prompt,
             mode: mode,
             summary: summary,
+            continuationSummary: continuationSummary,
             context: context,
             conversation: conversation,
             documentText: documentText,

@@ -401,6 +401,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
             prompt: "写一个雨夜重逢的小说场景",
             mode: .collaboration,
             summary: "XATTR 记录的最新摘要",
+            continuationSummary: "XATTR 记录的模型摘要",
             context: ProjectContext(
                 intentSummary: "围绕 xattr 记录恢复协作状态。",
                 styleConstraints: ["克制", "平静"],
@@ -428,6 +429,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.currentGoal, "继续推进 xattr 版本")
         XCTAssertEqual(flow.activeProject.documentText, bodyText)
         XCTAssertEqual(flow.activeProject.conversation.count, 2)
+        XCTAssertEqual(flow.activeProject.continuationSummary, "XATTR 记录的模型摘要")
     }
 
     func testMockEngineRevisesSelectedAndWholeDocumentText() {

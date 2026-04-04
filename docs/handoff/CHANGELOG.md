@@ -1,9 +1,13 @@
 # Changelog
 
 ## 2026-04-05
+- `continueWriting` now consumes a persisted `continuationSummary` plus a trimmed document tail instead of the full正文, which keeps the continuation prompt compact and makes the model-facing summary separate from the UI-facing summary.
+
+## 2026-04-05
 - Local edit completion now has a dedicated transient presentation state: the正文 viewport is locked while the replacement lands, then the newly replaced range flashes briefly so users can see exactly what changed without the page jumping away from the edited passage.
 - The flash is driven from the edit patch itself via the replacement range, so the effect stays scoped to the local edit path instead of becoming a general-purpose document animation.
 - Verification for this update passed with `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
+- Independent review on 2026-04-05 passed the local edit presentation checks: the patch exposes a replacement highlight range, the selection-popover UI test still passes on macOS, and the implementation keeps the flash limited to `.edit` without affecting start-draft or continue-writing paths.
 
 ## 2026-04-04
 - The file/document model was redesigned around a split between正文 and collaboration metadata. Markdown files now keep正文 plus a hidden identity marker, `xattr` owns the primary `docID`, the app-side metadata store keeps the latest conversation history and short summary snapshot, and Save As generates a fresh `docID` instead of inheriting the old one.

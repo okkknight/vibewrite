@@ -55,6 +55,7 @@ struct VibeWriteMarkdownDocument: Hashable {
             prompt: prompt,
             mode: mode,
             summary: summary,
+            continuationSummary: summary,
             context: ProjectContext.recovered(
                 prompt: prompt,
                 body: cleanedBody,

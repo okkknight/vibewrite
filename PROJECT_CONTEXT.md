@@ -20,14 +20,15 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and the editor follows the document end during AI streaming so the output feels fast without turning into big bursty jumps.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
 - Remote AI completion metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay aligned with the document language instead of drifting into English.
+- `continueWriting` now reads a persisted `continuationSummary` plus a trimmed document tail instead of the full正文, so long documents stay within a smaller continuation context.
 - `continueWriting` now has an explicit prompt-level requirement for complete metadata and 3 concise follow-up chips, so suggestion output is encouraged more strongly on the continuation path without adding any fallback behavior.
 - Continue-writing playback now reveals from the end of the current正文 rather than from character 0, so the streamed preview stays anchored to the latest paragraph instead of replaying the whole document from the top.
 - Local edit requests now carry a stable `selectionRange`, and the patch/revision/mock/preview layers resolve edits from that exact range instead of re-matching by string content. That keeps repeated local edits anchored to the intended passage even when the same words appear elsewhere.
 - Local edit completion now has its own visual presentation state: the正文 editor locks its viewport while the replacement lands, then briefly flashes the newly replaced range so users can see exactly what changed without the page jumping away.
 - Edit responses no longer stream-replace the正文 while the model is still generating. The live preview renderer is bypassed for `.edit`, so local patch edits apply once at completion instead of causing jumpy chunk-by-chunk replacement.
 - The page header subtitle still surfaces `project.summary` when the body is non-empty, so if the text under the title looks off-topic the real bug is upstream in the model output or summary writeback path, not the subtitle component itself.
-- The app now keeps正文 and collaboration history in separate stores: the Markdown file holds正文 plus a hidden marker, `xattr` stores the primary document identity, and the app-side metadata store keeps the latest collaboration state, summary snapshot, and recent conversation history.
-- User文本 stays in the Markdown file, while collaboration state, summary snapshots, and conversation history live in the app-side metadata store. Only lightweight recent-document entries remain app-owned for convenience.
+- The app now keeps正文 and collaboration history in separate stores: the Markdown file holds正文 plus a hidden marker, `xattr` stores the primary document identity, and the app-side metadata store keeps the latest collaboration state, `continuationSummary`, and recent conversation history.
+- User文本 stays in the Markdown file, while collaboration state, `continuationSummary`, and conversation history live in the app-side metadata store. Only lightweight recent-document entries remain app-owned for convenience.
 - `task/TASK_20260403_024.md` completed the visual restyle pass: the app keeps the same structure and interactions, but the shell/theme now uses a clearer Apple-style visual system.
 - The post-submit hang in `UITests/VibeWriteUITests.swift` was not an XCTest idle problem. Direct sampling showed a SwiftUI/AppKit feedback loop in the AppKit-backed editor bridge:
   - `SelectableTextEditor.updateNSView(...)` kept mutating `NSTextView` properties and syncing selection/accessibility state
@@ -112,7 +113,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - If the subtitle shows unrelated copy, inspect the AI response summary and `WritingAIModels.apply(...)` before changing the title component.
 - If you touch the start-draft request assembly again, make sure the prompt is still passed to the AI request once and is not silently dropped by dedup logic.
 - If you touch the file document parser or save flow, keep `xattr` as the primary identity source, fall back to the body marker only when needed, and preserve the正文-only recovery path when metadata is missing or broken.
-- If you touch collaboration state persistence, keep the recent-conversation cap at 20 rounds and keep the short summary snapshot in sync with the latest metadata record.
+- If you touch collaboration state persistence, keep the recent-conversation cap at 20 rounds and keep the `continuationSummary` in sync with the latest metadata record.
 
 ## Working rules
 - Keep the handoff concise and durable.
