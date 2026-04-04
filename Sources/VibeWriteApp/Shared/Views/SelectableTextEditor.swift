@@ -85,8 +85,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView
         )
         _ = context.coordinator.syncText(text, in: textView)
-        context.coordinator.syncSelectionBinding(from: textView)
-        context.coordinator.syncSelectionPopoverOrigin(from: textView)
+        context.coordinator.syncSelectionOverlayState(from: textView)
 
         return scrollView
     }
@@ -107,7 +106,6 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView
         )
         let didMutateText = context.coordinator.syncText(text, in: textView)
-        context.coordinator.syncSelection(from: textView, desiredSelection: selectedText)
         context.coordinator.syncAccessibilityValue(in: textView)
         context.coordinator.syncLayout(
             in: textView,
@@ -116,7 +114,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             prefersSelectionVisibility: didMutateText == false,
             shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd
         )
-        context.coordinator.syncSelectionPopoverOrigin(from: textView)
+        if didMutateText {
+            context.coordinator.syncSelectionOverlayState(from: textView)
+        }
         if didMutateText {
             context.coordinator.ensureReadableTextAttributes(in: textView)
         }
@@ -130,7 +130,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
         var readableContentWidth: CGFloat?
-        private var lastMirroredSelectionText: String?
         private var programmaticChangeDepth = 0
         private var lastAppliedIsEditable: Bool?
         private var lastAppliedFont: NSFont?
@@ -141,6 +140,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var needsFullTextRestyle = false
         private var lastLoggedLayoutSignature: String?
         private var isPerformingLayoutSync = false
+        private var selectionOverlayUpdateGeneration = 0
 
         private var isApplyingProgrammaticChange: Bool {
             programmaticChangeDepth > 0
@@ -185,7 +185,7 @@ struct SelectableTextEditor: NSViewRepresentable {
                 prefersSelectionVisibility: false,
                 shouldAutoScrollToDocumentEnd: false
             )
-            syncSelectionPopoverOrigin(from: textView)
+            syncSelectionOverlayState(from: textView)
             logSelectionEvent("scroll bounds changed selection=\(debugRange(textView.selectedRange())) origin=\(debugPoint(selectionPopoverOrigin))")
         }
 
@@ -311,122 +311,26 @@ struct SelectableTextEditor: NSViewRepresentable {
             return true
         }
 
-        func syncSelection(from textView: NSTextView, desiredSelection: String?) {
-            guard !isPerformingLayoutSync else { return }
-
-            let currentRange = textView.selectedRange()
-            if desiredSelection == nil {
-                if currentRange.length > 0, lastMirroredSelectionText != nil {
-                    beginProgrammaticChange()
-                    defer {
-                        endProgrammaticChange()
-                    }
-                    textView.setSelectedRange(NSRange(location: currentRange.location, length: 0))
-                    lastMirroredSelectionText = nil
-                }
-
-                syncSelectionBinding(from: textView)
-                return
-            }
-
-            syncSelectionBinding(from: textView)
-        }
-
-        func syncSelectionBinding(from textView: NSTextView) {
+        func syncSelectionOverlayState(from textView: NSTextView) {
             guard !isApplyingProgrammaticChange else { return }
             guard !isPerformingLayoutSync else { return }
 
             let range = textView.selectedRange()
-            guard range.length > 0 else {
-                setSelectedTextIfNeeded(nil)
-                lastMirroredSelectionText = nil
-                logSelectionEvent("selection cleared selection=\(debugRange(range))")
+            guard let snapshot = selectionSnapshot(from: textView, selection: range) else {
+                enqueueSelectionOverlayUpdate(selectedText: nil, origin: nil)
+                if range.length == 0 {
+                    logSelectionEvent("selection cleared selection=\(debugRange(range))")
+                    logSelectionEvent("popover origin cleared empty selection=\(debugRange(range))")
+                }
                 return
             }
 
-            let string = textView.string as NSString
-            guard range.location + range.length <= string.length else {
-                setSelectedTextIfNeeded(nil)
-                logSelectionEvent("selection out of bounds selection=\(debugRange(range)) stringLength=\(string.length)")
-                return
-            }
-
-            let selected = string.substring(with: range)
-            setSelectedTextIfNeeded(selected)
-            lastMirroredSelectionText = selected
-            logSelectionEvent("selection updated selection=\(debugRange(range)) preview=\(selected.vibewriteLogPreview(maxLength: 60))")
-        }
-
-        func syncSelectionPopoverOrigin(from textView: NSTextView) {
-            guard !isApplyingProgrammaticChange else { return }
-            guard let scrollView else {
-                setSelectionPopoverOriginIfNeeded(nil)
-                logSelectionEvent("popover origin skipped missing scroll view selection=\(debugRange(textView.selectedRange()))")
-                return
-            }
-
-            let selection = textView.selectedRange()
-            guard selection.length > 0 else {
-                setSelectionPopoverOriginIfNeeded(nil)
-                logSelectionEvent("popover origin cleared empty selection=\(debugRange(selection))")
-                return
-            }
-
-            guard let textContainer = textView.textContainer,
-                  let layoutManager = textView.layoutManager else {
-                setSelectionPopoverOriginIfNeeded(nil)
-                logSelectionEvent("popover origin skipped missing layout objects selection=\(debugRange(selection))")
-                return
-            }
-
-            let stringLength = textView.string.utf16.count
-            guard selection.location < stringLength else {
-                setSelectionPopoverOriginIfNeeded(nil)
-                logSelectionEvent("popover origin skipped selection past string length selection=\(debugRange(selection)) stringLength=\(stringLength)")
-                return
-            }
-
-            let clampedLength = min(selection.length, stringLength - selection.location)
-            let characterRange = NSRange(location: selection.location, length: clampedLength)
-            let glyphRange = layoutManager.glyphRange(
-                forCharacterRange: characterRange,
-                actualCharacterRange: nil
-            )
-
-            guard glyphRange.length > 0 else {
-                setSelectionPopoverOriginIfNeeded(nil)
-                logSelectionEvent("popover origin skipped empty glyph range selection=\(debugRange(selection))")
-                return
-            }
-
-            var selectionRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
-            selectionRect.origin.x += textView.textContainerOrigin.x
-            selectionRect.origin.y += textView.textContainerOrigin.y
-            let selectionRectInScrollView = textView.convert(selectionRect, to: scrollView)
-
-            let visibleBounds = scrollView.contentView.bounds
-            let visibleWidth = max(visibleBounds.width, 1)
-            let visibleHeight = max(visibleBounds.height, 1)
-
-            let maxPopoverWidth: CGFloat = 320
-            let estimatedPopoverHeight: CGFloat = 76
-            let horizontalPadding: CGFloat = 12
-            let verticalPadding: CGFloat = 10
-
-            let clampedX = min(
-                max(selectionRectInScrollView.minX, horizontalPadding),
-                max(visibleWidth - maxPopoverWidth - horizontalPadding, horizontalPadding)
-            )
-            let topLeadingY = selectionRectInScrollView.minY - estimatedPopoverHeight - verticalPadding
-            let clampedY = min(
-                max(topLeadingY, verticalPadding),
-                max(visibleHeight - estimatedPopoverHeight - verticalPadding, verticalPadding)
-            )
-
-            let origin = CGPoint(x: clampedX, y: clampedY)
-            setSelectionPopoverOriginIfNeeded(origin)
+            enqueueSelectionOverlayUpdate(selectedText: snapshot.selectedText, origin: snapshot.origin)
             logSelectionEvent(
-                "popover origin updated selection=\(debugRange(selection)) rect=\(debugRect(selectionRectInScrollView)) visible=\(debugSize(visibleWidth, visibleHeight)) origin=\(debugPoint(origin))"
+                "selection updated selection=\(debugRange(range)) preview=\(snapshot.selectedText.vibewriteLogPreview(maxLength: 60))"
+            )
+            logSelectionEvent(
+                "popover origin updated selection=\(debugRange(range)) rect=\(debugRect(snapshot.rectInScrollView)) visible=\(debugSize(snapshot.visibleWidth, snapshot.visibleHeight)) origin=\(debugPoint(snapshot.origin))"
             )
         }
 
@@ -453,12 +357,10 @@ struct SelectableTextEditor: NSViewRepresentable {
             let clipBounds = scrollView.contentView.bounds
             let visibleWidth = max(clipBounds.width, 1)
             let visibleHeight = max(clipBounds.height, 1)
-            let scrollbarGutterWidth: CGFloat = 14
-            let readableWidth = max(visibleWidth - scrollbarGutterWidth, 1)
             let textInsetY: CGFloat = 18
             let textInsetX: CGFloat = 18
-            let outerReadableWidth = min(readableContentWidth ?? readableWidth, readableWidth)
-            let outerLeadingInset = max((readableWidth - outerReadableWidth) / 2, 0)
+            let outerReadableWidth = min(readableContentWidth ?? visibleWidth, visibleWidth)
+            let outerLeadingInset = max((visibleWidth - outerReadableWidth) / 2, 0)
             let horizontalInset = outerLeadingInset + textInsetX
             let containerWidth = max(outerReadableWidth - (textInsetX * 2), 1)
 
@@ -529,7 +431,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard !isPerformingLayoutSync else { return }
 
             setTextIfNeeded(textView.string)
-            syncSelectionBinding(from: textView)
+            syncSelectionOverlayState(from: textView)
         }
 
         func textViewDidChangeSelection(_ notification: Notification) {
@@ -541,8 +443,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard !isPerformingLayoutSync else { return }
 
             logSelectionEvent("delegate selection changed selection=\(debugRange(textView.selectedRange())) editable=\(textView.isEditable)")
-            syncSelectionBinding(from: textView)
-            syncSelectionPopoverOrigin(from: textView)
+            syncSelectionOverlayState(from: textView)
         }
 
         private func setTextIfNeeded(_ newText: String) {
@@ -550,14 +451,101 @@ struct SelectableTextEditor: NSViewRepresentable {
             text = newText
         }
 
-        private func setSelectedTextIfNeeded(_ newSelectedText: String?) {
-            guard selectedText != newSelectedText else { return }
-            selectedText = newSelectedText
+        private func enqueueSelectionOverlayUpdate(selectedText newSelectedText: String?, origin newOrigin: CGPoint?) {
+            guard selectedText != newSelectedText || selectionPopoverOrigin != newOrigin else { return }
+
+            selectionOverlayUpdateGeneration += 1
+            let generation = selectionOverlayUpdateGeneration
+            DispatchQueue.main.async { [weak self] in
+                guard let self else { return }
+                guard self.selectionOverlayUpdateGeneration == generation else { return }
+
+                if self.selectedText != newSelectedText {
+                    self.selectedText = newSelectedText
+                }
+                if self.selectionPopoverOrigin != newOrigin {
+                    self.selectionPopoverOrigin = newOrigin
+                }
+            }
         }
 
-        private func setSelectionPopoverOriginIfNeeded(_ newOrigin: CGPoint?) {
-            guard selectionPopoverOrigin != newOrigin else { return }
-            selectionPopoverOrigin = newOrigin
+        private func selectionSnapshot(
+            from textView: NSTextView,
+            selection: NSRange
+        ) -> (selectedText: String, origin: CGPoint, rectInScrollView: CGRect, visibleWidth: CGFloat, visibleHeight: CGFloat)? {
+            guard selection.length > 0 else { return nil }
+
+            let string = textView.string as NSString
+            guard selection.location + selection.length <= string.length else {
+                logSelectionEvent("selection out of bounds selection=\(debugRange(selection)) stringLength=\(string.length)")
+                return nil
+            }
+
+            let selectedText = string.substring(with: selection)
+            guard !selectedText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return nil
+            }
+
+            guard let scrollView else {
+                logSelectionEvent("popover origin skipped missing scroll view selection=\(debugRange(selection))")
+                return nil
+            }
+
+            guard let textContainer = textView.textContainer,
+                  let layoutManager = textView.layoutManager else {
+                logSelectionEvent("popover origin skipped missing layout objects selection=\(debugRange(selection))")
+                return nil
+            }
+
+            let stringLength = textView.string.utf16.count
+            guard selection.location < stringLength else {
+                logSelectionEvent("popover origin skipped selection past string length selection=\(debugRange(selection)) stringLength=\(stringLength)")
+                return nil
+            }
+
+            let clampedLength = min(selection.length, stringLength - selection.location)
+            let characterRange = NSRange(location: selection.location, length: clampedLength)
+            let glyphRange = layoutManager.glyphRange(
+                forCharacterRange: characterRange,
+                actualCharacterRange: nil
+            )
+
+            guard glyphRange.length > 0 else {
+                logSelectionEvent("popover origin skipped empty glyph range selection=\(debugRange(selection))")
+                return nil
+            }
+
+            var selectionRect = layoutManager.boundingRect(forGlyphRange: glyphRange, in: textContainer)
+            selectionRect.origin.x += textView.textContainerOrigin.x
+            selectionRect.origin.y += textView.textContainerOrigin.y
+            let selectionRectInScrollView = textView.convert(selectionRect, to: scrollView)
+
+            let visibleBounds = scrollView.contentView.bounds
+            let visibleWidth = max(visibleBounds.width, 1)
+            let visibleHeight = max(visibleBounds.height, 1)
+
+            let maxPopoverWidth: CGFloat = 320
+            let estimatedPopoverHeight: CGFloat = 76
+            let horizontalPadding: CGFloat = 12
+            let verticalPadding: CGFloat = 10
+
+            let clampedX = min(
+                max(selectionRectInScrollView.minX, horizontalPadding),
+                max(visibleWidth - maxPopoverWidth - horizontalPadding, horizontalPadding)
+            )
+            let topLeadingY = selectionRectInScrollView.minY - estimatedPopoverHeight - verticalPadding
+            let clampedY = min(
+                max(topLeadingY, verticalPadding),
+                max(visibleHeight - estimatedPopoverHeight - verticalPadding, verticalPadding)
+            )
+
+            return (
+                selectedText: selectedText,
+                origin: CGPoint(x: clampedX, y: clampedY),
+                rectInScrollView: selectionRectInScrollView,
+                visibleWidth: visibleWidth,
+                visibleHeight: visibleHeight
+            )
         }
 
         private func logSelectionEvent(_ message: String) {
