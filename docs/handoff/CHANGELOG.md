@@ -1,4 +1,8 @@
 ## 2026-04-05
+- Trace debugging found the local-edit flash was drawing at zero opacity on its first frame, so the overlay timing was adjusted to keep the rounded highlight visible briefly before fading out.
+- Verification for this follow-up passed with `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
+
+## 2026-04-05
 - The正文 scroll indicator is now rendered as a separate overlay at the far right edge of the app instead of inside the正文 editing column, so the正文 width itself stays unchanged while the chrome moves outward.
 - Verified with `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
