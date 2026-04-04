@@ -1102,11 +1102,13 @@ struct ExternalVerticalScroller: NSViewRepresentable {
     func makeNSView(context: Context) -> ExternalVerticalScrollerView {
         let view = ExternalVerticalScrollerView()
         view.scrollView = scrollView
+        view.refreshScrollerVisibility()
         return view
     }
 
     func updateNSView(_ nsView: ExternalVerticalScrollerView, context: Context) {
         nsView.scrollView = scrollView
+        nsView.refreshScrollerVisibility()
     }
 }
 
@@ -1206,7 +1208,7 @@ final class ExternalVerticalScrollerView: NSView {
     }
 
     @MainActor
-    private func refreshScrollerVisibility() {
+    func refreshScrollerVisibility() {
         needsDisplay = true
         isHidden = shouldHideScroller
     }
