@@ -211,21 +211,122 @@ final class VibeWriteUITests: XCTestCase {
 
         XCTAssertTrue(waitForElementToAppear(
             in: window,
-            identifier: "project.editSelectionButton",
+            identifier: "project.selectionVisualButton",
             timeout: 10
         ))
 
         XCTAssertTrue(waitForElementToAppear(
             in: window,
-            identifier: "project.selectionContinueButton",
+            identifier: "project.selectionRestrainedButton",
             timeout: 10
         ))
 
-        let selectionContinueButton = window.descendants(matching: .any)
-            .matching(identifier: "project.selectionContinueButton")
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionCompellingButton",
+            timeout: 10
+        ))
+
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionCustomButton",
+            timeout: 10
+        ))
+
+        let selectionVisualButton = window.descendants(matching: .any)
+            .matching(identifier: "project.selectionVisualButton")
             .firstMatch
 
-        selectionContinueButton.click()
+        selectionVisualButton.click()
+    }
+
+    func testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit() throws {
+        let app = launchApplication(
+            bundleIdentifier: "com.knightspace.vibewrite",
+            launchArguments: [
+                "--vibe-ai-mode=stub"
+            ]
+        )
+        addUIInterruptionMonitor(withDescription: "Dismiss unexpected startup dialog") { dialog in
+            for label in ["Allow", "OK", "Continue", "取消", "Cancel", "Not Now", "不要", "Don't Allow"] {
+                let button = dialog.buttons[label]
+                if button.exists {
+                    button.click()
+                    return true
+                }
+            }
+
+            if let firstButton = dialog.buttons.allElementsBoundByIndex.first {
+                firstButton.click()
+                return true
+            }
+
+            return false
+        }
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(waitForElementToAppear(window, timeout: 15))
+        window.click()
+
+        let bodyEditor = window.textViews["project.bodyEditor"]
+        XCTAssertTrue(waitForElementToAppear(bodyEditor, timeout: 10))
+
+        let messageInputField = window.descendants(matching: .any)
+            .matching(identifier: "project.messageInput")
+            .firstMatch
+        XCTAssertTrue(waitForElementToAppear(messageInputField, timeout: 10))
+
+        messageInputField.click()
+        messageInputField.typeText("Write about adult loneliness.")
+        messageInputField.typeKey(.return, modifierFlags: [])
+
+        XCTAssertTrue(waitForCondition(timeout: 12) {
+            let currentBodyText = (bodyEditor.value as? String) ?? ""
+            return !currentBodyText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        })
+
+        let firstDraftText = (bodyEditor.value as? String) ?? ""
+        XCTAssertFalse(firstDraftText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        bodyEditor.click()
+        bodyEditor.typeKey("a", modifierFlags: .command)
+
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionVisualButton",
+            timeout: 10
+        ))
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionRestrainedButton",
+            timeout: 10
+        ))
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionCompellingButton",
+            timeout: 10
+        ))
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionCustomButton",
+            timeout: 10
+        ))
+
+        let selectionVisualButton = window.descendants(matching: .any)
+            .matching(identifier: "project.selectionVisualButton")
+            .firstMatch
+        selectionVisualButton.click()
+
+        XCTAssertTrue(waitForElementToAppear(
+            in: window,
+            identifier: "project.selectionPresetLoading",
+            timeout: 10
+        ))
+
+        XCTAssertTrue(waitForCondition(timeout: 12) {
+            let currentBodyText = (bodyEditor.value as? String) ?? ""
+            return currentBodyText != firstDraftText
+        })
     }
 
     func testCompactLayoutShowsSidebarDrawers() throws {

@@ -198,7 +198,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
     }
 
-    func testEditStreamsIncrementallyWhilePreservingPatchBoundaries() async throws {
+    func testEditAppliesPatchAtCompletionWhilePreservingPatchBoundaries() async throws {
         let storageURL = try makeTempStorageURL()
         defer {
             try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
@@ -221,22 +221,18 @@ final class VibeWriteAppFlowTests: XCTestCase {
             try await flow.performWritingAction(
                 .edit,
                 userMessage: "请把这段改得更克制一点",
-                selectionText: selection
+                selectionText: selection,
+                selectionRange: WritingTextSelectionRange(NSRange(targetRange, in: project.documentText))
             )
         }
 
-        let editGrowthObserved = await waitUntil(timeout: 4) {
-            flow.activeProject.documentText != project.documentText
-        }
-        XCTAssertTrue(editGrowthObserved)
-
+        try? await Task.sleep(nanoseconds: 90_000_000)
         let interimText = flow.activeProject.documentText
-        XCTAssertTrue(interimText.hasPrefix(prefix))
-        XCTAssertTrue(interimText.hasSuffix(suffix))
 
         try await task.value
 
         let finalText = flow.activeProject.documentText
+        XCTAssertTrue(interimText == project.documentText || interimText == finalText)
         XCTAssertTrue(finalText.hasPrefix(prefix))
         XCTAssertTrue(finalText.hasSuffix(suffix))
         XCTAssertTrue(finalText.contains("留一点空白") || finalText.contains("不用说得太满"))

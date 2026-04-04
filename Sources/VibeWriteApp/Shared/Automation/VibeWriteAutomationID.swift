@@ -32,6 +32,11 @@ enum VibeWriteAutomationID {
     static let projectRetrySectionButton = "project.retrySectionButton"
     static let projectSelectionPopover = "project.selectionPopover"
     static let projectEditSelectionButton = "project.editSelectionButton"
+    static let projectSelectionVisualButton = "project.selectionVisualButton"
+    static let projectSelectionRestrainedButton = "project.selectionRestrainedButton"
+    static let projectSelectionCompellingButton = "project.selectionCompellingButton"
+    static let projectSelectionCustomButton = "project.selectionCustomButton"
+    static let projectSelectionPresetLoading = "project.selectionPresetLoading"
     static let projectSelectionContinueButton = "project.selectionContinueButton"
     static let projectCompactSidebarBackdrop = "project.compactSidebarBackdrop"
 }

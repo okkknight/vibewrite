@@ -169,6 +169,8 @@ struct ProjectComposerBar: View {
             return "sparkles"
         case "继续写":
             return "arrow.forward"
+        case "修改这段":
+            return "pencil"
         case "编辑这段":
             return "pencil"
         default:

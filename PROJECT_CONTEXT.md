@@ -36,6 +36,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection edit popover now tracks the selected正文 region instead of staying pinned to the page's top-right corner. The key fix was to keep selection updates live and use the scroll-view's top-left coordinate system directly; the earlier version was converting the y position the wrong way and could push the popover out of view.
 - Follow-up debugging showed the popover was still not appearing because the AppKit bridge kept syncing a nil binding back into `NSTextView` and clearing the user's non-empty selection during layout/update churn. The current fix only clears the editor selection after a real mirrored selection existed, so the user selection can stabilize and the popover can render.
 - A later trace narrowed another popover regression further: non-empty selection snapshots were only reaching SwiftUI on scroll-bounds changes, while direct user selection changes were often missed during layout churn. `SelectableTextEditor` now listens to `NSTextView.didChangeSelectionNotification` directly and flushes any selection sync that arrived mid-layout as soon as layout finishes, so the popover no longer has to wait for a manual scroll to appear.
+- Selection edit is no longer a single opaque `润色此处` action. The popover now exposes explicit preset intents (`更画面` / `更克制` / `更抓人`) plus `自定义`; presets still call the same `.edit` action with a concrete prompt, while `自定义` moves focus into the bottom composer so the user can supply their own instruction before the edit runs.
+- Composer-triggered selection edits no longer fall back to an empty black-box rewrite. When there is an active selection, submitting without text now activates the custom-input path instead of firing `.edit` with no explicit instruction.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the update.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle fixes.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle restore.
@@ -84,6 +86,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `swift test`
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` currently gets past the second-submit path, but the UI suite still fails later at the assistant rail shell assertion
+- `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` passes and covers the new selection-preset edit path end-to-end on the real macOS app
 - `swift test` passes with the file-based document flow and menu commands in place.
 
 ## Runtime notes

@@ -11,6 +11,8 @@ struct WritingProjectView: View {
     @State private var selectedText: String?
     @State private var selectedTextRange: WritingTextSelectionRange?
     @State private var selectionPopoverOrigin: CGPoint?
+    @State private var selectionPopoverPendingPreset: SelectionEditPreset?
+    @State private var isSelectionCustomInputActive = false
     @State private var showComparison = false
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
@@ -52,6 +54,8 @@ struct WritingProjectView: View {
             selectedText = nil
             selectedTextRange = nil
             selectionPopoverOrigin = nil
+            selectionPopoverPendingPreset = nil
+            isSelectionCustomInputActive = false
             showComparison = false
             showAssistantLayer = false
             showHistoryLayer = false
@@ -67,9 +71,17 @@ struct WritingProjectView: View {
         }
         .onChange(of: selectedText) { _, _ in
             logSelectionOverlayState(trigger: "selectedText changed")
+            if normalizedSelectedText == nil {
+                resetSelectionEditUIState()
+            }
         }
         .onChange(of: selectionPopoverOrigin) { _, _ in
             logSelectionOverlayState(trigger: "selectionPopoverOrigin changed")
+        }
+        .onChange(of: selectedTextRange) { oldValue, newValue in
+            if oldValue != newValue {
+                resetSelectionEditUIState()
+            }
         }
         .onAppear {
             logSelectionOverlayState(trigger: "writing project appeared")
@@ -296,15 +308,11 @@ struct WritingProjectView: View {
                    let selectionPopoverOrigin {
                     SelectionPopover(
                         selectedText: selectedText,
-                        onEditSelection: {
-                            applyRevision(
-                                .edit,
-                                selectionText: selectedText,
-                                selectionRange: selectedTextRange,
-                                userMessage: draftInstructionText(),
-                                clearDraftOnSuccess: true
-                            )
-                        }
+                        pendingPreset: selectionPopoverPendingPreset,
+                        isCustomInputActive: isSelectionCustomInputActive,
+                        isRequestInFlight: flow.isAIRequestInFlight,
+                        onPresetTap: triggerSelectionPresetEdit,
+                        onCustomTap: activateSelectionCustomInput
                     )
                     .offset(x: selectionPopoverOrigin.x, y: selectionPopoverOrigin.y)
                     .zIndex(1)
@@ -427,7 +435,7 @@ struct WritingProjectView: View {
         case .continueWriting:
             return "继续写"
         case .edit:
-            return "润色此处"
+            return "修改这段"
         }
     }
 
@@ -442,7 +450,7 @@ struct WritingProjectView: View {
         case .continueWriting:
             return "想继续往哪儿写，可以补一句"
         case .edit:
-            return "听听你的修改建议"
+            return isSelectionCustomInputActive ? "告诉我你想怎么改这段" : "输入自定义修改意见"
         }
     }
 
@@ -540,14 +548,46 @@ struct WritingProjectView: View {
         case .edit:
             guard let selection = selectedText,
                   !selection.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return }
+            guard let userMessage = draftInstructionText() else {
+                activateSelectionCustomInput()
+                return
+            }
             beginComposerThinking()
             applyRevision(
                 .edit,
                 selectionText: selection,
                 selectionRange: selectedTextRange,
-                userMessage: draftInstructionText(),
+                userMessage: userMessage,
                 clearDraftOnSuccess: true
             )
+        }
+    }
+
+    private func triggerSelectionPresetEdit(_ preset: SelectionEditPreset) {
+        guard !flow.isAIRequestInFlight else { return }
+        guard let selection = normalizedSelectedText else { return }
+
+        resetSelectionEditUIState()
+        selectionPopoverPendingPreset = preset
+        beginComposerThinking()
+        applyRevision(
+            .edit,
+            selectionText: selection,
+            selectionRange: selectedTextRange,
+            userMessage: preset.prompt,
+            clearDraftOnSuccess: true
+        )
+    }
+
+    private func activateSelectionCustomInput() {
+        guard !flow.isAIRequestInFlight else { return }
+        guard normalizedSelectedText != nil else { return }
+
+        selectionPopoverPendingPreset = nil
+        isSelectionCustomInputActive = true
+        isComposerLocked = false
+        DispatchQueue.main.async {
+            messageFieldFocused = true
         }
     }
 
@@ -623,9 +663,11 @@ struct WritingProjectView: View {
 
         DispatchQueue.main.async {
             isComposerLocked = false
+            selectionPopoverPendingPreset = nil
             if shouldClearSelection {
                 selectedText = nil
                 selectedTextRange = nil
+                resetSelectionEditUIState()
             }
             if shouldCloseComparison {
                 showComparison = false
@@ -644,6 +686,12 @@ struct WritingProjectView: View {
 
     private func unlockComposerAfterRequest() {
         isComposerLocked = false
+        selectionPopoverPendingPreset = nil
+    }
+
+    private func resetSelectionEditUIState() {
+        selectionPopoverPendingPreset = nil
+        isSelectionCustomInputActive = false
     }
 
     private func retryLastChange() {
@@ -696,6 +744,45 @@ struct WritingProjectView: View {
     }
 }
 
+private enum SelectionEditPreset: CaseIterable, Hashable {
+    case moreVisual
+    case moreRestrained
+    case moreCompelling
+
+    var title: String {
+        switch self {
+        case .moreVisual:
+            return "更画面"
+        case .moreRestrained:
+            return "更克制"
+        case .moreCompelling:
+            return "更抓人"
+        }
+    }
+
+    var prompt: String {
+        switch self {
+        case .moreVisual:
+            return "把这段改得更有画面感，更具体、更可感，但保持原意，不要明显扩写。"
+        case .moreRestrained:
+            return "把这段改得更克制、更收一点，减少解释和用力过猛，保持原意。"
+        case .moreCompelling:
+            return "把这段改得更抓人、更有吸引力，但不要浮夸，保持原意。"
+        }
+    }
+
+    var accessibilityIdentifier: String {
+        switch self {
+        case .moreVisual:
+            return VibeWriteAutomationID.projectSelectionVisualButton
+        case .moreRestrained:
+            return VibeWriteAutomationID.projectSelectionRestrainedButton
+        case .moreCompelling:
+            return VibeWriteAutomationID.projectSelectionCompellingButton
+        }
+    }
+}
+
 private struct ChipGrid<Item: Hashable, Content: View>: View {
     let items: [Item]
     let content: (Item) -> Content
@@ -715,29 +802,61 @@ private struct ChipGrid<Item: Hashable, Content: View>: View {
 
 private struct SelectionPopover: View {
     let selectedText: String
-    let onEditSelection: () -> Void
+    let pendingPreset: SelectionEditPreset?
+    let isCustomInputActive: Bool
+    let isRequestInFlight: Bool
+    let onPresetTap: (SelectionEditPreset) -> Void
+    let onCustomTap: () -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 7) {
-            Text(selectedText)
-                .font(.system(size: 12.2, weight: .medium, design: .default))
-                .foregroundStyle(Color.vibeCanvasInk)
-                .lineLimit(2)
-                .truncationMode(.tail)
+        VStack(alignment: .leading, spacing: 10) {
+            HStack(alignment: .top, spacing: 12) {
+                Text(selectedText)
+                    .font(.system(size: 12.2, weight: .medium, design: .default))
+                    .foregroundStyle(Color.vibeCanvasInk)
+                    .lineLimit(2)
+                    .truncationMode(.tail)
 
-            HStack(spacing: 8) {
-                ActionChip(
-                    "润色此处",
-                    tint: .vibeCanvasAccent,
-                    accessibilityIdentifier: VibeWriteAutomationID.projectEditSelectionButton
-                ) {
-                    onEditSelection()
+                Spacer(minLength: 0)
+
+                if pendingPreset != nil && isRequestInFlight {
+                    ProgressView()
+                        .progressViewStyle(.circular)
+                        .controlSize(.small)
+                        .tint(Color.vibeCanvasAccent)
+                        .padding(.top, 2)
+                        .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPresetLoading)
                 }
+            }
+
+            LazyVGrid(
+                columns: [GridItem(.adaptive(minimum: 72), spacing: 8, alignment: .leading)],
+                alignment: .leading,
+                spacing: 8
+            ) {
+                ForEach(SelectionEditPreset.allCases, id: \.self) { preset in
+                    SelectionPopoverChip(
+                        title: preset.title,
+                        isActive: pendingPreset == preset,
+                        isDisabled: isRequestInFlight,
+                        accessibilityIdentifier: preset.accessibilityIdentifier
+                    ) {
+                        onPresetTap(preset)
+                    }
+                }
+
+                SelectionPopoverChip(
+                    title: "自定义",
+                    isActive: isCustomInputActive,
+                    isDisabled: isRequestInFlight,
+                    accessibilityIdentifier: VibeWriteAutomationID.projectSelectionCustomButton,
+                    action: onCustomTap
+                )
             }
         }
         .padding(.vertical, 8)
         .padding(.horizontal, 12)
-        .frame(maxWidth: 300, alignment: .leading)
+        .frame(maxWidth: 328, alignment: .leading)
         .onAppear {
             let preview = selectedText.vibewriteLogPreview(maxLength: 60)
             let message = "selection popover appeared selection=\(preview)"
@@ -769,6 +888,51 @@ private struct SelectionPopover: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPopover)
+    }
+}
+
+private struct SelectionPopoverChip: View {
+    let title: String
+    let isActive: Bool
+    let isDisabled: Bool
+    let accessibilityIdentifier: String
+    let action: () -> Void
+
+    var body: some View {
+        Button(action: action) {
+            Text(title)
+                .font(.system(size: 12, weight: .semibold, design: .default))
+                .lineLimit(1)
+                .truncationMode(.tail)
+                .fixedSize(horizontal: true, vertical: false)
+                .foregroundStyle(foregroundColor)
+                .padding(.vertical, 7)
+                .padding(.horizontal, 12)
+                .background {
+                    Capsule(style: .continuous)
+                        .fill(backgroundColor)
+                }
+                .overlay {
+                    Capsule(style: .continuous)
+                        .strokeBorder(borderColor, lineWidth: 1)
+                }
+        }
+        .buttonStyle(.plain)
+        .disabled(isDisabled)
+        .opacity(isDisabled && !isActive ? 0.58 : 1)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
+
+    private var foregroundColor: Color {
+        isActive ? .vibeCanvasInk : .vibeCanvasAccent
+    }
+
+    private var backgroundColor: Color {
+        isActive ? Color.vibeCanvasAccent.opacity(0.22) : Color.vibeCanvasAccent.opacity(0.12)
+    }
+
+    private var borderColor: Color {
+        isActive ? Color.vibeCanvasAccent.opacity(0.52) : Color.vibeCanvasAccent.opacity(0.22)
     }
 }
 @MainActor
