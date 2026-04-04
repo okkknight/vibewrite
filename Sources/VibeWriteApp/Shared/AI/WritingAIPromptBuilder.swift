@@ -35,6 +35,8 @@ struct WritingAIPromptBuilder {
         - The metadata block is not part of the正文 and must not be mixed into the prose.
         - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
+        - When the action is "continueWriting", still return a complete metadata block and make suggestionChips describe the most useful next steps after this continuation, not generic continuation prompts.
+        - For "continueWriting", prefer 3 concise chips that follow the current正文 naturally and help the app suggest what to do next.
 
         Rules:
         - Keep the writing voice calm, precise, and native to a macOS writing app.
@@ -71,6 +73,9 @@ struct WritingAIPromptBuilder {
         if request.action == .startDraft {
             lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
+        } else if request.action == .continueWriting {
+            lines.append("For continueWriting, return 3 concise suggestion chips that describe the most useful next steps after this continuation.")
+            lines.append("Those chips should follow the current正文 naturally and should not be generic continuation prompts.")
         }
 
         lines.append("Respond with only the writing text for the action above.")

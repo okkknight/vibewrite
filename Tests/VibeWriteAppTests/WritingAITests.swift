@@ -137,6 +137,30 @@ final class WritingAITests: XCTestCase {
         XCTAssertFalse(userPrompt.contains("assistantMessage"))
     }
 
+    func testContinueWritingPromptRequestsConcreteSuggestionChips() {
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot
+        let request = WritingAIRequest(
+            action: .continueWriting,
+            project: project,
+            userMessage: "继续往下写",
+            selectionText: nil
+        )
+
+        let messages = WritingAIPromptBuilder().messages(
+            for: request,
+            provider: "minimax",
+            model: "MiniMax-M2.7"
+        )
+
+        let systemPrompt = messages.first?.content ?? ""
+        let userPrompt = messages.last?.content ?? ""
+
+        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\""))
+        XCTAssertTrue(systemPrompt.contains("prefer 3 concise chips"))
+        XCTAssertTrue(userPrompt.contains("For continueWriting, return 3 concise suggestion chips"))
+        XCTAssertTrue(userPrompt.contains("should follow the current正文 naturally"))
+    }
+
     func testStreamingPreviewRendererStartsContinuationFromRevealOffset() {
         let configuration = WritingStreamingConfiguration.configuration(
             from: [

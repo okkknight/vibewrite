@@ -30,7 +30,6 @@ struct WritingProjectView: View {
         shouldShowHistorySidebar ? 80 : 44
     }
     private var writingContentMaxWidth: CGFloat { 900 }
-    private var writingReadableTextWidth: CGFloat { 828 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
 
     init(
@@ -285,7 +284,6 @@ struct WritingProjectView: View {
                     isEditable: !flow.isAIRequestInFlight && flow.activeEditLock == nil,
                     accessibilityIdentifier: VibeWriteAutomationID.projectBodyEditor,
                     shouldAutoScrollToDocumentEnd: flow.isAIRequestInFlight,
-                    readableContentWidth: writingReadableTextWidth,
                     textFont: NSFont.systemFont(ofSize: 16, weight: .regular),
                     textColor: NSColor.vibeCanvasInk,
                     insertionPointColor: NSColor.vibeAccent,

@@ -10,7 +10,6 @@ struct SelectableTextEditor: NSViewRepresentable {
     var isEditable: Bool = true
     var accessibilityIdentifier: String?
     var shouldAutoScrollToDocumentEnd: Bool = false
-    var readableContentWidth: CGFloat? = nil
     var textFont: NSFont = .systemFont(ofSize: 21, weight: .regular)
     var textColor: NSColor = .labelColor
     var insertionPointColor: NSColor = .vibeAccent
@@ -21,8 +20,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             text: $text,
             selectedText: $selectedText,
             selectedTextRange: $selectedTextRange,
-            selectionPopoverOrigin: $selectionPopoverOrigin,
-            readableContentWidth: readableContentWidth
+            selectionPopoverOrigin: $selectionPopoverOrigin
         )
     }
 
@@ -76,7 +74,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         scrollView.documentView = textView
 
         context.coordinator.textView = textView
-        context.coordinator.readableContentWidth = readableContentWidth
         context.coordinator.installObservers(for: scrollView, textView: textView)
         context.coordinator.syncTypography(
             isEditable: isEditable,
@@ -98,7 +95,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         }
 
         context.coordinator.textView = textView
-        context.coordinator.readableContentWidth = readableContentWidth
         context.coordinator.syncTypography(
             isEditable: isEditable,
             font: textFont,
@@ -112,7 +108,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         context.coordinator.syncLayout(
             in: textView,
             scrollView: scrollView,
-            readableContentWidth: readableContentWidth,
             prefersSelectionVisibility: didMutateText == false,
             shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd
         )
@@ -132,7 +127,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         @Binding private var selectionPopoverOrigin: CGPoint?
         weak var textView: NSTextView?
         weak var scrollView: NSScrollView?
-        var readableContentWidth: CGFloat?
         private var programmaticChangeDepth = 0
         private var lastAppliedIsEditable: Bool?
         private var lastAppliedFont: NSFont?
@@ -154,14 +148,12 @@ struct SelectableTextEditor: NSViewRepresentable {
             text: Binding<String>,
             selectedText: Binding<String?>,
             selectedTextRange: Binding<WritingTextSelectionRange?>,
-            selectionPopoverOrigin: Binding<CGPoint?>,
-            readableContentWidth: CGFloat?
+            selectionPopoverOrigin: Binding<CGPoint?>
         ) {
             _text = text
             _selectedText = selectedText
             _selectedTextRange = selectedTextRange
             _selectionPopoverOrigin = selectionPopoverOrigin
-            self.readableContentWidth = readableContentWidth
         }
 
         deinit {
@@ -194,7 +186,6 @@ struct SelectableTextEditor: NSViewRepresentable {
             syncLayout(
                 in: textView,
                 scrollView: scrollView,
-                readableContentWidth: readableContentWidth,
                 prefersSelectionVisibility: false,
                 shouldAutoScrollToDocumentEnd: false
             )
@@ -382,7 +373,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         func syncLayout(
             in textView: NSTextView,
             scrollView: NSScrollView,
-            readableContentWidth: CGFloat?,
             prefersSelectionVisibility: Bool,
             shouldAutoScrollToDocumentEnd: Bool
         ) {
@@ -394,10 +384,8 @@ struct SelectableTextEditor: NSViewRepresentable {
             let visibleHeight = max(clipBounds.height, 1)
             let textInsetY: CGFloat = 18
             let textInsetX: CGFloat = 18
-            let outerReadableWidth = min(readableContentWidth ?? visibleWidth, visibleWidth)
-            let outerLeadingInset = max((visibleWidth - outerReadableWidth) / 2, 0)
-            let horizontalInset = outerLeadingInset + textInsetX
-            let containerWidth = max(outerReadableWidth - (textInsetX * 2), 1)
+            let horizontalInset = textInsetX
+            let containerWidth = max(visibleWidth - (textInsetX * 2), 1)
 
             guard visibleWidth > 1, visibleHeight > 1 else { return }
 

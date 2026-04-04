@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-04-04
+- `continueWriting` now asks for a complete metadata block plus 3 concise follow-up chips directly in the prompt, so the continuation path gives the model a stronger nudge to return suggestions in the same language as the正文 without adding any fallback behavior.
+
+## 2026-04-04
+- The正文 editor now shares the same outer content column as the bottom composer but no longer applies its own centered readable-width calculation. It uses a fixed internal text inset and a right-side scroll gutter instead, which keeps the editor and composer aligned on both left and right edges without clipping正文.
 - Remote AI metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay in Chinese instead of drifting into English.
 - Continue-writing streaming now reveals from the end of the current正文 instead of starting from character 0, so the streamed preview stays anchored to the latest paragraph.
 
