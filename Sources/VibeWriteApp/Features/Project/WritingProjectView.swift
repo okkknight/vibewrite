@@ -117,7 +117,6 @@ struct WritingProjectView: View {
                 ExternalVerticalScroller(scrollView: bodyEditorScrollView)
                     .frame(width: 12)
                     .frame(maxHeight: .infinity)
-                    .padding(.trailing, 2)
                     .accessibilityHidden(true)
             }
         }

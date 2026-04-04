@@ -11,7 +11,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
-- The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset while the visible vertical scroll bar is rendered as a separate overlay at the far right edge of the app so the正文 width itself stays unchanged.
+- The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset while the visible vertical scroll bar is rendered as a separate overlay at the far right edge of the app, with content that is too short to scroll staying hidden and the bar auto-hiding again after inactivity.
 - Clicking selection-popover `自定义` now reveals a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the old popover while the user stays in the custom-edit flow.
 - The latest committed change before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.

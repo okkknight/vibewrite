@@ -1102,13 +1102,13 @@ struct ExternalVerticalScroller: NSViewRepresentable {
     func makeNSView(context: Context) -> ExternalVerticalScrollerView {
         let view = ExternalVerticalScrollerView()
         view.scrollView = scrollView
-        view.refreshScrollerVisibility()
+        view.syncVisibilityForCurrentContent()
         return view
     }
 
     func updateNSView(_ nsView: ExternalVerticalScrollerView, context: Context) {
         nsView.scrollView = scrollView
-        nsView.refreshScrollerVisibility()
+        nsView.syncVisibilityForCurrentContent()
     }
 }
 
@@ -1118,18 +1118,19 @@ final class ExternalVerticalScrollerView: NSView {
     private let minimumKnobHeight: CGFloat = 30
     private let trackWidth: CGFloat = 5
     private let knobWidth: CGFloat = 5
+    private let autoHideDelay: TimeInterval = 2.0
     private let trackColor = NSColor.vibeCanvasInk.withAlphaComponent(0.06)
     private let knobColor = NSColor.vibeCanvasInk.withAlphaComponent(0.42)
     private let knobHoverColor = NSColor.vibeCanvasInk.withAlphaComponent(0.60)
     private var dragAnchorOffsetY: CGFloat?
+    private var autoHideWorkItem: DispatchWorkItem?
 
     weak var scrollView: NSScrollView? {
         didSet {
             guard oldValue !== scrollView else { return }
             resetObservers()
             installObservers()
-            needsDisplay = true
-            isHidden = shouldHideScroller
+            syncVisibilityForCurrentContent()
         }
     }
 
@@ -1208,23 +1209,70 @@ final class ExternalVerticalScrollerView: NSView {
     }
 
     @MainActor
-    func refreshScrollerVisibility() {
-        needsDisplay = true
-        isHidden = shouldHideScroller
+    func syncVisibilityForCurrentContent() {
+        autoHideWorkItem?.cancel()
+        autoHideWorkItem = nil
+
+        guard hasScrollableContent else {
+            isHidden = true
+            needsDisplay = true
+            return
+        }
+
+        if isHidden == false {
+            scheduleAutoHide()
+        }
     }
 
     @objc
     private func handleScrollViewBoundsDidChange(_ notification: Notification) {
         Task { @MainActor [weak self] in
-            self?.refreshScrollerVisibility()
+            self?.revealTemporarily()
         }
     }
 
     @objc
     private func handleDocumentViewFrameDidChange(_ notification: Notification) {
         Task { @MainActor [weak self] in
-            self?.refreshScrollerVisibility()
+            self?.syncVisibilityForCurrentContent()
         }
+    }
+
+    private var hasScrollableContent: Bool {
+        !shouldHideScroller
+    }
+
+    @MainActor
+    private func revealTemporarily() {
+        guard hasScrollableContent else {
+            isHidden = true
+            needsDisplay = true
+            return
+        }
+
+        isHidden = false
+        needsDisplay = true
+        scheduleAutoHide()
+    }
+
+    @MainActor
+    private func hideNow() {
+        autoHideWorkItem?.cancel()
+        autoHideWorkItem = nil
+        isHidden = true
+        needsDisplay = true
+    }
+
+    @MainActor
+    private func scheduleAutoHide() {
+        autoHideWorkItem?.cancel()
+        let workItem = DispatchWorkItem { [weak self] in
+            Task { @MainActor [weak self] in
+                self?.hideNow()
+            }
+        }
+        autoHideWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + autoHideDelay, execute: workItem)
     }
 
     override func draw(_ dirtyRect: NSRect) {
@@ -1257,6 +1305,10 @@ final class ExternalVerticalScrollerView: NSView {
         guard shouldHideScroller == false,
               let metrics = knobMetrics() else { return }
 
+        Task { @MainActor [weak self] in
+            self?.revealTemporarily()
+        }
+
         let location = convert(event.locationInWindow, from: nil)
         let thumb = metrics.thumbRect
 
@@ -1279,6 +1331,10 @@ final class ExternalVerticalScrollerView: NSView {
         guard shouldHideScroller == false,
               let metrics = knobMetrics() else { return }
 
+        Task { @MainActor [weak self] in
+            self?.revealTemporarily()
+        }
+
         let location = convert(event.locationInWindow, from: nil)
         let track = trackRect
         let thumbHeight = metrics.thumbRect.height
@@ -1300,6 +1356,8 @@ final class ExternalVerticalScrollerView: NSView {
         let clipBounds = scrollView.contentView.bounds
         scrollView.contentView.scroll(to: CGPoint(x: clipBounds.origin.x, y: clampedOffset))
         scrollView.reflectScrolledClipView(scrollView.contentView)
-        needsDisplay = true
+        Task { @MainActor [weak self] in
+            self?.revealTemporarily()
+        }
     }
 }

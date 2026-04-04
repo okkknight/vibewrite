@@ -1,4 +1,8 @@
 ## 2026-04-05
+- The far-right scrollbar overlay now stays hidden when the正文 is too short to scroll and automatically fades away again after a short period of scroll inactivity.
+- The正文 content area no longer gives up width to reserve that scrollbar; the overlay sits at the app edge instead, so the text no longer gets clipped on the right.
+
+## 2026-04-05
 - Trace debugging found the local-edit flash was drawing at zero opacity on its first frame, so the overlay timing was adjusted to keep the rounded highlight visible briefly before fading out.
 - Verification for this follow-up passed with `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
 
