@@ -12,8 +12,10 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
 - The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset and lets the scroll bar sit in a right-side gutter so both edges stay exactly aligned with the composer.
+- Clicking selection-popover `自定义` now only focuses the bottom composer input and briefly highlights the input field itself, instead of flashing the whole composer.
 - The latest committed change before this update is `fc91b0f`, which refined the selection edit intent popover.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
+- The document storage model has been redesigned so the Markdown file carries only正文 plus a hidden identity marker, while the collaboration metadata lives in an app-side metadata store keyed by `docID`. `xattr` owns the primary identity marker, the body marker is a fallback, Save As generates a fresh `docID`, and malformed metadata always degrades to正文-only editing.
 - The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and the editor follows the document end during AI streaming so the output feels fast without turning into big bursty jumps.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
@@ -23,8 +25,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Local edit requests now carry a stable `selectionRange`, and the patch/revision/mock/preview layers resolve edits from that exact range instead of re-matching by string content. That keeps repeated local edits anchored to the intended passage even when the same words appear elsewhere.
 - Edit responses no longer stream-replace the正文 while the model is still generating. The live preview renderer is bypassed for `.edit`, so local patch edits apply once at completion instead of causing jumpy chunk-by-chunk replacement.
 - The page header subtitle still surfaces `project.summary` when the body is non-empty, so if the text under the title looks off-topic the real bug is upstream in the model output or summary writeback path, not the subtitle component itself.
-- The app has switched to a file-first document model: Markdown files carry a compact YAML-style metadata block plus正文, the header title is directly editable, `Cmd+O` / `Cmd+S` / `Cmd+Shift+S` now live in the File menu, and context recovery never blocks writing even if metadata is missing or malformed.
-- User文本 and协作 state are no longer kept in the app's primary local store. Only lightweight recent-document entries remain app-owned; the writable project state now lives in the user's Markdown file.
+- The app now keeps正文 and collaboration history in separate stores: the Markdown file holds正文 plus a hidden marker, `xattr` stores the primary document identity, and the app-side metadata store keeps the latest collaboration state, summary snapshot, and recent conversation history.
+- User文本 stays in the Markdown file, while collaboration state, summary snapshots, and conversation history live in the app-side metadata store. Only lightweight recent-document entries remain app-owned for convenience.
 - `task/TASK_20260403_024.md` completed the visual restyle pass: the app keeps the same structure and interactions, but the shell/theme now uses a clearer Apple-style visual system.
 - The post-submit hang in `UITests/VibeWriteUITests.swift` was not an XCTest idle problem. Direct sampling showed a SwiftUI/AppKit feedback loop in the AppKit-backed editor bridge:
   - `SelectableTextEditor.updateNSView(...)` kept mutating `NSTextView` properties and syncing selection/accessibility state
@@ -45,8 +47,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the update.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle fixes.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle restore.
-- Prompt-only follow-up verification is currently blocked by an unrelated compile error already present in `Sources/VibeWriteApp/Shared/Documents/VibeWriteMarkdownDocument.swift` in the working tree; the new prompt text itself is limited to `WritingAIPromptBuilder` and its test coverage.
-- `swift test` currently compiles successfully but fails to launch the macOS test bundle in this environment because of a local library-load/code-signing policy issue; the app target still builds cleanly with `xcodebuild build`.
+- The document split is covered by targeted tests for save/reopen, malformed metadata fallback, and xattr precedence, so the new storage path has direct coverage instead of depending on the old embedded-metadata flow.
+- `swift test` now passes with the file-based document flow and menu commands in place.
 - The targeted UI test now gets past the second submit and into the rail section, but it is still not fully green because `project.assistantRailShell` does not appear within the current timeout.
 - The writing session remains正文-first with collapsible AI/history rails and a standalone bottom composer.
 - AI requests stream deltas into the active project; final responses are patched locally and persisted once at the end.
@@ -73,6 +75,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `Sources/VibeWriteApp/Shared/Views/SelectableTextEditor.swift`
 - `Sources/VibeWriteApp/Shared/Views/ProjectShellChrome.swift`
 - `Sources/VibeWriteApp/Shared/Documents/VibeWriteMarkdownDocument.swift`
+- `Sources/VibeWriteApp/Shared/Documents/VibeWriteDocumentMetadataStore.swift`
 - `Sources/VibeWriteApp/Shared/Models/WritingPatchModels.swift`
 - `Sources/VibeWriteApp/Shared/AI/WritingAIConfiguration.swift`
 - `Sources/VibeWriteApp/Shared/AI/WritingStreamingConfiguration.swift`
@@ -90,6 +93,9 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `swift build`
 - `swift test`
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
+- `swift test --filter VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`
+- `swift test --filter VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`
+- `swift test --filter VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` currently gets past the second-submit path, but the UI suite still fails later at the assistant rail shell assertion
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` passes and covers the new selection-preset edit path end-to-end on the real macOS app
 - `swift test` passes with the file-based document flow and menu commands in place.
@@ -103,7 +109,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - If you touch the edit streaming preview path, check both `startDraft` and `edit` so the stream still reveals from the intended region.
 - If the subtitle shows unrelated copy, inspect the AI response summary and `WritingAIModels.apply(...)` before changing the title component.
 - If you touch the start-draft request assembly again, make sure the prompt is still passed to the AI request once and is not silently dropped by dedup logic.
-- If you touch the file document parser or save flow, make sure malformed metadata still degrades to正文-only editing instead of blocking open/save.
+- If you touch the file document parser or save flow, keep `xattr` as the primary identity source, fall back to the body marker only when needed, and preserve the正文-only recovery path when metadata is missing or broken.
+- If you touch collaboration state persistence, keep the recent-conversation cap at 20 rounds and keep the short summary snapshot in sync with the latest metadata record.
 
 ## Working rules
 - Keep the handoff concise and durable.

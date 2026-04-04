@@ -112,7 +112,7 @@ struct ProjectAISidebarView: View {
     }
 
     private var conversationPreview: [ConversationMessage] {
-        Array(project.conversation.suffix(4))
+        Array(project.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit))
     }
 
     private var suggestionChips: [String] {

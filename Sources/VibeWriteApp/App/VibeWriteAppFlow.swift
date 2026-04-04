@@ -14,6 +14,8 @@ final class VibeWriteAppFlow: ObservableObject {
     @Published private(set) var recentDocumentEntries: [RecentDocumentEntry]
 
     private let recentDocumentStore: RecentDocumentStore
+    private let documentMetadataStore: VibeWriteDocumentMetadataStore
+    private let documentIdentityStore: VibeWriteDocumentIdentityStore
     private let aiClient: any WritingAIClient
     private let streamingConfiguration: WritingStreamingConfiguration
     private let emptyProjectShell: WritingProject
@@ -31,11 +33,20 @@ final class VibeWriteAppFlow: ObservableObject {
             URL(fileURLWithPath: $0)
         }
         let shouldResetStorage = ProcessInfo.processInfo.environment["VIBEWRITE_UI_TEST_RESET_STORAGE"] == "1"
+        let resolvedRecentStorageURL = storageURL ?? environmentStorageURL ?? RecentDocumentStore.defaultStorageURL(fileManager: fileManager)
+        let resolvedMetadataStorageURL = resolvedRecentStorageURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("document-collaboration-store.json")
         let resolvedStore = RecentDocumentStore(
-            storageURL: storageURL ?? environmentStorageURL ?? RecentDocumentStore.defaultStorageURL(fileManager: fileManager),
+            storageURL: resolvedRecentStorageURL,
             fileManager: fileManager
         )
         self.recentDocumentStore = resolvedStore
+        self.documentMetadataStore = VibeWriteDocumentMetadataStore(
+            storageURL: resolvedMetadataStorageURL,
+            fileManager: fileManager
+        )
+        self.documentIdentityStore = VibeWriteDocumentIdentityStore()
         self.aiClient = aiClient ?? WritingAIClientFactory.makeDefaultClient(configuration: aiConfiguration)
         self.streamingConfiguration = streamingConfiguration
         self.emptyProjectShell = WritingProject.entryShell(mode: .collaboration)
@@ -45,6 +56,7 @@ final class VibeWriteAppFlow: ObservableObject {
             self.projects = []
             self.activeProjectID = nil
             resolvedStore.clear()
+            documentMetadataStore.clear()
             self.recentDocumentEntries = []
             self.savedDocumentContents = nil
             self.currentDocumentURL = nil
@@ -163,6 +175,10 @@ final class VibeWriteAppFlow: ObservableObject {
         var updatedProject = activeProject
         updatedProject.title = trimmed
         activeProject = updatedProject
+        if let currentDocumentURL {
+            documentMetadataStore.save(project: updatedProject)
+            recordRecentDocument(url: currentDocumentURL, title: updatedProject.title)
+        }
     }
 
     func deleteActiveProject() {
@@ -179,6 +195,7 @@ final class VibeWriteAppFlow: ObservableObject {
 
     func resetLocalData() {
         recentDocumentStore.clear()
+        documentMetadataStore.clear()
         recentDocumentEntries = []
         projects = []
         activeProjectID = nil
@@ -334,9 +351,8 @@ final class VibeWriteAppFlow: ObservableObject {
                 "Flow completed AI request action=\(action.rawValue, privacy: .public) finalDocumentPreview=\(liveProject.documentText.vibewriteLogPreview(maxLength: 120), privacy: .public)"
             )
             replaceActiveProject(liveProject, persist: false)
-            if currentDocumentURL != nil {
-                savedDocumentContents = currentDocumentFileText
-                recordRecentDocument(url: currentDocumentURL!, title: liveProject.title)
+            if let currentDocumentURL {
+                _ = saveCurrentDocument(to: currentDocumentURL)
             }
         } catch {
             VibeWriteLog.ai.error(
@@ -371,6 +387,35 @@ final class VibeWriteAppFlow: ObservableObject {
 
         projects = [project]
         activeProjectID = project.id
+    }
+
+    @discardableResult
+    private func saveCurrentDocument(
+        to url: URL,
+        project: WritingProject,
+        updateActiveProject: Bool
+    ) -> Bool {
+        let document = VibeWriteMarkdownDocument(project: project)
+        let renderedText = document.renderedText()
+
+        do {
+            try ensureDocumentParentDirectoryExists(for: url)
+            try renderedText.write(to: url, atomically: true, encoding: .utf8)
+            if let identityMarker = document.identityMarker {
+                _ = documentIdentityStore.writeDocumentID(identityMarker, to: url)
+            }
+            documentMetadataStore.save(project: project)
+            if updateActiveProject {
+                replaceActiveProject(project, persist: false)
+            }
+            currentDocumentURL = url
+            savedDocumentContents = renderedText
+            recordRecentDocument(url: url, title: project.title)
+            return true
+        } catch {
+            aiErrorMessage = error.localizedDescription
+            return false
+        }
     }
 
     private func project(for id: UUID) -> WritingProject? {
@@ -435,24 +480,16 @@ final class VibeWriteAppFlow: ObservableObject {
             return false
         }
 
-        return saveCurrentDocument(to: url)
+        let projectToSave = currentDocumentURL == nil ? activeProject : activeProject.forkedSaveAsCopy()
+        return saveCurrentDocument(
+            to: url,
+            project: projectToSave,
+            updateActiveProject: currentDocumentURL != nil
+        )
     }
 
     func saveCurrentDocument(to url: URL) -> Bool {
-        let document = VibeWriteMarkdownDocument(project: activeProject)
-        let renderedText = document.renderedText()
-
-        do {
-            try ensureDocumentParentDirectoryExists(for: url)
-            try renderedText.write(to: url, atomically: true, encoding: .utf8)
-            currentDocumentURL = url
-            savedDocumentContents = renderedText
-            recordRecentDocument(url: url, title: activeProject.title)
-            return true
-        } catch {
-            aiErrorMessage = error.localizedDescription
-            return false
-        }
+        saveCurrentDocument(to: url, project: activeProject, updateActiveProject: false)
     }
 
     func openDocumentFromPanel() -> Bool {
@@ -480,15 +517,22 @@ final class VibeWriteAppFlow: ObservableObject {
     func openDocument(at url: URL) -> Bool {
         do {
             let rawText = try String(contentsOf: url, encoding: .utf8)
-            let parsedDocument = VibeWriteMarkdownDocument.parse(
-                from: rawText,
-                fallbackTitle: url.deletingPathExtension().lastPathComponent,
-                fallbackAutomationKey: url.deletingPathExtension().lastPathComponent
-            )
-            let project = parsedDocument.makeProject(
-                fallbackTitle: url.deletingPathExtension().lastPathComponent,
-                fallbackAutomationKey: url.deletingPathExtension().lastPathComponent
-            )
+            let parsedDocument = VibeWriteMarkdownDocument.parse(from: rawText)
+            let fallbackTitle = url.deletingPathExtension().lastPathComponent
+            let fallbackAutomationKey = url.deletingPathExtension().lastPathComponent
+            let resolvedMarker = documentIdentityStore.readDocumentID(from: url) ?? parsedDocument.identityMarker
+            let project = resolvedMarker
+                .flatMap { documentMetadataStore.loadRecord(documentID: $0.documentID) }?
+                .makeProject(
+                    documentText: parsedDocument.body,
+                    fallbackTitle: fallbackTitle,
+                    fallbackAutomationKey: fallbackAutomationKey
+                )
+                ?? parsedDocument.makeProject(
+                    documentID: resolvedMarker?.documentID,
+                    fallbackTitle: fallbackTitle,
+                    fallbackAutomationKey: fallbackAutomationKey
+                )
             currentDocumentURL = url
             savedDocumentContents = rawText
             openProject(project)

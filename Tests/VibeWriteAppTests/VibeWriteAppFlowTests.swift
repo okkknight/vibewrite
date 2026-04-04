@@ -239,7 +239,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .edit)
     }
 
-    func testSavingAndReopeningMarkdownDocumentRestoresLatestContext() throws {
+    func testSavingAndReopeningDocumentRestoresMetadataStoreState() throws {
         let storageURL = try makeTempStorageURL()
         defer {
             try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
@@ -248,25 +248,55 @@ final class VibeWriteAppFlowTests: XCTestCase {
         let initialFlow = VibeWriteAppFlow(storageURL: storageURL)
         let project = WritingProject.quickStart(
             prompt: "写一个雨夜重逢的小说场景",
-            mode: .discussion,
+            mode: .collaboration,
             automationKey: "project.persisted.demo"
         )
         initialFlow.openProject(project)
 
         var updatedProject = initialFlow.activeProject
+        updatedProject.summary = "正在收紧雨夜重逢的第一段"
         updatedProject.currentGoal = "确认角色关系"
         updatedProject.recentDecisions = ["先说明场景", "再处理重逢"]
+        for index in 1...25 {
+            updatedProject.conversation.append(
+                ConversationMessage(
+                    role: .user,
+                    text: "第 \(index) 轮用户补充",
+                    timestamp: "用户 · 刚刚"
+                )
+            )
+            updatedProject.conversation.append(
+                ConversationMessage(
+                    role: .assistant,
+                    text: "第 \(index) 轮 AI 反馈",
+                    timestamp: "AI · 刚刚"
+                )
+            )
+        }
         initialFlow.activeProject = updatedProject
 
         let documentURL = storageURL.deletingPathExtension().appendingPathExtension("md")
         XCTAssertTrue(initialFlow.saveCurrentDocument(to: documentURL))
+
+        let renderedText = try String(contentsOf: documentURL, encoding: .utf8)
+        XCTAssertTrue(renderedText.hasPrefix(VibeWriteMarkdownDocument.markerStartToken))
+        XCTAssertFalse(renderedText.contains("确认角色关系"))
+        XCTAssertFalse(renderedText.contains("第 1 轮用户补充"))
 
         let reopenedFlow = VibeWriteAppFlow(storageURL: storageURL)
         XCTAssertTrue(reopenedFlow.openDocument(at: documentURL))
 
         XCTAssertEqual(reopenedFlow.activeProject.id, updatedProject.id)
         XCTAssertEqual(reopenedFlow.activeProject.title, updatedProject.title)
+        XCTAssertEqual(reopenedFlow.activeProject.summary, updatedProject.summary)
         XCTAssertEqual(reopenedFlow.activeProject.currentGoal, "确认角色关系")
+        XCTAssertEqual(reopenedFlow.activeProject.recentDecisions, updatedProject.recentDecisions)
+        XCTAssertEqual(reopenedFlow.activeProject.suggestionChips, updatedProject.suggestionChips)
+        XCTAssertEqual(
+            reopenedFlow.activeProject.conversation.count,
+            VibeWriteDocumentMetadataPolicy.conversationMessageLimit
+        )
+        XCTAssertEqual(reopenedFlow.activeProject.conversation.first?.text, "第 6 轮用户补充")
         XCTAssertTrue(reopenedFlow.activeProject.documentText.isEmpty)
         XCTAssertTrue(reopenedFlow.recentDocumentEntries.contains(where: { $0.url == documentURL }))
     }
@@ -297,44 +327,107 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(restoredFlow.recentDocumentEntries.isEmpty)
     }
 
-    func testMarkdownDocumentFallsBackWhenMetadataIsMalformed() {
-        let rawText = """
-        <!-- vibe-write-metadata
+    func testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed() throws {
+        let storageURL = try makeTempStorageURL()
+        let metadataURL = metadataStorageURL(for: storageURL)
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        try createParentDirectoryIfNeeded(for: metadataURL)
+        try """
         { this is not valid json
-        -->
+        """.write(to: metadataURL, atomically: true, encoding: .utf8)
 
-        林校第一次注意到苏迟，是在图书馆三楼靠窗的位置。
-        """
+        let documentID = UUID()
+        let rawText = VibeWriteMarkdownDocument(
+            identityMarker: VibeWriteDocumentIdentityMarker(
+                schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+                documentID: documentID
+            ),
+            body: """
+            林校第一次注意到苏迟，是在图书馆三楼靠窗的位置。
+            """
+        ).renderedText()
 
-        let parsedDocument = VibeWriteMarkdownDocument.parse(
-            from: rawText,
-            fallbackTitle: "未命名写作",
-            fallbackAutomationKey: "project.fallback.demo"
-        )
-        let reopenedProject = parsedDocument.makeProject(
-            fallbackTitle: "未命名写作",
-            fallbackAutomationKey: "project.fallback.demo"
-        )
+        let documentURL = storageURL.deletingPathExtension().appendingPathExtension("md")
+        try rawText.write(to: documentURL, atomically: true, encoding: .utf8)
 
-        XCTAssertEqual(reopenedProject.title, "未命名写作")
-        XCTAssertTrue(reopenedProject.documentText.contains("林校第一次注意到苏迟"))
-        XCTAssertEqual(reopenedProject.context.currentGoal, "继续当前正文")
-        XCTAssertEqual(reopenedProject.suggestionChips, ["继续写", "编辑这段", "补一段"])
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        XCTAssertTrue(flow.openDocument(at: documentURL))
+
+        XCTAssertEqual(flow.activeProject.id, documentID)
+        XCTAssertEqual(flow.activeProject.title, documentURL.deletingPathExtension().lastPathComponent)
+        XCTAssertTrue(flow.activeProject.documentText.contains("林校第一次注意到苏迟"))
+        XCTAssertEqual(flow.activeProject.currentGoal, "继续当前正文")
+        XCTAssertTrue(flow.activeProject.conversation.isEmpty)
+        XCTAssertEqual(flow.activeProject.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
 
-    func testMarkdownDocumentRoundTripsProjectState() {
-        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
-        let document = VibeWriteMarkdownDocument(project: project)
-        let reopenedProject = VibeWriteMarkdownDocument.parse(from: document.renderedText())
-            .makeProject()
+    func testDocumentIdentityPrefersXattrOverHiddenMarker() throws {
+        let storageURL = try makeTempStorageURL()
+        let metadataURL = metadataStorageURL(for: storageURL)
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
 
-        XCTAssertEqual(reopenedProject.id, project.id)
-        XCTAssertEqual(reopenedProject.title, project.title)
-        XCTAssertEqual(reopenedProject.prompt, project.prompt)
-        XCTAssertEqual(reopenedProject.mode, project.mode)
-        XCTAssertEqual(reopenedProject.documentText, project.documentText)
-        XCTAssertEqual(reopenedProject.context.currentGoal, project.context.currentGoal)
-        XCTAssertEqual(reopenedProject.suggestionChips, project.suggestionChips)
+        let bodyMarkerID = UUID()
+        let xattrID = UUID()
+        let bodyText = "正文内容只会出现在文件正文里。"
+        let documentURL = storageURL.deletingPathExtension().appendingPathExtension("md")
+        let markerDocument = VibeWriteMarkdownDocument(
+            identityMarker: VibeWriteDocumentIdentityMarker(
+                schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+                documentID: bodyMarkerID
+            ),
+            body: bodyText
+        )
+        try markerDocument.renderedText().write(to: documentURL, atomically: true, encoding: .utf8)
+
+        let identityStore = VibeWriteDocumentIdentityStore()
+        XCTAssertTrue(identityStore.writeDocumentID(
+            VibeWriteDocumentIdentityMarker(
+                schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+                documentID: xattrID
+            ),
+            to: documentURL
+        ))
+
+        let metadataStore = VibeWriteDocumentMetadataStore(storageURL: metadataURL)
+        let xattrProject = WritingProject(
+            id: xattrID,
+            automationKey: "project.xattr.demo",
+            title: "XATTR 版本",
+            prompt: "写一个雨夜重逢的小说场景",
+            mode: .collaboration,
+            summary: "XATTR 记录的最新摘要",
+            context: ProjectContext(
+                intentSummary: "围绕 xattr 记录恢复协作状态。",
+                styleConstraints: ["克制", "平静"],
+                currentGoal: "继续推进 xattr 版本",
+                recentDecisions: ["xattr 优先"],
+                workingMemory: ["测试 xattr 优先级"],
+                nextFocus: "继续下一段"
+            ),
+            conversation: [
+                ConversationMessage(role: .user, text: "先看 xattr 能不能优先", timestamp: "用户 · 刚刚"),
+                ConversationMessage(role: .assistant, text: "xattr 应该优先于正文隐藏标记。", timestamp: "AI · 刚刚")
+            ],
+            documentText: bodyText,
+            suggestionChips: ["继续写", "编辑这段"],
+            revisionHistory: [],
+            updatedAt: .now
+        )
+        metadataStore.save(project: xattrProject)
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        XCTAssertTrue(flow.openDocument(at: documentURL))
+
+        XCTAssertEqual(flow.activeProject.id, xattrID)
+        XCTAssertEqual(flow.activeProject.title, "XATTR 版本")
+        XCTAssertEqual(flow.activeProject.currentGoal, "继续推进 xattr 版本")
+        XCTAssertEqual(flow.activeProject.documentText, bodyText)
+        XCTAssertEqual(flow.activeProject.conversation.count, 2)
     }
 
     func testMockEngineRevisesSelectedAndWholeDocumentText() {
@@ -658,6 +751,21 @@ final class VibeWriteAppFlowTests: XCTestCase {
         let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
         try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
         return directory.appendingPathComponent("local-project-store.json")
+    }
+
+    private func metadataStorageURL(for storageURL: URL) -> URL {
+        storageURL
+            .deletingLastPathComponent()
+            .appendingPathComponent("document-collaboration-store.json")
+    }
+
+    private func createParentDirectoryIfNeeded(for url: URL) throws {
+        let directory = url.deletingLastPathComponent()
+        if FileManager.default.fileExists(atPath: directory.path) {
+            return
+        }
+
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
     }
 
     @MainActor

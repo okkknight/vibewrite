@@ -21,7 +21,7 @@ struct ProjectHistoryDrawerView: View {
     }
 
     private var recentMessages: [ConversationMessage] {
-        Array(project.conversation.suffix(4))
+        Array(project.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit))
     }
 
     var body: some View {

@@ -18,6 +18,7 @@
 		100000000000000000000080 /* VibeWriteCommands.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000083 /* VibeWriteCommands.swift */; };
 		100000000000000000000081 /* RecentDocumentStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000084 /* RecentDocumentStore.swift */; };
 		100000000000000000000082 /* VibeWriteMarkdownDocument.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000085 /* VibeWriteMarkdownDocument.swift */; };
+		100000000000000000000088 /* VibeWriteDocumentMetadataStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000087 /* VibeWriteDocumentMetadataStore.swift */; };
 		100000000000000000000035 /* VibeWriteAutomationID.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000025 /* VibeWriteAutomationID.swift */; };
 		100000000000000000000036 /* VibeWriteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000026 /* VibeWriteModels.swift */; };
 		100000000000000000000037 /* MockWritingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000027 /* MockWritingEngine.swift */; };
@@ -63,6 +64,7 @@
 		100000000000000000000083 /* VibeWriteCommands.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteCommands.swift; sourceTree = "<group>"; };
 		100000000000000000000084 /* RecentDocumentStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RecentDocumentStore.swift; sourceTree = "<group>"; };
 		100000000000000000000085 /* VibeWriteMarkdownDocument.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteMarkdownDocument.swift; sourceTree = "<group>"; };
+		100000000000000000000087 /* VibeWriteDocumentMetadataStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteDocumentMetadataStore.swift; sourceTree = "<group>"; };
 		100000000000000000000025 /* VibeWriteAutomationID.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteAutomationID.swift; sourceTree = "<group>"; };
 		100000000000000000000026 /* VibeWriteModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteModels.swift; sourceTree = "<group>"; };
 		100000000000000000000027 /* MockWritingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWritingEngine.swift; sourceTree = "<group>"; };
@@ -209,6 +211,7 @@
 			isa = PBXGroup;
 			children = (
 				100000000000000000000085 /* VibeWriteMarkdownDocument.swift */,
+				100000000000000000000087 /* VibeWriteDocumentMetadataStore.swift */,
 			);
 			path = Documents;
 			sourceTree = "<group>";
@@ -356,6 +359,7 @@
 				100000000000000000000032 /* VibeWriteAppFlow.swift in Sources */,
 				10000000000000000000004E /* LocalProjectStore.swift in Sources */,
 				100000000000000000000034 /* WritingProjectView.swift in Sources */,
+				100000000000000000000088 /* VibeWriteDocumentMetadataStore.swift in Sources */,
 				100000000000000000000073 /* ProjectAISidebarView.swift in Sources */,
 				100000000000000000000075 /* ProjectHistoryDrawerView.swift in Sources */,
 				100000000000000000000077 /* ProjectComposerBar.swift in Sources */,

@@ -1,6 +1,14 @@
 # Changelog
 
 ## 2026-04-04
+- The file/document model was redesigned around a split between正文 and collaboration metadata. Markdown files now keep正文 plus a hidden identity marker, `xattr` owns the primary `docID`, the app-side metadata store keeps the latest conversation history and short summary snapshot, and Save As generates a fresh `docID` instead of inheriting the old one.
+- Open/save now treat collaboration metadata as optional附属信息: if `xattr` and the hidden marker both fail or the stored metadata is malformed, the app falls back to正文-only editing instead of blocking the document.
+
+## 2026-04-04
+- Conversation history is now capped to the latest 20 rounds, and the sidebars preview that cap by showing the latest 40 messages. A very short summary snapshot is stored alongside the conversation so the collaboration context can recover without carrying the entire history forever.
+
+## 2026-04-04
+- Clicking `自定义` in the selection popover now focuses the bottom composer input and briefly highlights only the input field, so the handoff from selection editing to custom instruction entry is visible without making the whole composer louder.
 - `continueWriting` now asks for a complete metadata block plus 3 concise follow-up chips directly in the prompt, so the continuation path gives the model a stronger nudge to return suggestions in the same language as the正文 without adding any fallback behavior.
 
 ## 2026-04-04
@@ -43,9 +51,9 @@
 - Root-cause follow-up: the popover was still not appearing because the AppKit bridge was clearing the user's live selection during layout/update sync when the binding was nil. The selection sync now only clears the editor selection after a real mirrored selection existed, which lets the non-empty selection stabilize.
 
 ## 2026-04-04
-- VibeWrite now uses file-backed Markdown documents as the source of truth for user writing state. The app saves and opens `.md`-style files with a compact metadata block, the File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, and the project title is editable directly in the header.
-- The document parser degrades safely: if metadata is missing or malformed, the app falls back to正文-only editing instead of blocking open/save or context recovery.
-- The app no longer keeps user文本/协作 state in its primary local store. It now only retains lightweight recent-document entries for convenience, while the actual writing content lives in the user's file.
+- VibeWrite now uses file-backed Markdown documents as the source of truth for user writing state. The app saves and opens `.md`-style files with正文 plus a hidden identity marker, `xattr` carries the primary `docID`, the File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, and the project title is editable directly in the header.
+- The document parser degrades safely: if the identity marker is missing or malformed, or if the stored collaboration metadata is broken, the app falls back to正文-only editing instead of blocking open/save or context recovery.
+- The app no longer keeps user文本/协作 state in its primary local store. It now only retains lightweight recent-document entries for convenience, while the actual writing content lives in the user's file and collaboration state lives in the app-side metadata store.
 
 ## 2026-04-04
 - The streaming正文 preview now uses a dedicated playback renderer instead of a simple flush throttle: the first chunk still appears immediately, subsequent deltas are revealed on a frame-paced cadence, and the cadence is now configurable through `WritingStreamingConfiguration` plus `VIBEWRITE_STREAMING_*` build settings.

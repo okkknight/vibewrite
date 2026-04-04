@@ -33,8 +33,10 @@ This directory is the compact handoff layer for VibeWrite.
 ## Current state
 - V2 docs remain the source of truth; `docs/V1/` is archival only.
 - The正文 editor and bottom composer now share one outer content column, and the editor bridge no longer centers a separate readable-width block. The editor uses a fixed text inset plus a right-side scroll gutter so both left and right edges stay aligned with the composer.
+- Clicking `自定义` in the selection popover focuses the bottom composer input and briefly highlights the input field only; the composer shell itself stays visually quiet.
 - The latest repo commit before this update is `fc91b0f`, which refined the selection edit intent popover.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
+- The document storage model now keeps正文 and collaboration state separate: the Markdown file stores正文 plus a hidden identity marker, `xattr` carries the primary `docID`, and the app-side metadata store keeps conversation history, a short summary snapshot, and the latest collaboration context. Save As creates a fresh `docID`, and malformed metadata falls back to正文-only editing instead of blocking open/save.
 - The selection popover bridge was narrowed so update sync no longer clears a live NSTextView selection when the SwiftUI binding is nil, which lets the non-empty selection stabilize for popover display.
 - Streaming正文 preview now uses a dedicated playback renderer: the first visible chunk is emitted immediately, later deltas are revealed on a frame-paced cadence, and the editor auto-scrolls to the document end while AI is actively streaming.
 - The流式 cadence is code-configurable through `WritingStreamingConfiguration` plus the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`, so we can tune the feel without scattering constants through the app.
@@ -43,8 +45,8 @@ This directory is the compact handoff layer for VibeWrite.
 - Continue-writing streaming playback now reveals from the end of the current正文 instead of starting from character 0, so the visible stream stays anchored to the latest paragraph.
 - Local edit requests now preserve the selected正文 position as a stable `selectionRange`, and the edit/revision/mock/preview layers use that exact range instead of re-finding text by content. That prevents repeated local edits from drifting to earlier duplicate passages.
 - Edit mode no longer uses the streaming preview renderer to rewrite the正文 live. The final patch is applied once at completion so local edits do not visually flicker through chunk-by-chunk replacement.
-- The app now saves and opens user work as Markdown files with a compact metadata block. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad metadata never blocks正文 editing.
-- The app-owned local store now only keeps lightweight recent-document entries; the actual writing state is file-backed and lives in the user's Markdown document.
+- The app now saves and opens user work as Markdown files with正文 plus a hidden marker. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad or missing collaboration metadata never blocks正文 editing.
+- The app-owned local store now only keeps lightweight recent-document entries; the actual writing state lives in the Markdown file, and the collaboration state lives in the app-side metadata store keyed by `docID`.
 - Edit streaming now starts from the selected passage instead of replaying from the top of the document, so local patch responses feel anchored to the user’s selection.
 - The page header subtitle continues to use `project.summary`; if the text under the title is off-topic, the issue is in the summary source, not the subtitle component.
 - `task/TASK_20260403_024.md` completed the visual restyle pass, but the deeper post-submit diagnosis found an app-side hang rather than an XCTest idle issue.
@@ -68,8 +70,8 @@ This directory is the compact handoff layer for VibeWrite.
 - When the正文 is fully cleared, the title subtitle now falls back to the initial stage description instead of lingering on the last generated summary; while AI is thinking, the subtitle can append a light animated ellipsis.
 - Empty body state is now stripped down to the plain editor surface and cursor-ready input area; the old "还没有正文" prompt card has been removed from the正文 panel.
 - The top-left assistant sidebar toggle is clickable again; the centered project-title layer in the header now ignores hit testing so it no longer blocks the button.
-- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the prompt-loss fix; `swift test` compiles but currently fails to launch the macOS test bundle in this environment because of a local code-signing/library-load policy issue.
-- Prompt-only verification is currently blocked by an unrelated compile error already present in `Sources/VibeWriteApp/Shared/Documents/VibeWriteMarkdownDocument.swift` in the working tree; this follow-up only touches `WritingAIPromptBuilder` and `WritingAITests`.
+- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the prompt-loss fix; the document split now has targeted unit coverage for save/reopen, malformed metadata fallback, and xattr precedence.
+- The new document split is covered by targeted tests for save/reopen, malformed metadata fallback, and xattr precedence, so the storage path has direct coverage instead of relying on the older embedded-metadata flow.
 - `swift test` now passes with the file-based document flow and menu commands in place.
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` passes and exercises the new preset-based local edit flow on the real app.
 - The remaining open issues are the later UI-test rail assertion and the layout/semantics work that still needs review outside this prompt-loss fix.
@@ -79,3 +81,5 @@ This directory is the compact handoff layer for VibeWrite.
 - The app no longer synthesizes fallback next-step suggestions when the model omits metadata: `summary`, `nextFocus`, and `suggestionChips` now stay empty unless the remote response provides them, and the sidebar/composer render only real model output.
 - Runtime AI logs now record whether completion metadata was actually parsed, along with the parsed summary/next-focus/suggestion counts, so the next real request can confirm whether the remote model is returning suggestions or the UI is simply receiving an empty block.
 - Crash tracing logs were added around the first-draft patch path so the next reproduce cycle can tell whether the segfault happens before `WritingEditPatch.init` finishes or inside one of its field assignments.
+- If you touch the file document parser or save flow, keep `xattr` as the first identity source, fall back to the hidden body marker only when needed, and make sure missing or malformed metadata still degrades to正文-only editing instead of blocking open/save.
+- If you touch collaboration state persistence, keep the latest 20 conversation rounds plus the short summary snapshot in sync with the metadata store.

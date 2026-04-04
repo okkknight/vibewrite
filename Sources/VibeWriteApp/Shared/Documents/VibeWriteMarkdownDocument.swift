@@ -1,141 +1,99 @@
 import Foundation
 
-struct VibeWriteDocumentMetadata: Codable, Hashable {
-    var schemaVersion: Int
-    var id: UUID
-    var automationKey: String
-    var title: String
-    var prompt: String
-    var summary: String
-    var mode: WritingProjectMode
-    var updatedAt: Date
-    var context: ProjectContext
-    var suggestionChips: [String]
-}
-
 struct VibeWriteMarkdownDocument: Hashable {
-    static let metadataStartMarker = "<!-- vibe-write-metadata"
-    static let metadataEndMarker = "-->"
-
-    var metadata: VibeWriteDocumentMetadata
+    var identityMarker: VibeWriteDocumentIdentityMarker?
     var body: String
 
-    init(metadata: VibeWriteDocumentMetadata, body: String) {
-        self.metadata = metadata
+    init(identityMarker: VibeWriteDocumentIdentityMarker? = nil, body: String) {
+        self.identityMarker = identityMarker
         self.body = body
     }
 
     init(project: WritingProject) {
-        metadata = VibeWriteDocumentMetadata(
-            schemaVersion: 1,
-            id: project.id,
-            automationKey: project.automationKey,
-            title: project.title,
-            prompt: project.prompt,
-            summary: project.summary,
-            mode: project.mode,
-            updatedAt: project.updatedAt,
-            context: project.context,
-            suggestionChips: project.suggestionChips
+        identityMarker = VibeWriteDocumentIdentityMarker(
+            schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+            documentID: project.id
         )
         body = project.documentText
     }
 
     func renderedText() -> String {
-        let encodedMetadata = (try? JSONEncoder.vibeWriteDocumentEncoder.encode(metadata))
-            .flatMap { String(data: $0, encoding: .utf8) }
-            ?? "{}"
+        let marker = identityMarker ?? VibeWriteDocumentIdentityMarker(
+            schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+            documentID: UUID()
+        )
+        let markerLine = Self.renderMarkerLine(marker)
 
         if body.isEmpty {
-            return "\(Self.metadataStartMarker)\n\(encodedMetadata)\n\(Self.metadataEndMarker)\n"
+            return markerLine + "\n"
         }
 
-        return "\(Self.metadataStartMarker)\n\(encodedMetadata)\n\(Self.metadataEndMarker)\n\n\(body)"
+        return markerLine + "\n\n" + body
     }
 
-    func makeProject(fallbackTitle: String? = nil, fallbackAutomationKey: String? = nil) -> WritingProject {
-        let resolvedTitle = metadata.title.trimmingCharacters(in: .whitespacesAndNewlines).ifEmpty(fallbackTitle) ?? metadata.mode.defaultTitle
-        let resolvedPrompt = metadata.prompt.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedSummary = metadata.summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedAutomationKey = metadata.automationKey.trimmingCharacters(in: .whitespacesAndNewlines).ifEmpty(fallbackAutomationKey) ?? metadata.id.uuidString.lowercased()
-
-        return WritingProject(
-            id: metadata.id,
-            automationKey: resolvedAutomationKey,
-            title: resolvedTitle,
-            prompt: resolvedPrompt,
-            mode: metadata.mode,
-            summary: resolvedSummary.isEmpty ? Self.defaultSummary(prompt: resolvedPrompt, body: body, mode: metadata.mode) : resolvedSummary,
-            context: metadata.context,
-            conversation: [],
-            documentText: body,
-            suggestionChips: Self.normalizedSuggestionChips(metadata.suggestionChips, prompt: resolvedPrompt, body: body, mode: metadata.mode),
-            revisionHistory: [],
-            updatedAt: metadata.updatedAt
-        )
-    }
-
-    static func parse(from rawText: String, fallbackTitle: String? = nil, fallbackAutomationKey: String? = nil) -> VibeWriteMarkdownDocument {
-        guard let markerStart = rawText.range(of: Self.metadataStartMarker),
-              rawText[markerStart.lowerBound...].hasPrefix(Self.metadataStartMarker) else {
-            return fallbackDocument(from: rawText, fallbackTitle: fallbackTitle, fallbackAutomationKey: fallbackAutomationKey)
-        }
-
-        guard let markerEnd = rawText.range(of: Self.metadataEndMarker, range: markerStart.upperBound..<rawText.endIndex) else {
-            return fallbackDocument(from: rawText, fallbackTitle: fallbackTitle, fallbackAutomationKey: fallbackAutomationKey)
-        }
-
-        let metadataSlice = rawText[markerStart.upperBound..<markerEnd.lowerBound]
-        let bodyStart = rawText.index(markerEnd.upperBound, offsetBy: rawText[markerEnd.upperBound...].hasPrefix("\n") ? 1 : 0, limitedBy: rawText.endIndex) ?? markerEnd.upperBound
-        let rawBody = bodyStart < rawText.endIndex ? String(rawText[bodyStart...]) : ""
-        let body = rawBody.removingLeadingNewlines()
-
-        guard let metadataData = metadataSlice.trimmingCharacters(in: .whitespacesAndNewlines).data(using: .utf8),
-              let metadata = try? JSONDecoder.vibeWriteDocumentDecoder.decode(VibeWriteDocumentMetadata.self, from: metadataData) else {
-            return fallbackDocument(from: rawBody, fallbackTitle: fallbackTitle, fallbackAutomationKey: fallbackAutomationKey)
-        }
-
-        return VibeWriteMarkdownDocument(metadata: metadata, body: body)
-    }
-
-    private static func fallbackDocument(
-        from rawText: String,
-        fallbackTitle: String?,
-        fallbackAutomationKey: String?
-    ) -> VibeWriteMarkdownDocument {
-        let body = rawText.removingLeadingNewlines()
-        let trimmedFallbackTitle = fallbackTitle?.trimmingCharacters(in: .whitespacesAndNewlines)
-        let title = (trimmedFallbackTitle?.isEmpty == false ? trimmedFallbackTitle : nil) ?? "未命名写作"
+    func makeProject(
+        documentID: UUID? = nil,
+        fallbackTitle: String? = nil,
+        fallbackAutomationKey: String? = nil
+    ) -> WritingProject {
+        let resolvedDocumentID = documentID ?? identityMarker?.documentID ?? UUID()
+        let resolvedTitle = fallbackTitle?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .ifEmpty(nil) ?? "未命名写作"
+        let resolvedAutomationKey = fallbackAutomationKey?
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+            .ifEmpty(nil) ?? resolvedDocumentID.uuidString.lowercased()
+        let cleanedBody = body.removingLeadingNewlines()
         let mode: WritingProjectMode = .collaboration
         let prompt = ""
-        let context = ProjectContext.recovered(
-            prompt: prompt,
-            body: body,
-            title: title,
-            mode: mode
-        )
+        let summary = Self.defaultSummary(prompt: prompt, body: cleanedBody, mode: mode)
 
-        return VibeWriteMarkdownDocument(
-            metadata: VibeWriteDocumentMetadata(
-                schemaVersion: 1,
-                id: UUID(),
-                automationKey: {
-                    let trimmedFallbackAutomationKey = fallbackAutomationKey?.trimmingCharacters(in: .whitespacesAndNewlines)
-                    return (trimmedFallbackAutomationKey?.isEmpty == false ? trimmedFallbackAutomationKey : nil) ?? UUID().uuidString.lowercased()
-                }(),
-                title: title,
+        return WritingProject(
+            id: resolvedDocumentID,
+            automationKey: resolvedAutomationKey,
+            title: resolvedTitle,
+            prompt: prompt,
+            mode: mode,
+            summary: summary,
+            context: ProjectContext.recovered(
                 prompt: prompt,
-                summary: defaultSummary(prompt: prompt, body: body, mode: mode),
-                mode: mode,
-                updatedAt: .now,
-                context: context,
-                suggestionChips: defaultSuggestionChips(prompt: prompt, body: body, mode: mode)
+                body: cleanedBody,
+                title: resolvedTitle,
+                mode: mode
             ),
-            body: body
+            conversation: [],
+            documentText: cleanedBody,
+            suggestionChips: Self.defaultSuggestionChips(prompt: prompt, body: cleanedBody, mode: mode),
+            revisionHistory: [],
+            updatedAt: .now
         )
     }
 
-    private static func defaultSummary(prompt: String, body: String, mode: WritingProjectMode) -> String {
+    static func parse(from rawText: String) -> VibeWriteMarkdownDocument {
+        guard let markerLineRange = rawText.firstLineRange else {
+            return VibeWriteMarkdownDocument(identityMarker: nil, body: rawText.removingLeadingNewlines())
+        }
+
+        let markerLine = String(rawText[markerLineRange])
+        let looksLikeMarkerLine = markerLine.trimmingCharacters(in: .whitespacesAndNewlines).hasPrefix(Self.markerStartToken)
+            && markerLine.trimmingCharacters(in: .whitespacesAndNewlines).hasSuffix(Self.markerEndToken)
+        guard looksLikeMarkerLine else {
+            return VibeWriteMarkdownDocument(identityMarker: nil, body: rawText.removingLeadingNewlines())
+        }
+
+        let marker = parseIdentityMarker(from: markerLine)
+        let remainderStart: String.Index
+        if markerLineRange.upperBound < rawText.endIndex {
+            remainderStart = rawText.index(after: markerLineRange.upperBound)
+        } else {
+            remainderStart = rawText.endIndex
+        }
+
+        let rawBody = remainderStart < rawText.endIndex ? String(rawText[remainderStart...]) : ""
+        return VibeWriteMarkdownDocument(identityMarker: marker, body: rawBody.removingLeadingNewlines())
+    }
+
+    static func defaultSummary(prompt: String, body: String, mode: WritingProjectMode) -> String {
         if !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
             return "打开已有正文，继续往下写"
         }
@@ -147,7 +105,7 @@ struct VibeWriteMarkdownDocument: Hashable {
         return mode.stageDescription
     }
 
-    private static func defaultSuggestionChips(prompt: String, body: String, mode: WritingProjectMode) -> [String] {
+    static func defaultSuggestionChips(prompt: String, body: String, mode: WritingProjectMode) -> [String] {
         let hasBody = !body.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
         if hasBody {
             return ["继续写", "编辑这段", "补一段"]
@@ -156,18 +114,39 @@ struct VibeWriteMarkdownDocument: Hashable {
         return mode == .discussion ? ["开始起稿", "确认方向", "确认语气"] : ["开始起稿"]
     }
 
-    private static func normalizedSuggestionChips(_ chips: [String], prompt: String, body: String, mode: WritingProjectMode) -> [String] {
-        let trimmed = chips
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
+    static func renderMarkerLine(_ marker: VibeWriteDocumentIdentityMarker) -> String {
+        let encodedMarker = (try? JSONEncoder.vibeWriteDocumentMarkerEncoder.encode(marker))
+            .flatMap { String(data: $0, encoding: .utf8) }
+            ?? "{}"
 
-        if !trimmed.isEmpty {
-            var seen = Set<String>()
-            return trimmed.filter { seen.insert($0).inserted }
+        return "\(Self.markerStartToken) \(encodedMarker) \(Self.markerEndToken)"
+    }
+
+    static func parseIdentityMarker(from rawLine: String) -> VibeWriteDocumentIdentityMarker? {
+        let trimmed = rawLine.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard trimmed.hasPrefix(Self.markerStartToken), trimmed.hasSuffix(Self.markerEndToken) else {
+            return nil
         }
 
-        return defaultSuggestionChips(prompt: prompt, body: body, mode: mode)
+        let startIndex = trimmed.index(trimmed.startIndex, offsetBy: Self.markerStartToken.count)
+        let endIndex = trimmed.index(trimmed.endIndex, offsetBy: -Self.markerEndToken.count)
+        let jsonSlice = trimmed[startIndex..<endIndex].trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = jsonSlice.data(using: .utf8),
+              let marker = try? JSONDecoder.vibeWriteDocumentMarkerDecoder.decode(VibeWriteDocumentIdentityMarker.self, from: data),
+              marker.schemaVersion == VibeWriteDocumentMetadataPolicy.schemaVersion else {
+            return nil
+        }
+
+        return marker
     }
+
+    static let markerStartToken = "<!-- vibe-write-document"
+    static let markerEndToken = "-->"
+}
+
+struct VibeWriteDocumentIdentityMarker: Codable, Hashable {
+    var schemaVersion: Int
+    var documentID: UUID
 }
 
 extension ProjectContext {
@@ -191,16 +170,16 @@ extension ProjectContext {
 }
 
 private extension JSONEncoder {
-    static var vibeWriteDocumentEncoder: JSONEncoder {
+    static var vibeWriteDocumentMarkerEncoder: JSONEncoder {
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
-        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        encoder.outputFormatting = [.sortedKeys]
         return encoder
     }
 }
 
 private extension JSONDecoder {
-    static var vibeWriteDocumentDecoder: JSONDecoder {
+    static var vibeWriteDocumentMarkerDecoder: JSONDecoder {
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
         return decoder
@@ -208,6 +187,20 @@ private extension JSONDecoder {
 }
 
 private extension String {
+    var firstLineRange: Range<String.Index>? {
+        guard !isEmpty else {
+            return nil
+        }
+
+        for index in indices {
+            if self[index] == "\n" || self[index] == "\r" {
+                return startIndex..<index
+            }
+        }
+
+        return startIndex..<endIndex
+    }
+
     func ifEmpty(_ fallback: String?) -> String? {
         let trimmed = trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
