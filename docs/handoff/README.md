@@ -46,6 +46,8 @@ This directory is the compact handoff layer for VibeWrite.
 - Continue-writing streaming playback now reveals from the end of the current正文 instead of starting from character 0, so the visible stream stays anchored to the latest paragraph.
 - Local edit requests now preserve the selected正文 position as a stable `selectionRange`, and the edit/revision/mock/preview layers use that exact range instead of re-finding text by content. That prevents repeated local edits from drifting to earlier duplicate passages.
 - Local edit completion now has its own transient presentation state: the正文 viewport stays anchored while the replacement lands, then the new text flashes briefly so users can see what changed without the page jumping away from the edited paragraph.
+- The local-edit flash was refined again: it now uses a rounded overlay highlight with a lighter yellow tint, the flash pops in immediately and fades out gradually, and the viewport stays anchored after the flash instead of snapping the cursor to the document end.
+- The selection-preset loading state is now represented as a real busy/disabled state in the selection chips, and the targeted UI test waits for the preset button to disable instead of probing a fragile accessibility spinner node.
 - Edit mode no longer uses the streaming preview renderer to rewrite the正文 live. The final patch is applied once at completion so local edits do not visually flicker through chunk-by-chunk replacement.
 - The app now saves and opens user work as Markdown files with正文 plus a hidden marker. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad or missing collaboration metadata never blocks正文 editing.
 - The app-owned local store now only keeps lightweight recent-document entries; the actual writing state lives in the Markdown file, and the collaboration state lives in the app-side metadata store keyed by `docID`.
@@ -73,6 +75,7 @@ This directory is the compact handoff layer for VibeWrite.
 - Empty body state is now stripped down to the plain editor surface and cursor-ready input area; the old "还没有正文" prompt card has been removed from the正文 panel.
 - The top-left assistant sidebar toggle is clickable again; the centered project-title layer in the header now ignores hit testing so it no longer blocks the button.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the prompt-loss fix; the document split now has targeted unit coverage for save/reopen, malformed metadata fallback, and xattr precedence.
+- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the local-edit flash and viewport refinements.
 - `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`
 - The new document split is covered by targeted tests for save/reopen, malformed metadata fallback, and xattr precedence, so the storage path has direct coverage instead of relying on the older embedded-metadata flow.
 - `swift test` now passes with the file-based document flow and menu commands in place.

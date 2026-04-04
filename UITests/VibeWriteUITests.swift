@@ -317,11 +317,9 @@ final class VibeWriteUITests: XCTestCase {
             .firstMatch
         selectionVisualButton.click()
 
-        XCTAssertTrue(waitForElementToAppear(
-            in: window,
-            identifier: "project.selectionPresetLoading",
-            timeout: 10
-        ))
+        XCTAssertTrue(waitForCondition(timeout: 10) {
+            !selectionVisualButton.isEnabled
+        }, "selection preset button should enter a busy/disabled state while the edit runs")
 
         XCTAssertTrue(waitForCondition(timeout: 12) {
             let currentBodyText = (bodyEditor.value as? String) ?? ""

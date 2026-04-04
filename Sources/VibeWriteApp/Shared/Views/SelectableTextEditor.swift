@@ -27,6 +27,7 @@ struct SelectableTextEditor: NSViewRepresentable {
     var textContainerInset: NSSize = NSSize(width: 18, height: 18)
     var localEditFlash: WritingLocalEditFlash?
     var isViewportLockedDuringLocalEdit: Bool = false
+    var shouldPreserveSelectionOverlayDuringPendingLocalEdit: Bool = false
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -108,6 +109,9 @@ struct SelectableTextEditor: NSViewRepresentable {
         }
 
         context.coordinator.textView = textView
+        context.coordinator.setSelectionOverlayPreservationDuringPendingLocalEdit(
+            shouldPreserveSelectionOverlayDuringPendingLocalEdit
+        )
         context.coordinator.syncTypography(
             isEditable: isEditable,
             font: textFont,
@@ -160,7 +164,8 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var needsSelectionOverlaySyncAfterLayout = false
         private var lockedViewportOrigin: CGPoint?
         private var lastAppliedLocalEditFlashID: UUID?
-        private var highlightedLocalEditRange: NSRange?
+        private weak var localEditFlashOverlayView: LocalEditFlashOverlayView?
+        private var shouldPreserveSelectionOverlayDuringPendingLocalEdit = false
 
         private var isApplyingProgrammaticChange: Bool {
             programmaticChangeDepth > 0
@@ -178,6 +183,10 @@ struct SelectableTextEditor: NSViewRepresentable {
             _selectionPopoverOrigin = selectionPopoverOrigin
         }
 
+        func setSelectionOverlayPreservationDuringPendingLocalEdit(_ shouldPreserve: Bool) {
+            shouldPreserveSelectionOverlayDuringPendingLocalEdit = shouldPreserve
+        }
+
         deinit {
             NotificationCenter.default.removeObserver(self)
         }
@@ -186,6 +195,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             self.scrollView = scrollView
             self.textView = textView
             NotificationCenter.default.removeObserver(self)
+            ensureLocalEditFlashOverlay(in: scrollView, textView: textView)
             NotificationCenter.default.addObserver(
                 self,
                 selector: #selector(handleScrollViewBoundsDidChange(_:)),
@@ -205,6 +215,10 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let scrollView,
                   let textView else { return }
 
+            if !isPerformingLayoutSync {
+                lockedViewportOrigin = nil
+            }
+
             syncLayout(
                 in: textView,
                 scrollView: scrollView,
@@ -223,6 +237,10 @@ struct SelectableTextEditor: NSViewRepresentable {
             }
 
             guard !isApplyingProgrammaticChange else { return }
+
+            if !isPerformingLayoutSync {
+                lockedViewportOrigin = nil
+            }
 
             if isPerformingLayoutSync {
                 needsSelectionOverlaySyncAfterLayout = true
@@ -362,6 +380,10 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             let range = textView.selectedRange()
             guard let snapshot = selectionSnapshot(from: textView, selection: range) else {
+                if shouldPreserveSelectionOverlayDuringPendingLocalEdit {
+                    logSelectionEvent("selection preserved during pending local edit selection=\(debugRange(range))")
+                    return
+                }
                 enqueueSelectionOverlayUpdate(selectedText: nil, selectedTextRange: nil, origin: nil)
                 if range.length == 0 {
                     logSelectionEvent("selection cleared selection=\(debugRange(range))")
@@ -417,8 +439,6 @@ struct SelectableTextEditor: NSViewRepresentable {
                 if lockedViewportOrigin == nil {
                     lockedViewportOrigin = clipBounds.origin
                 }
-            } else {
-                lockedViewportOrigin = nil
             }
 
             isPerformingLayoutSync = true
@@ -456,7 +476,7 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             textView.needsDisplay = true
 
-            if isViewportLockedDuringLocalEdit, let lockedViewportOrigin {
+            if let lockedViewportOrigin {
                 scrollView.contentView.scroll(to: lockedViewportOrigin)
             } else if shouldAutoScrollToDocumentEnd {
                 let endRange = NSRange(location: textView.string.utf16.count, length: 0)
@@ -469,6 +489,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             }
 
             scrollView.reflectScrolledClipView(scrollView.contentView)
+            localEditFlashOverlayView?.needsDisplay = true
             logLayoutIfNeeded(
                 textView: textView,
                 scrollView: scrollView,
@@ -487,10 +508,11 @@ struct SelectableTextEditor: NSViewRepresentable {
             in textView: NSTextView,
             scrollView: NSScrollView
         ) {
-            guard let layoutManager = textView.layoutManager else { return }
+            ensureLocalEditFlashOverlay(in: scrollView, textView: textView)
+            guard let localEditFlashOverlayView else { return }
 
             guard let localEditFlash else {
-                clearLocalEditFlash(in: layoutManager)
+                clearLocalEditFlash(in: localEditFlashOverlayView)
                 return
             }
 
@@ -498,35 +520,41 @@ struct SelectableTextEditor: NSViewRepresentable {
                 return
             }
 
-            clearLocalEditFlash(in: layoutManager)
+            clearLocalEditFlash(in: localEditFlashOverlayView)
 
             guard let flashRange = localEditFlash.range.range(in: textView.string),
                   flashRange.lowerBound < flashRange.upperBound else {
                 lastAppliedLocalEditFlashID = nil
-                highlightedLocalEditRange = nil
                 return
             }
 
             let highlightRange = NSRange(flashRange, in: textView.string)
-            let highlightColor = NSColor.systemYellow.withAlphaComponent(0.22)
-            layoutManager.addTemporaryAttribute(.backgroundColor, value: highlightColor, forCharacterRange: highlightRange)
-            layoutManager.invalidateDisplay(forCharacterRange: highlightRange)
+            localEditFlashOverlayView.applyFlash(range: highlightRange, in: textView)
             lastAppliedLocalEditFlashID = localEditFlash.id
-            highlightedLocalEditRange = highlightRange
-            textView.needsDisplay = true
-            scrollView.reflectScrolledClipView(scrollView.contentView)
         }
 
-        private func clearLocalEditFlash(in layoutManager: NSLayoutManager) {
-            guard let highlightedLocalEditRange else {
+        private func clearLocalEditFlash(in overlayView: LocalEditFlashOverlayView) {
+            guard lastAppliedLocalEditFlashID != nil || overlayView.hasActiveFlash else {
                 lastAppliedLocalEditFlashID = nil
                 return
             }
 
-            layoutManager.removeTemporaryAttribute(.backgroundColor, forCharacterRange: highlightedLocalEditRange)
-            layoutManager.invalidateDisplay(forCharacterRange: highlightedLocalEditRange)
-            self.highlightedLocalEditRange = nil
+            overlayView.clearFlash()
             lastAppliedLocalEditFlashID = nil
+        }
+
+        private func ensureLocalEditFlashOverlay(in scrollView: NSScrollView, textView: NSTextView) {
+            if let localEditFlashOverlayView {
+                localEditFlashOverlayView.attach(to: textView)
+                localEditFlashOverlayView.needsDisplay = true
+                return
+            }
+
+            let overlayView = LocalEditFlashOverlayView(frame: scrollView.contentView.bounds)
+            overlayView.autoresizingMask = [.width, .height]
+            overlayView.attach(to: textView)
+            scrollView.contentView.addSubview(overlayView, positioned: .above, relativeTo: textView)
+            localEditFlashOverlayView = overlayView
         }
 
         func textDidChange(_ notification: Notification) {
@@ -827,6 +855,96 @@ struct SelectableTextEditor: NSViewRepresentable {
             }
 
             return String(format: "%.2f", Double(value))
+        }
+    }
+}
+
+private final class LocalEditFlashOverlayView: NSView {
+    private weak var textView: NSTextView?
+    private var flashRange: NSRange?
+
+    var hasActiveFlash: Bool {
+        flashRange != nil
+    }
+
+    override var isFlipped: Bool { true }
+
+    override var isOpaque: Bool { false }
+
+    override init(frame frameRect: NSRect) {
+        super.init(frame: frameRect)
+        wantsLayer = true
+        layer?.backgroundColor = NSColor.clear.cgColor
+        alphaValue = 0
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    override func hitTest(_ point: NSPoint) -> NSView? {
+        nil
+    }
+
+    func attach(to textView: NSTextView) {
+        self.textView = textView
+    }
+
+    func applyFlash(range: NSRange, in textView: NSTextView) {
+        self.textView = textView
+        flashRange = range
+        isHidden = false
+        layer?.removeAllAnimations()
+        alphaValue = 1
+        needsDisplay = true
+
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = 1.8
+            context.timingFunction = CAMediaTimingFunction(name: .easeOut)
+            self.animator().alphaValue = 0
+        }
+    }
+
+    func clearFlash() {
+        layer?.removeAllAnimations()
+        flashRange = nil
+        alphaValue = 0
+        isHidden = true
+        needsDisplay = true
+    }
+
+    override func draw(_ dirtyRect: NSRect) {
+        guard let textView,
+              let flashRange,
+              flashRange.length > 0,
+              let layoutManager = textView.layoutManager,
+              let textContainer = textView.textContainer else {
+            return
+        }
+
+        let glyphRange = layoutManager.glyphRange(forCharacterRange: flashRange, actualCharacterRange: nil)
+        guard glyphRange.length > 0 else { return }
+
+        let textOrigin = textView.textContainerOrigin
+        let paddingX: CGFloat = 2
+        let paddingY: CGFloat = 1.5
+        let radius: CGFloat = 6
+        let fillColor = NSColor.systemYellow.withAlphaComponent(0.10)
+
+        layoutManager.enumerateEnclosingRects(
+            forGlyphRange: glyphRange,
+            withinSelectedGlyphRange: NSRange(location: 0, length: 0),
+            in: textContainer
+        ) { rect, _ in
+            var adjustedRect = rect.offsetBy(dx: textOrigin.x, dy: textOrigin.y)
+            adjustedRect = adjustedRect.insetBy(dx: -paddingX, dy: -paddingY)
+            adjustedRect = textView.convert(adjustedRect, to: self)
+
+            let roundedRadius = min(radius, adjustedRect.width / 2, adjustedRect.height / 2)
+            guard roundedRadius > 0 else { return }
+            let roundedPath = NSBezierPath(roundedRect: adjustedRect, xRadius: roundedRadius, yRadius: roundedRadius)
+            fillColor.setFill()
+            roundedPath.fill()
         }
     }
 }

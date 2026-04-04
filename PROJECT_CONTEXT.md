@@ -25,6 +25,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Continue-writing playback now reveals from the end of the current正文 rather than from character 0, so the streamed preview stays anchored to the latest paragraph instead of replaying the whole document from the top.
 - Local edit requests now carry a stable `selectionRange`, and the patch/revision/mock/preview layers resolve edits from that exact range instead of re-matching by string content. That keeps repeated local edits anchored to the intended passage even when the same words appear elsewhere.
 - Local edit completion now has its own visual presentation state: the正文 editor locks its viewport while the replacement lands, then briefly flashes the newly replaced range so users can see exactly what changed without the page jumping away.
+- The local-edit flash was refined again: it now uses a rounded overlay highlight instead of a flat text background, the yellow tint is lighter, the flash pops in immediately and fades out gradually, and the viewport stays anchored after the flash instead of snapping the cursor to the document end.
+- The selection-preset loading state is now represented as a real busy/disabled state in the selection chips, and the targeted UI test waits for the preset button to disable instead of probing a fragile accessibility spinner node.
 - Edit responses no longer stream-replace the正文 while the model is still generating. The live preview renderer is bypassed for `.edit`, so local patch edits apply once at completion instead of causing jumpy chunk-by-chunk replacement.
 - The page header subtitle still surfaces `project.summary` when the body is non-empty, so if the text under the title looks off-topic the real bug is upstream in the model output or summary writeback path, not the subtitle component itself.
 - The app now keeps正文 and collaboration history in separate stores: the Markdown file holds正文 plus a hidden marker, `xattr` stores the primary document identity, and the app-side metadata store keeps the latest collaboration state, `continuationSummary`, and recent conversation history.
@@ -99,6 +101,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `swift test --filter VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`
 - `swift test --filter VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`
 - `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`
+- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` currently gets past the second-submit path, but the UI suite still fails later at the assistant rail shell assertion
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` passes and covers the new selection-preset edit path end-to-end on the real macOS app
 - `swift test` passes with the file-based document flow and menu commands in place.

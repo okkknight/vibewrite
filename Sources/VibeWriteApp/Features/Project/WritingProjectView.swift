@@ -12,8 +12,12 @@ struct WritingProjectView: View {
     @State private var selectedTextRange: WritingTextSelectionRange?
     @State private var selectionPopoverOrigin: CGPoint?
     @State private var selectionPopoverPendingPreset: SelectionEditPreset?
+    @State private var selectionPresetLoadingStartedAt: Date?
+    @State private var selectionPopoverLockedText: String?
+    @State private var selectionPopoverLockedOrigin: CGPoint?
     @State private var isSelectionCustomInputActive = false
     @State private var isSelectionCustomInputHighlighted = false
+    @State private var isSelectionPopoverTemporarilyHidden = false
     @State private var localEditFlash: WritingLocalEditFlash?
     @State private var isLocalEditViewportLocked = false
     @State private var showComparison = false
@@ -61,8 +65,12 @@ struct WritingProjectView: View {
             selectedTextRange = nil
             selectionPopoverOrigin = nil
             selectionPopoverPendingPreset = nil
+            selectionPresetLoadingStartedAt = nil
+            selectionPopoverLockedText = nil
+            selectionPopoverLockedOrigin = nil
             isSelectionCustomInputActive = false
             isSelectionCustomInputHighlighted = false
+            isSelectionPopoverTemporarilyHidden = false
             localEditFlash = nil
             isLocalEditViewportLocked = false
             showComparison = false
@@ -82,13 +90,15 @@ struct WritingProjectView: View {
             logSelectionOverlayState(trigger: "selectedText changed")
             if normalizedSelectedText == nil {
                 resetSelectionEditUIState()
+            } else if !isSelectionCustomInputActive {
+                isSelectionPopoverTemporarilyHidden = false
             }
         }
         .onChange(of: selectionPopoverOrigin) { _, _ in
             logSelectionOverlayState(trigger: "selectionPopoverOrigin changed")
         }
         .onChange(of: selectedTextRange) { oldValue, newValue in
-            if oldValue != newValue {
+            if oldValue != newValue, !isSelectionCustomInputActive {
                 resetSelectionEditUIState()
             }
         }
@@ -129,13 +139,13 @@ struct WritingProjectView: View {
                 .padding(.horizontal, 22)
                 .padding(.top, 10)
                 .padding(.bottom, 8)
+                .simultaneousGesture(TapGesture().onEnded {
+                    dismissSelectionCustomInputContext()
+                })
 
             writingBodyPane(topPadding: 26, bottomPadding: 18)
 
-            writingContentColumn {
-                composerBar
-                    .padding(.vertical, 16)
-            }
+            composerSection(verticalPadding: 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -145,6 +155,9 @@ struct WritingProjectView: View {
             .frame(width: assistantDrawerWidth)
             .padding(.vertical, 10)
             .padding(.leading, 10)
+            .simultaneousGesture(TapGesture().onEnded {
+                dismissSelectionCustomInputContext()
+            })
     }
 
     private var wideHistoryRail: some View {
@@ -152,6 +165,9 @@ struct WritingProjectView: View {
             .frame(width: historyDrawerWidth)
             .padding(.vertical, 10)
             .padding(.trailing, 10)
+            .simultaneousGesture(TapGesture().onEnded {
+                dismissSelectionCustomInputContext()
+            })
     }
 
     private var centerStage: some View {
@@ -160,16 +176,16 @@ struct WritingProjectView: View {
                 .padding(.horizontal, shellLayoutMode.isCompact ? 18 : 22)
                 .padding(.top, shellLayoutMode.isCompact ? 10 : 10)
                 .padding(.bottom, shellLayoutMode.isCompact ? 8 : 8)
+                .simultaneousGesture(TapGesture().onEnded {
+                    dismissSelectionCustomInputContext()
+                })
 
             writingBodyPane(
                 topPadding: shellLayoutMode.isCompact ? 22 : 28,
                 bottomPadding: 18
             )
 
-            writingContentColumn {
-                composerBar
-                    .padding(.vertical, shellLayoutMode.isCompact ? 14 : 16)
-            }
+            composerSection(verticalPadding: shellLayoutMode.isCompact ? 14 : 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: shellLayoutMode.isCompact ? .infinity : 872, alignment: .top)
@@ -300,7 +316,8 @@ struct WritingProjectView: View {
                     selectedTextBackgroundColor: NSColor.vibeAccent.withAlphaComponent(0.30),
                     textContainerInset: writingBodyTextContainerInset,
                     localEditFlash: localEditFlash,
-                    isViewportLockedDuringLocalEdit: isLocalEditViewportLocked
+                    isViewportLockedDuringLocalEdit: isLocalEditViewportLocked,
+                    shouldPreserveSelectionOverlayDuringPendingLocalEdit: selectionPopoverPendingPreset != nil || isComposerLocked
                 )
                 .id(project.id)
                 .frame(
@@ -315,8 +332,8 @@ struct WritingProjectView: View {
                     }
                 }
 
-                if let selectedText = normalizedSelectedText,
-                   let selectionPopoverOrigin {
+                if let selectedText = activeSelectionPopoverText,
+                   let selectionPopoverOrigin = activeSelectionPopoverOrigin {
                     SelectionPopover(
                         selectedText: selectedText,
                         pendingPreset: selectionPopoverPendingPreset,
@@ -416,12 +433,29 @@ struct WritingProjectView: View {
         return trimmed
     }
 
+    private var activeSelectionPopoverText: String? {
+        if selectionPopoverPendingPreset != nil {
+            return selectionPopoverLockedText ?? normalizedSelectedText
+        }
+
+        guard isSelectionCustomInputActive == false,
+              isSelectionPopoverTemporarilyHidden == false else {
+            return nil
+        }
+
+        return selectionPopoverLockedText ?? normalizedSelectedText
+    }
+
+    private var activeSelectionPopoverOrigin: CGPoint? {
+        selectionPopoverLockedOrigin ?? selectionPopoverOrigin
+    }
+
     private func logSelectionOverlayState(trigger: String) {
-        let selectionPreview = normalizedSelectedText?.vibewriteLogPreview(maxLength: 60) ?? "nil"
-        let originPreview = selectionPopoverOrigin.map {
+        let selectionPreview = activeSelectionPopoverText?.vibewriteLogPreview(maxLength: 60) ?? "nil"
+        let originPreview = activeSelectionPopoverOrigin.map {
             String(format: "(%.1f, %.1f)", Double($0.x), Double($0.y))
         } ?? "nil"
-        let renderable = normalizedSelectedText != nil && selectionPopoverOrigin != nil
+        let renderable = activeSelectionPopoverText != nil && activeSelectionPopoverOrigin != nil
         let message = "selection overlay \(trigger) selection=\(selectionPreview) origin=\(originPreview) renderable=\(renderable)"
         VibeWriteDebugTrace.append(message)
         VibeWriteLog.launch.info("\(message, privacy: .public)")
@@ -465,6 +499,11 @@ struct WritingProjectView: View {
         }
     }
 
+    private var selectionCustomContextText: String? {
+        guard isSelectionCustomInputActive else { return nil }
+        return normalizedSelectedText
+    }
+
     private var composerBar: some View {
         ProjectComposerBar(
             messageDraft: $messageDraft,
@@ -484,6 +523,21 @@ struct WritingProjectView: View {
             onAssistantSuggestionTap: handleSuggestionTap
         )
         .frame(maxWidth: writingContentMaxWidth, alignment: .leading)
+    }
+
+    private func composerSection(verticalPadding: CGFloat) -> some View {
+        writingContentColumn {
+            VStack(alignment: .leading, spacing: 6) {
+                if let selectionCustomContextText {
+                    selectionCustomContextCapsule(text: selectionCustomContextText)
+                        .transition(.opacity.combined(with: .move(edge: .top)))
+                }
+
+                composerBar
+                    .padding(.vertical, verticalPadding)
+            }
+            .animation(.easeInOut(duration: 0.16), value: selectionCustomContextText)
+        }
     }
 
     private func writingContentColumn<Content: View>(
@@ -581,7 +635,10 @@ struct WritingProjectView: View {
         guard let selection = normalizedSelectedText else { return }
 
         resetSelectionEditUIState()
+        selectionPopoverLockedText = selection
+        selectionPopoverLockedOrigin = selectionPopoverOrigin
         selectionPopoverPendingPreset = preset
+        selectionPresetLoadingStartedAt = Date()
         beginComposerThinking()
         beginLocalEditPresentation()
         applyRevision(
@@ -598,8 +655,11 @@ struct WritingProjectView: View {
         guard normalizedSelectedText != nil else { return }
 
         selectionPopoverPendingPreset = nil
-        isSelectionCustomInputActive = true
-        flashSelectionCustomInputHighlight()
+        isSelectionPopoverTemporarilyHidden = false
+        withAnimation(.easeOut(duration: 0.16)) {
+            isSelectionCustomInputActive = true
+            flashSelectionCustomInputHighlight()
+        }
         isComposerLocked = false
         DispatchQueue.main.async {
             messageFieldFocused = true
@@ -683,13 +743,14 @@ struct WritingProjectView: View {
         let shouldReleaseFocus = clearDraftOnSuccess && messageFieldFocused
         let latestRevision = flow.activeProject.revisionHistory.last
         let shouldFlashLocalEdit = action == .edit && latestRevision?.patch.replacementHighlightRange != nil
+        let shouldDelayPresetLoadingReset = action == .edit && selectionPopoverPendingPreset != nil
+        let presetLoadingStartedAt = selectionPresetLoadingStartedAt
         let flash = latestRevision?.patch.replacementHighlightRange.map {
             WritingLocalEditFlash(range: $0)
         }
 
         DispatchQueue.main.async {
             isComposerLocked = false
-            selectionPopoverPendingPreset = nil
             if shouldClearSelection {
                 selectedText = nil
                 selectedTextRange = nil
@@ -725,12 +786,35 @@ struct WritingProjectView: View {
                 localEditFlash = nil
                 isLocalEditViewportLocked = false
             }
+
+            if shouldDelayPresetLoadingReset {
+                let minimumVisibleDuration: TimeInterval = 0.9
+                let elapsed = presetLoadingStartedAt.map { Date().timeIntervalSince($0) } ?? 0
+                let remaining = max(minimumVisibleDuration - elapsed, 0)
+                let currentPreset = selectionPopoverPendingPreset
+                DispatchQueue.main.asyncAfter(deadline: .now() + remaining) {
+                    if selectionPopoverPendingPreset == currentPreset {
+                        selectionPopoverPendingPreset = nil
+                        selectionPresetLoadingStartedAt = nil
+                        selectionPopoverLockedText = nil
+                        selectionPopoverLockedOrigin = nil
+                    }
+                }
+            } else {
+                selectionPopoverPendingPreset = nil
+                selectionPresetLoadingStartedAt = nil
+                selectionPopoverLockedText = nil
+                selectionPopoverLockedOrigin = nil
+            }
         }
     }
 
     private func unlockComposerAfterRequest() {
         isComposerLocked = false
         selectionPopoverPendingPreset = nil
+        selectionPresetLoadingStartedAt = nil
+        selectionPopoverLockedText = nil
+        selectionPopoverLockedOrigin = nil
         localEditFlash = nil
         isLocalEditViewportLocked = false
     }
@@ -744,6 +828,20 @@ struct WritingProjectView: View {
         selectionPopoverPendingPreset = nil
         isSelectionCustomInputActive = false
         isSelectionCustomInputHighlighted = false
+        isSelectionPopoverTemporarilyHidden = false
+    }
+
+    private func dismissSelectionCustomInputContext() {
+        guard isSelectionCustomInputActive || isSelectionPopoverTemporarilyHidden == false else {
+            return
+        }
+
+        withAnimation(.easeOut(duration: 0.16)) {
+            isSelectionCustomInputActive = false
+            isSelectionCustomInputHighlighted = false
+            isSelectionPopoverTemporarilyHidden = true
+        }
+        messageFieldFocused = false
     }
 
     private func flashSelectionCustomInputHighlight() {
@@ -807,6 +905,42 @@ struct WritingProjectView: View {
         if shouldShowHistorySidebar {
             showHistoryLayer = true
         }
+    }
+
+    private func selectionCustomContextCapsule(text: String) -> some View {
+        Text(text)
+            .font(.system(size: 12.2, weight: .medium, design: .default))
+            .foregroundStyle(Color.vibeCanvasInk)
+            .lineLimit(1)
+            .truncationMode(.tail)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
+            .background {
+                RoundedRectangle(cornerRadius: 16, style: .continuous)
+                    .fill(Color.vibeCanvasLift.opacity(0.90))
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .fill(
+                                LinearGradient(
+                                    colors: [
+                                        Color.white.opacity(0.018),
+                                        .clear
+                                    ],
+                                    startPoint: .topLeading,
+                                    endPoint: .bottomTrailing
+                                )
+                            )
+                            .blendMode(.softLight)
+                    )
+                    .overlay(
+                        RoundedRectangle(cornerRadius: 16, style: .continuous)
+                            .strokeBorder(Color.vibeCanvasStroke.opacity(0.46), lineWidth: 1)
+                    )
+                    .shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
+            }
+            .accessibilityLabel("选中内容")
+            .accessibilityValue(text)
     }
 }
 
@@ -885,13 +1019,21 @@ private struct SelectionPopover: View {
 
                 Spacer(minLength: 0)
 
-                if pendingPreset != nil && isRequestInFlight {
-                    ProgressView()
-                        .progressViewStyle(.circular)
-                        .controlSize(.small)
-                        .tint(Color.vibeCanvasAccent)
-                        .padding(.top, 2)
-                        .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPresetLoading)
+                if pendingPreset != nil {
+                    HStack(spacing: 6) {
+                        ProgressView()
+                            .progressViewStyle(.circular)
+                            .controlSize(.small)
+                            .tint(Color.vibeCanvasAccent)
+
+                        Text("AI 正在思考")
+                            .font(.system(size: 11.0, weight: .medium, design: .default))
+                            .foregroundStyle(Color.vibeCanvasInkSoft)
+                    }
+                    .padding(.top, 2)
+                    .frame(minWidth: 18, minHeight: 18)
+                    .accessibilityElement(children: .contain)
+                    .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPresetLoading)
                 }
             }
 
@@ -901,7 +1043,7 @@ private struct SelectionPopover: View {
                         SelectionPopoverChip(
                             title: preset.title,
                             isActive: pendingPreset == preset,
-                            isDisabled: isRequestInFlight,
+                            isDisabled: isRequestInFlight || pendingPreset != nil,
                             accessibilityIdentifier: preset.accessibilityIdentifier
                         ) {
                             onPresetTap(preset)
@@ -911,7 +1053,7 @@ private struct SelectionPopover: View {
                     SelectionPopoverChip(
                         title: "自定义",
                         isActive: isCustomInputActive,
-                        isDisabled: isRequestInFlight,
+                        isDisabled: isRequestInFlight || pendingPreset != nil,
                         accessibilityIdentifier: VibeWriteAutomationID.projectSelectionCustomButton,
                         action: onCustomTap
                     )
