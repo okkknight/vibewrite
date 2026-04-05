@@ -1,4 +1,8 @@
 ## 2026-04-05
+- The app now launches in day mode by default.
+- Fixed capsules stay more muted than clickable suggestion chips in both day and night themes, while the suggestion chips themselves keep a warmer but lighter gold-brown day-mode tone.
+
+## 2026-04-05
 - `startDraft` now carries a harder metadata prompt: the model is explicitly told to always return `summary`, `nextFocus`, and exactly 3 concise follow-up chips even when the opening itself is short.
 - `startDraft` now uses a wider request budget than the default path so the opening and trailing metadata have more room than before.
 

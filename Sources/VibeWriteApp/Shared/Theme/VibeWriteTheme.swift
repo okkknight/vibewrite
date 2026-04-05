@@ -276,8 +276,8 @@ struct AccentPill: View {
 
     private var foregroundColor: Color {
         colorScheme == .light
-            ? Color(red: 0.52, green: 0.40, blue: 0.18)
-            : tint
+            ? Color(red: 0.46, green: 0.34, blue: 0.14)
+            : Color(red: 0.88, green: 0.77, blue: 0.46)
     }
 
     private var backgroundColor: Color {
@@ -328,7 +328,7 @@ struct ActionChip: View {
 
     private var foregroundColor: Color {
         colorScheme == .light
-            ? Color(red: 0.52, green: 0.40, blue: 0.18)
+            ? Color(red: 0.60, green: 0.47, blue: 0.22)
             : tint
     }
 

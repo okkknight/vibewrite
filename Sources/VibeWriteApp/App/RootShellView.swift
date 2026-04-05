@@ -4,7 +4,7 @@ import SwiftUI
 @MainActor
 struct RootShellView: View {
     @ObservedObject var flow: VibeWriteAppFlow
-    @State private var appearanceMode: VibeAppearanceMode = .night
+    @State private var appearanceMode: VibeAppearanceMode = .day
     @State private var didRequestActivation = false
     private let isRunningInPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
 
