@@ -275,7 +275,9 @@ struct AccentPill: View {
     }
 
     private var foregroundColor: Color {
-        colorScheme == .light ? Color.vibeCanvasInk : tint
+        colorScheme == .light
+            ? Color(red: 0.52, green: 0.40, blue: 0.18)
+            : tint
     }
 
     private var backgroundColor: Color {
@@ -325,7 +327,9 @@ struct ActionChip: View {
     }
 
     private var foregroundColor: Color {
-        colorScheme == .light ? Color.vibeCanvasInk : tint
+        colorScheme == .light
+            ? Color(red: 0.52, green: 0.40, blue: 0.18)
+            : tint
     }
 
     private var backgroundColor: Color {

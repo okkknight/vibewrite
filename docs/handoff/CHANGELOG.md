@@ -6,7 +6,7 @@
 - `continueWriting` now includes a compact project-state block in addition to the persisted `continuationSummary` and trimmed document tail, and the remote request gives continuation a slightly wider token budget so the trailing metadata has more room to survive long generations.
 
 ## 2026-04-05
-- Day-mode selection context capsules and assistant suggestion chips now use a slightly stronger foreground/background contrast so the light theme stays legible without changing the night theme styling.
+- Day-mode selection context capsules and assistant suggestion chips now use a warmer gold-brown foreground with slightly stronger contrast so the light theme stays legible without changing the night theme styling.
 
 ## 2026-04-05
 - The far-right scrollbar overlay now stays hidden when the正文 is too short to scroll and automatically fades away again after a short period of scroll inactivity.

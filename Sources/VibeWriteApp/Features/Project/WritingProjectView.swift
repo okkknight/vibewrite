@@ -976,7 +976,7 @@ struct WritingProjectView: View {
 
     private var selectionCapsuleForegroundColor: Color {
         appearanceMode == .day
-            ? Color(red: 0.19, green: 0.15, blue: 0.09)
+            ? Color(red: 0.50, green: 0.39, blue: 0.18)
             : Color.vibeCanvasInk
     }
 
