@@ -61,6 +61,9 @@ struct WritingProjectView: View {
                     )
                     return
                 }
+                VibeWriteDebugTrace.append(
+                    "project title binding accepted projectID=\(projectID.uuidString) newTitleCount=\(newTitle.count)"
+                )
                 var updatedProject = flow.activeProject
                 updatedProject.title = newTitle
                 flow.openProject(updatedProject)
@@ -84,6 +87,9 @@ struct WritingProjectView: View {
                     )
                     return
                 }
+                VibeWriteDebugTrace.append(
+                    "project body binding accepted projectID=\(projectID.uuidString) newTextCount=\(newText.count)"
+                )
                 var updatedProject = flow.activeProject
                 updatedProject.documentText = newText
                 flow.openProject(updatedProject)
@@ -1096,7 +1102,7 @@ private struct SelectionPopover: View {
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
             HStack(alignment: .top, spacing: 12) {
-                Text(selectedText)
+                Text(selectionPreviewText)
                     .font(.system(size: 12.2, weight: .medium, design: .default))
                     .foregroundStyle(Color.vibeCanvasInk)
                     .lineLimit(2)
@@ -1180,6 +1186,16 @@ private struct SelectionPopover: View {
         }
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPopover)
+    }
+
+    private var selectionPreviewText: String {
+        let lines = selectedText
+            .split(whereSeparator: \.isNewline)
+            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let collapsed = lines.joined(separator: " ")
+        return collapsed.isEmpty ? selectedText.trimmingCharacters(in: .whitespacesAndNewlines) : collapsed
     }
 }
 
