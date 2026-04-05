@@ -1078,7 +1078,8 @@ private final class StyledTextView: NSTextView {
     private func refreshLayoutAfterResize() {
         guard let textContainer else { return }
 
-        let width = max(bounds.width, 1)
+        let horizontalInset = max(textContainerInset.width, 0)
+        let width = max(bounds.width - (horizontalInset * 2), 1)
         let desiredContainerSize = NSSize(
             width: width,
             height: CGFloat.greatestFiniteMagnitude

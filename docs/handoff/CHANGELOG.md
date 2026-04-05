@@ -1,6 +1,7 @@
 ## 2026-04-05
 - The far-right scrollbar overlay now stays hidden when the正文 is too short to scroll and automatically fades away again after a short period of scroll inactivity.
 - The正文 content area now reserves a slim lane at the far right edge for that scrollbar instead of letting the control overlay sit on top of the text, so the text no longer gets clipped on the right.
+- The AppKit text bridge now computes its internal text width from the same inset-aware layout formula as the main sync pass, which removes the last few clipped pixels on the right edge.
 
 ## 2026-04-05
 - Trace debugging found the local-edit flash was drawing at zero opacity on its first frame, so the overlay timing was adjusted to keep the rounded highlight visible briefly before fading out.
