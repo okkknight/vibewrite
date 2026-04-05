@@ -129,11 +129,15 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(systemPrompt.contains("summary, nextFocus, suggestionChips"))
         XCTAssertTrue(systemPrompt.contains("Chinese writing tasks"))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"startDraft\", always return a complete metadata block even if the opening is short."))
+        XCTAssertTrue(systemPrompt.contains("For \"startDraft\", keep summary concise"))
         XCTAssertTrue(userPrompt.contains("Action: startDraft"))
         XCTAssertTrue(userPrompt.contains("User message: \(prompt)"))
         XCTAssertTrue(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(userPrompt.contains("summary, nextFocus, and suggestionChips"))
         XCTAssertTrue(userPrompt.contains("Chinese writing tasks"))
+        XCTAssertTrue(userPrompt.contains("For startDraft, the metadata block is required"))
+        XCTAssertTrue(userPrompt.contains("exactly 3 concise suggestion chips"))
         XCTAssertFalse(userPrompt.contains("assistantMessage"))
     }
 

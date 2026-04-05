@@ -33,8 +33,10 @@ struct WritingAIPromptBuilder {
         - Match the metadata language to the language of the current正文 and user request.
         - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
         - The metadata block is not part of the正文 and must not be mixed into the prose.
+        - When the action is "startDraft", always return a complete metadata block even if the opening is short.
         - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
+        - For "startDraft", keep summary concise and state the opening's current condition, keep nextFocus concrete, and keep suggestionChips directly actionable.
         - When the action is "continueWriting", still return a complete metadata block and make suggestionChips describe the most useful next steps after this continuation, not generic continuation prompts.
         - For "continueWriting", prefer 3 concise chips that follow the current正文 naturally and help the app suggest what to do next.
         - When the action is "continueWriting", treat the document summary as global context, the project state as the current working memory, and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
@@ -89,6 +91,8 @@ struct WritingAIPromptBuilder {
         }
 
         if request.action == .startDraft {
+            lines.append("For startDraft, the metadata block is required and must include summary, nextFocus, and exactly 3 concise suggestion chips.")
+            lines.append("The summary should briefly describe the current opening state, nextFocus should name the next concrete step, and suggestionChips should be the most useful immediate follow-up actions.")
             lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
         } else if request.action == .continueWriting {
