@@ -1119,7 +1119,9 @@ final class ExternalVerticalScrollerView: NSView {
     private let minimumKnobHeight: CGFloat = 30
     private let trackWidth: CGFloat = 5
     private let knobWidth: CGFloat = 5
-    private let autoHideDelay: TimeInterval = 2.0
+    private let autoHideDelay: TimeInterval = 1.1
+    private let fadeInDuration: TimeInterval = 0.10
+    private let fadeOutDuration: TimeInterval = 0.18
     private let trackColor = NSColor.vibeCanvasInk.withAlphaComponent(0.06)
     private let knobColor = NSColor.vibeCanvasInk.withAlphaComponent(0.42)
     private let knobHoverColor = NSColor.vibeCanvasInk.withAlphaComponent(0.60)
@@ -1211,12 +1213,10 @@ final class ExternalVerticalScrollerView: NSView {
 
     @MainActor
     func syncVisibilityForCurrentContent() {
-        autoHideWorkItem?.cancel()
-        autoHideWorkItem = nil
+        cancelAutoHideSchedule()
 
         guard hasScrollableContent else {
-            isHidden = true
-            needsDisplay = true
+            hideImmediately()
             return
         }
 
@@ -1246,27 +1246,27 @@ final class ExternalVerticalScrollerView: NSView {
     @MainActor
     private func revealTemporarily() {
         guard hasScrollableContent else {
-            isHidden = true
-            needsDisplay = true
+            hideImmediately()
             return
         }
 
-        isHidden = false
-        needsDisplay = true
+        showTemporarily()
         scheduleAutoHide()
     }
 
     @MainActor
     private func hideNow() {
-        autoHideWorkItem?.cancel()
-        autoHideWorkItem = nil
-        isHidden = true
-        needsDisplay = true
+        cancelAutoHideSchedule()
+        guard isHidden == false else { return }
+        animateVisibility(to: 0, duration: fadeOutDuration) { [weak self] in
+            self?.isHidden = true
+            self?.needsDisplay = true
+        }
     }
 
     @MainActor
     private func scheduleAutoHide() {
-        autoHideWorkItem?.cancel()
+        cancelAutoHideSchedule()
         let workItem = DispatchWorkItem { [weak self] in
             Task { @MainActor [weak self] in
                 self?.hideNow()
@@ -1274,6 +1274,58 @@ final class ExternalVerticalScrollerView: NSView {
         }
         autoHideWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + autoHideDelay, execute: workItem)
+    }
+
+    @MainActor
+    private func cancelAutoHideSchedule() {
+        autoHideWorkItem?.cancel()
+        autoHideWorkItem = nil
+    }
+
+    @MainActor
+    private func hideImmediately() {
+        cancelAutoHideSchedule()
+        layer?.removeAllAnimations()
+        alphaValue = 0
+        isHidden = true
+        needsDisplay = true
+    }
+
+    @MainActor
+    private func showTemporarily() {
+        cancelAutoHideSchedule()
+        layer?.removeAllAnimations()
+
+        if isHidden {
+            alphaValue = 0
+            isHidden = false
+            needsDisplay = true
+            animateVisibility(to: 1, duration: fadeInDuration, completion: nil)
+            return
+        }
+
+        isHidden = false
+        needsDisplay = true
+        if alphaValue < 1 {
+            animateVisibility(to: 1, duration: fadeInDuration, completion: nil)
+        } else {
+            alphaValue = 1
+        }
+    }
+
+    @MainActor
+    private func animateVisibility(
+        to targetAlpha: CGFloat,
+        duration: TimeInterval,
+        completion: (() -> Void)?
+    ) {
+        NSAnimationContext.runAnimationGroup { context in
+            context.duration = duration
+            context.timingFunction = CAMediaTimingFunction(name: .easeInEaseOut)
+            animator().alphaValue = targetAlpha
+        } completionHandler: {
+            completion?()
+        }
     }
 
     override func draw(_ dirtyRect: NSRect) {
