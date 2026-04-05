@@ -27,6 +27,7 @@
 
 ## 2026-04-05
 - `continueWriting` now includes a compact project-state block in addition to the persisted `continuationSummary` and trimmed document tail, and the remote request gives continuation a slightly wider token budget so the trailing metadata has more room to survive long generations.
+- `continueWriting`'s prompt was tightened again to treat the trailing metadata block as a completion condition, remove the "writing text only" conflict, and spell out the exact `[[VIBEWRITE_METADATA]]` + JSON skeleton so `suggestionChips` are more likely to return intact.
 
 ## 2026-04-05
 - Day-mode selection context capsules and assistant suggestion chips now use a warmer gold-brown foreground with slightly stronger contrast so the light theme stays legible without changing the night theme styling.

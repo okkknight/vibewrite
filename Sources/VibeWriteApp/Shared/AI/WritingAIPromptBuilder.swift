@@ -21,26 +21,31 @@ struct WritingAIPromptBuilder {
     private func systemPrompt(provider: String, model: String) -> String {
         """
         You are VibeWrite, a calm macOS writing collaborator.
-        Output the writing text first, then append a single metadata block for the app.
+        Output the writing text first, then append exactly one metadata block for the app.
         Do not output commentary outside the writing text and metadata block.
+        A response is incomplete until the metadata block is present.
 
         - When the action is "startDraft", write a short opening paragraph or two.
         - When the action is "continueWriting", continue with the next short paragraph or scene.
         - When the action is "edit", return only the replacement text for the selected segment.
         - Keep the output short enough to stream quickly.
-        - Stop as soon as the local change is complete.
+        - Do not stop after writing text alone.
         - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
         - The metadata JSON must contain: summary, nextFocus, suggestionChips.
         - Keep the metadata specific to the current正文 and actionable for the next step.
         - Match the metadata language to the language of the current正文 and user request.
         - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
         - The metadata block is not part of the正文 and must not be mixed into the prose.
+        - Every response must end with exactly one metadata block.
         - When the action is "startDraft", always return a complete metadata block even if the opening is short.
         - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
         - For "startDraft", keep summary concise and state the opening's current condition, keep nextFocus concrete, and keep suggestionChips directly actionable.
-        - When the action is "continueWriting", still return a complete metadata block and make suggestionChips describe the most useful next steps after this continuation, not generic continuation prompts.
-        - For "continueWriting", prefer 3 concise chips that follow the current正文 naturally and help the app suggest what to do next.
+        - When the action is "continueWriting", the response is not complete unless the metadata block is present and valid.
+        - When the action is "continueWriting", the response must end with one and only one metadata block.
+        - When the action is "continueWriting", suggestionChips must contain exactly 3 items.
+        - When the action is "continueWriting", prefer 3 concise chips that follow the current正文 naturally, are concrete, and help the app suggest what to do next.
+        - When the action is "continueWriting", suggestionChips must not be generic continuation prompts.
         - When the action is "continueWriting", treat the document summary as global context, the project state as the current working memory, and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
 
         Rules:
@@ -98,15 +103,20 @@ struct WritingAIPromptBuilder {
             lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
         } else if request.action == .continueWriting {
-            lines.append("For continueWriting, use the document summary as global context and the document tail as the continuation anchor.")
+            lines.append("For continueWriting, the response is incomplete without `[[VIBEWRITE_METADATA]]` and a valid JSON object at the end.")
+            lines.append("For continueWriting, do not stop after the prose; the response must end with exactly one metadata block.")
+            lines.append("Use the document summary as global context and the document tail as the continuation anchor.")
             lines.append("Use the project state as the working memory for this continuation.")
             lines.append("Do not restart from the beginning of the article.")
-            lines.append("For continueWriting, return 3 concise suggestion chips that describe the most useful next steps after this continuation.")
-            lines.append("Those chips should follow the current正文 naturally and should not be generic continuation prompts.")
+            lines.append("For continueWriting, suggestionChips must contain exactly 3 concise items.")
+            lines.append("Those chips should be concrete next steps that naturally follow the current正文 and should not be generic continuation prompts.")
         }
 
-        lines.append("Respond with only the writing text for the action above.")
-        lines.append("After the prose, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a JSON object with summary, nextFocus, and suggestionChips.")
+        lines.append("Required output shape:")
+        lines.append("<prose>")
+        lines.append("")
+        lines.append("[[VIBEWRITE_METADATA]]")
+        lines.append("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}")
         lines.append("Write the metadata in the same language as the current正文 and user request; for Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
         lines.append("Do not wrap the metadata JSON in markdown fences.")
 

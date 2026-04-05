@@ -129,16 +129,20 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(systemPrompt.contains("summary, nextFocus, suggestionChips"))
         XCTAssertTrue(systemPrompt.contains("Chinese writing tasks"))
-        XCTAssertTrue(systemPrompt.contains("When the action is \"startDraft\", always return a complete metadata block even if the opening is short."))
-        XCTAssertTrue(systemPrompt.contains("For \"startDraft\", keep summary concise"))
+        XCTAssertTrue(systemPrompt.contains("A response is incomplete until the metadata block is present."))
+        XCTAssertTrue(systemPrompt.contains("Every response must end with exactly one metadata block."))
+        XCTAssertTrue(systemPrompt.contains("Do not stop after writing text alone."))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", the response is not complete unless the metadata block is present and valid."))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", suggestionChips must contain exactly 3 items."))
         XCTAssertTrue(userPrompt.contains("Action: startDraft"))
         XCTAssertTrue(userPrompt.contains("User message: \(prompt)"))
         XCTAssertTrue(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
-        XCTAssertTrue(userPrompt.contains("summary, nextFocus, and suggestionChips"))
-        XCTAssertTrue(userPrompt.contains("Chinese writing tasks"))
+        XCTAssertTrue(userPrompt.contains("Required output shape:"))
+        XCTAssertTrue(userPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
         XCTAssertTrue(userPrompt.contains("For startDraft, the metadata block is required"))
         XCTAssertTrue(userPrompt.contains("exactly 3 concise suggestion chips"))
         XCTAssertFalse(userPrompt.contains("assistantMessage"))
+        XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
     }
 
     func testContinueWritingPromptRequestsConcreteSuggestionChips() {
@@ -185,8 +189,9 @@ final class WritingAITests: XCTestCase {
         let systemPrompt = messages.first?.content ?? ""
         let userPrompt = messages.last?.content ?? ""
 
-        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\""))
-        XCTAssertTrue(systemPrompt.contains("prefer 3 concise chips"))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", the response is not complete unless the metadata block is present and valid."))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", the response must end with one and only one metadata block."))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", suggestionChips must contain exactly 3 items."))
         XCTAssertTrue(userPrompt.contains("Document summary:"))
         XCTAssertTrue(userPrompt.contains("Document tail:"))
         XCTAssertTrue(userPrompt.contains("Project state:"))
@@ -197,8 +202,11 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(userPrompt.contains("Style constraints: 克制 · 平静 · 非鸡汤"))
         XCTAssertFalse(userPrompt.contains("前文第1段用来铺陈背景和细节"))
         XCTAssertFalse(userPrompt.contains("Current document:"))
-        XCTAssertTrue(userPrompt.contains("For continueWriting, return 3 concise suggestion chips"))
-        XCTAssertTrue(userPrompt.contains("should follow the current正文 naturally"))
+        XCTAssertTrue(userPrompt.contains("For continueWriting, the response is incomplete without `[[VIBEWRITE_METADATA]]` and a valid JSON object at the end."))
+        XCTAssertTrue(userPrompt.contains("For continueWriting, suggestionChips must contain exactly 3 concise items."))
+        XCTAssertTrue(userPrompt.contains("Required output shape:"))
+        XCTAssertTrue(userPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
+        XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
     }
 
     func testRemoteClientUsesWiderMaxTokensAndProjectStateForContinueWriting() async throws {
