@@ -50,7 +50,17 @@ struct WritingProjectView: View {
         return Binding(
             get: { project.title },
             set: { newTitle in
+                let activeProjectID = flow.activeProject.id.uuidString
+                VibeWriteDebugTrace.append(
+                    "project title binding writeback projectID=\(projectID.uuidString) activeProjectID=\(activeProjectID) titleCount=\(newTitle.count)"
+                )
                 guard flow.activeProject.id == projectID else { return }
+                guard !flow.isDocumentHydrationProtected(for: projectID) else {
+                    VibeWriteDebugTrace.append(
+                        "project title binding suppressed during document hydration projectID=\(projectID.uuidString) titleCount=\(newTitle.count)"
+                    )
+                    return
+                }
                 var updatedProject = flow.activeProject
                 updatedProject.title = newTitle
                 flow.openProject(updatedProject)
@@ -63,7 +73,17 @@ struct WritingProjectView: View {
         return Binding(
             get: { project.documentText },
             set: { newText in
+                let activeProjectID = flow.activeProject.id.uuidString
+                VibeWriteDebugTrace.append(
+                    "project body binding writeback projectID=\(projectID.uuidString) activeProjectID=\(activeProjectID) textCount=\(newText.count)"
+                )
                 guard flow.activeProject.id == projectID else { return }
+                guard !flow.isDocumentHydrationProtected(for: projectID) else {
+                    VibeWriteDebugTrace.append(
+                        "project body binding suppressed during document hydration projectID=\(projectID.uuidString) textCount=\(newText.count)"
+                    )
+                    return
+                }
                 var updatedProject = flow.activeProject
                 updatedProject.documentText = newText
                 flow.openProject(updatedProject)

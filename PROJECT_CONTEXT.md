@@ -19,6 +19,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection/context and assistant suggestion capsules now use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - The latest committed change before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
+- The duplicate top-level `File` menu in macOS was traced to `CommandMenu("File")` inside `VibeWriteCommands`; the fix switched that menu wiring to standard `CommandGroup` insertion so we keep the same actions without creating a second top-level `File` menu.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
 - The document storage model has been redesigned so the Markdown file carries only正文 plus a hidden identity marker, while the collaboration metadata lives in an app-side metadata store keyed by `docID`. `xattr` owns the primary identity marker, the body marker is a fallback, Save As generates a fresh `docID`, and malformed metadata always degrades to正文-only editing.
 - The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
@@ -62,6 +63,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle fixes.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after moving the正文 scroll indicator out to the app's right edge.
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the latest edit-streaming and subtitle restore.
+- Opening an external VibeWrite document now enters a short hydration window before the project body's binding is allowed to write back, which keeps the first open from being blanked out by an empty editor sync while still leaving real user edits untouched.
 - The document split is covered by targeted tests for save/reopen, malformed metadata fallback, and xattr precedence, so the new storage path has direct coverage instead of depending on the old embedded-metadata flow.
 - `swift test` now passes with the file-based document flow and menu commands in place.
 - The targeted UI test now gets past the second submit and into the rail section, but it is still not fully green because `project.assistantRailShell` does not appear within the current timeout.

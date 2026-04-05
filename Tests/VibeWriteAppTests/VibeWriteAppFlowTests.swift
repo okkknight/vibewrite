@@ -41,6 +41,26 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.documentText, "")
     }
 
+    func testDocumentHydrationProtectionIsScopedToTheOpenedProject() {
+        let flow = VibeWriteAppFlow()
+        let project = WritingProject.entryShell(
+            prompt: "写一个雨夜重逢的小说场景",
+            mode: .collaboration,
+            automationKey: "project.hydration.demo"
+        )
+
+        XCTAssertFalse(flow.isDocumentHydrationProtected(for: project.id))
+
+        flow.beginDocumentHydration(for: project.id)
+
+        XCTAssertTrue(flow.isDocumentHydrationProtected(for: project.id))
+        XCTAssertFalse(flow.isDocumentHydrationProtected(for: UUID()))
+
+        flow.endDocumentHydration(for: project.id)
+
+        XCTAssertFalse(flow.isDocumentHydrationProtected(for: project.id))
+    }
+
     func testEmptyActiveProjectFallsBackToCollaborationShell() {
         let flow = VibeWriteAppFlow(forceBlankStartup: true)
 

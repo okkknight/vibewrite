@@ -20,6 +20,7 @@ final class VibeWriteAppFlow: ObservableObject {
     private let streamingConfiguration: WritingStreamingConfiguration
     private let emptyProjectShell: WritingProject
     private var savedDocumentContents: String?
+    private var documentHydrationProtectedProjectID: UUID?
 
     init(
         storageURL: URL? = nil,
@@ -125,6 +126,21 @@ final class VibeWriteAppFlow: ObservableObject {
 
     func openProject(_ project: WritingProject) {
         replaceActiveProject(project, persist: false)
+    }
+
+    func beginDocumentHydration(for projectID: UUID) {
+        documentHydrationProtectedProjectID = projectID
+        VibeWriteDebugTrace.append("flow document hydration started projectID=\(projectID.uuidString)")
+    }
+
+    func endDocumentHydration(for projectID: UUID) {
+        guard documentHydrationProtectedProjectID == projectID else { return }
+        documentHydrationProtectedProjectID = nil
+        VibeWriteDebugTrace.append("flow document hydration ended projectID=\(projectID.uuidString)")
+    }
+
+    func isDocumentHydrationProtected(for projectID: UUID) -> Bool {
+        documentHydrationProtectedProjectID == projectID
     }
 
     func createNewProject() {
@@ -538,7 +554,15 @@ final class VibeWriteAppFlow: ObservableObject {
                 )
             currentDocumentURL = url
             savedDocumentContents = rawText
+            beginDocumentHydration(for: project.id)
             openProject(project)
+            DispatchQueue.main.async { [weak self, projectID = project.id] in
+                self?.endDocumentHydration(for: projectID)
+            }
+            let currentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+            VibeWriteDebugTrace.append(
+                "flow openDocument applied url=\(url.lastPathComponent) projectID=\(project.id.uuidString) currentURL=\(currentURLName) savedCount=\(savedDocumentContents?.count ?? -1) activeCount=\(activeProject.documentText.count)"
+            )
             recordRecentDocument(url: url, title: project.title)
             return true
         } catch {

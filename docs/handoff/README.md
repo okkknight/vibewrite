@@ -36,7 +36,9 @@ This directory is the compact handoff layer for VibeWrite.
 - Clicking `自定义` in the selection popover now brings in a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the popover while the user continues the custom-edit flow.
 - The selection context capsule and assistant suggestion chips now use a warmer gold-brown day-mode foreground with slightly stronger light-mode contrast so the day theme stays readable while the night theme remains unchanged.
 - The app now launches in day mode by default, and the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
+- External document opens now pass through a short hydration window so the freshly loaded正文 is not immediately overwritten by an empty binding sync on the first render.
 - The latest repo commit before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
+- The duplicate top-level `File` menu was traced to a standalone `CommandMenu("File")` in `VibeWriteCommands`; the current fix routes those actions through standard `CommandGroup` placement so the app keeps one top-level File menu.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
 - The document storage model now keeps正文 and collaboration state separate: the Markdown file stores正文 plus a hidden identity marker, `xattr` carries the primary `docID`, and the app-side metadata store keeps conversation history, a `continuationSummary`, and the latest collaboration context. Save As creates a fresh `docID`, and malformed metadata falls back to正文-only editing instead of blocking open/save.
 - The selection popover bridge was narrowed so update sync no longer clears a live NSTextView selection when the SwiftUI binding is nil, which lets the non-empty selection stabilize for popover display.

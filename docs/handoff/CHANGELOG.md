@@ -1,4 +1,7 @@
 ## 2026-04-05
+- Fixed the duplicate top-level `File` menu on macOS by moving VibeWrite's document actions out of a standalone `CommandMenu("File")` and into standard `CommandGroup` insertion, so the app keeps one File menu instead of creating a second one.
+
+## 2026-04-05
 - Fixed the blank-start / first-open regression: the app now seeds its saved snapshot from the blank collaboration shell, and the project view ignores stale title/body writebacks from inactive project instances so opening an external file no longer gets overwritten by an empty buffer on the first pass.
 
 ## 2026-04-05
@@ -45,6 +48,9 @@
 - Verification for this refinement passed with `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
 
 # Changelog
+
+## 2026-04-05
+- Opening an external document now enters a short hydration window before the project body/title bindings are allowed to write back, which keeps the first open from being blanked out by an empty editor sync while still leaving real user edits untouched.
 
 ## 2026-04-05
 - `自定义` now brings the selected text into a same-width context capsule above the composer, keeps the input focused/highlighted, and hides the selection popover while the custom-edit flow stays active.
