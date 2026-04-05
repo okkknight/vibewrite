@@ -20,6 +20,7 @@ struct WritingProjectView: View {
     @State private var isSelectionPopoverTemporarilyHidden = false
     @State private var localEditFlash: WritingLocalEditFlash?
     @State private var isLocalEditViewportLocked = false
+    @State private var isDocumentEndFollowActive = false
     @State private var bodyEditorScrollView: NSScrollView?
     @State private var showComparison = false
     @State private var showAssistantLayer = false
@@ -127,6 +128,7 @@ struct WritingProjectView: View {
             isSelectionPopoverTemporarilyHidden = false
             localEditFlash = nil
             isLocalEditViewportLocked = false
+            isDocumentEndFollowActive = false
             bodyEditorScrollView = nil
             showComparison = false
             showAssistantLayer = false
@@ -370,7 +372,7 @@ struct WritingProjectView: View {
                     selectionPopoverOrigin: $selectionPopoverOrigin,
                     isEditable: !flow.isAIRequestInFlight && flow.activeEditLock == nil,
                     accessibilityIdentifier: VibeWriteAutomationID.projectBodyEditor,
-                    shouldAutoScrollToDocumentEnd: flow.isProseRequestInFlight,
+                    shouldAutoScrollToDocumentEnd: flow.isProseRequestInFlight || isDocumentEndFollowActive,
                     textFont: NSFont.systemFont(ofSize: 16, weight: .regular),
                     textColor: NSColor.vibeCanvasInk,
                     insertionPointColor: NSColor.vibeAccent,
@@ -751,6 +753,7 @@ struct WritingProjectView: View {
     }
 
     private func generateFirstDraft(trigger: String) {
+        beginDocumentEndFollow()
         Task { @MainActor in
             do {
                 try await flow.performWritingAction(.startDraft, userMessage: trigger, selectionText: nil)
@@ -760,6 +763,7 @@ struct WritingProjectView: View {
                     keepHistoryDrawerOpen: false
                 )
             } catch {
+                endDocumentEndFollow()
                 unlockComposerAfterRequest()
             }
         }
@@ -773,6 +777,9 @@ struct WritingProjectView: View {
         clearDraftOnSuccess: Bool = false,
         keepHistoryDrawerOpen: Bool = false
     ) {
+        if action == .startDraft || action == .continueWriting {
+            beginDocumentEndFollow()
+        }
         Task { @MainActor in
             do {
                 try await flow.performWritingAction(
@@ -787,6 +794,9 @@ struct WritingProjectView: View {
                     keepHistoryDrawerOpen: keepHistoryDrawerOpen
                 )
             } catch {
+                if action == .startDraft || action == .continueWriting {
+                    endDocumentEndFollow()
+                }
                 unlockComposerAfterRequest()
             }
         }
@@ -795,6 +805,14 @@ struct WritingProjectView: View {
     private func beginComposerThinking() {
         isComposerLocked = true
         messageFieldFocused = false
+    }
+
+    private func beginDocumentEndFollow() {
+        isDocumentEndFollowActive = true
+    }
+
+    private func endDocumentEndFollow() {
+        isDocumentEndFollowActive = false
     }
 
     private func schedulePostActionCleanup(
@@ -815,6 +833,11 @@ struct WritingProjectView: View {
             WritingLocalEditFlash(range: $0)
         }
         let flashRangePreview = latestRevision?.patch.replacementHighlightRange?.nsRange.debugDescription ?? "nil"
+        let shouldPinCaretToDocumentEnd = action == .startDraft || action == .continueWriting
+        let documentEndSelection = WritingTextSelectionRange(
+            location: flow.activeProject.documentText.utf16.count,
+            length: 0
+        )
 
         DispatchQueue.main.async {
             VibeWriteDebugTrace.append(
@@ -837,6 +860,16 @@ struct WritingProjectView: View {
             }
             if shouldReleaseFocus {
                 messageFieldFocused = false
+            }
+
+            if shouldPinCaretToDocumentEnd {
+                selectedText = nil
+                selectedTextRange = documentEndSelection
+                DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+                    if isDocumentEndFollowActive {
+                        isDocumentEndFollowActive = false
+                    }
+                }
             }
 
             if shouldFlashLocalEdit, let flash {
