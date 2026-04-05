@@ -32,7 +32,7 @@ This directory is the compact handoff layer for VibeWrite.
 
 ## Current state
 - V2 docs remain the source of truth; `docs/V1/` is archival only.
-- The正文 editor and bottom composer now share one outer content column, and the editor bridge no longer centers a separate readable-width block. The editor uses a fixed text inset while the visible vertical scroll indicator is rendered as a separate overlay at the far right edge of the app, and the indicator stays hidden when the正文 is not scrollable or after a short period of scroll inactivity.
+- The正文 editor and bottom composer now share one outer content column, and the editor bridge no longer centers a separate readable-width block. The editor uses a fixed text inset while the visible vertical scroll indicator is rendered in a reserved far-right lane at the edge of the app, and the indicator stays hidden when the正文 is not scrollable or after a short period of scroll inactivity.
 - Clicking `自定义` in the selection popover now brings in a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the popover while the user continues the custom-edit flow.
 - The latest repo commit before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.

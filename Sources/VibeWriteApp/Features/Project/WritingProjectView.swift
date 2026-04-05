@@ -39,6 +39,7 @@ struct WritingProjectView: View {
     }
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
+    private var bodyEditorScrollerLaneWidth: CGFloat { 12 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
@@ -110,15 +111,21 @@ struct WritingProjectView: View {
     }
 
     private var projectWorkspace: some View {
-        wideWorkspace
-        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .overlay(alignment: .trailing) {
-            if let bodyEditorScrollView {
-                ExternalVerticalScroller(scrollView: bodyEditorScrollView)
-                    .frame(width: 12)
-                    .frame(maxHeight: .infinity)
-                    .accessibilityHidden(true)
+        HStack(spacing: 0) {
+            wideWorkspace
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+
+            ZStack(alignment: .trailing) {
+                Color.clear
+
+                if let bodyEditorScrollView {
+                    ExternalVerticalScroller(scrollView: bodyEditorScrollView)
+                        .frame(width: bodyEditorScrollerLaneWidth)
+                        .frame(maxHeight: .infinity)
+                        .accessibilityHidden(true)
+                }
             }
+            .frame(width: bodyEditorScrollerLaneWidth)
         }
         .accessibilityIdentifier(VibeWriteAutomationID.projectPaperShell)
     }
