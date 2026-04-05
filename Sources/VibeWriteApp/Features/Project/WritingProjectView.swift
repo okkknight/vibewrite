@@ -941,7 +941,7 @@ struct WritingProjectView: View {
     private func selectionCustomContextCapsule(text: String) -> some View {
         Text(text)
             .font(.system(size: 12.2, weight: .medium, design: .default))
-            .foregroundStyle(Color.vibeCanvasInk)
+            .foregroundStyle(selectionCapsuleForegroundColor)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
@@ -949,7 +949,7 @@ struct WritingProjectView: View {
             .padding(.vertical, 10)
             .background {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.vibeCanvasLift.opacity(0.90))
+                    .fill(selectionCapsuleBackgroundColor)
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(
@@ -966,12 +966,30 @@ struct WritingProjectView: View {
                     )
                     .overlay(
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.vibeCanvasStroke.opacity(0.46), lineWidth: 1)
+                            .strokeBorder(selectionCapsuleStrokeColor, lineWidth: 1)
                     )
                     .shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
             }
             .accessibilityLabel("选中内容")
             .accessibilityValue(text)
+    }
+
+    private var selectionCapsuleForegroundColor: Color {
+        appearanceMode == .day
+            ? Color(red: 0.19, green: 0.15, blue: 0.09)
+            : Color.vibeCanvasInk
+    }
+
+    private var selectionCapsuleBackgroundColor: Color {
+        appearanceMode == .day
+            ? Color.vibeCanvasLift.opacity(0.96)
+            : Color.vibeCanvasLift.opacity(0.90)
+    }
+
+    private var selectionCapsuleStrokeColor: Color {
+        appearanceMode == .day
+            ? Color.vibeCanvasStroke.opacity(0.58)
+            : Color.vibeCanvasStroke.opacity(0.46)
     }
 }
 

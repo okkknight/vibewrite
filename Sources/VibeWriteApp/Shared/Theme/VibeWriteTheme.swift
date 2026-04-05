@@ -249,6 +249,7 @@ struct AccentPill: View {
     var icon: String?
     var tint: Color = .vibeAccent
     var accessibilityIdentifier: String? = nil
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Label {
@@ -259,14 +260,30 @@ struct AccentPill: View {
             }
         }
         .font(.system(size: 12.2, weight: .semibold, design: .default))
-        .foregroundStyle(tint)
+        .foregroundStyle(foregroundColor)
         .padding(.vertical, 7)
         .padding(.horizontal, 12)
         .background {
             Capsule(style: .continuous)
-                .fill(tint.opacity(0.18))
+                .fill(backgroundColor)
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(strokeColor, lineWidth: 1)
+                )
         }
         .accessibilityIdentifierIfPresent(accessibilityIdentifier)
+    }
+
+    private var foregroundColor: Color {
+        colorScheme == .light ? Color.vibeCanvasInk : tint
+    }
+
+    private var backgroundColor: Color {
+        colorScheme == .light ? tint.opacity(0.24) : tint.opacity(0.18)
+    }
+
+    private var strokeColor: Color {
+        colorScheme == .light ? Color.vibeCanvasStroke.opacity(0.26) : .clear
     }
 }
 
@@ -275,6 +292,7 @@ struct ActionChip: View {
     let tint: Color
     let accessibilityIdentifier: String?
     let action: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     init(_ title: String, tint: Color = .vibeAccent, accessibilityIdentifier: String? = nil, action: @escaping () -> Void) {
         self.title = title
@@ -290,16 +308,32 @@ struct ActionChip: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(tint)
+                .foregroundStyle(foregroundColor)
                 .padding(.vertical, 7)
                 .padding(.horizontal, 12)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(tint.opacity(0.18))
+                        .fill(backgroundColor)
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .strokeBorder(strokeColor, lineWidth: 1)
+                        )
                 }
         }
         .buttonStyle(.plain)
         .accessibilityIdentifierIfPresent(accessibilityIdentifier)
+    }
+
+    private var foregroundColor: Color {
+        colorScheme == .light ? Color.vibeCanvasInk : tint
+    }
+
+    private var backgroundColor: Color {
+        colorScheme == .light ? tint.opacity(0.24) : tint.opacity(0.18)
+    }
+
+    private var strokeColor: Color {
+        colorScheme == .light ? Color.vibeCanvasStroke.opacity(0.26) : .clear
     }
 }
 

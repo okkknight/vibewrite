@@ -283,6 +283,7 @@ private struct ComposerThinkingGlow: View {
 private struct AssistantSuggestionChip: View {
     let title: String
     let action: () -> Void
+    @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
         Button(action: action) {
@@ -291,15 +292,31 @@ private struct AssistantSuggestionChip: View {
                 .lineLimit(1)
                 .truncationMode(.tail)
                 .fixedSize(horizontal: true, vertical: false)
-                .foregroundStyle(Color.vibeCanvasAccent)
+                .foregroundStyle(foregroundColor)
                 .padding(.vertical, 7)
                 .padding(.horizontal, 12)
                 .background {
                     Capsule(style: .continuous)
-                        .fill(Color.vibeCanvasAccent.opacity(0.18))
+                        .fill(backgroundColor)
+                        .overlay(
+                            Capsule(style: .continuous)
+                                .strokeBorder(strokeColor, lineWidth: 1)
+                        )
                 }
         }
         .buttonStyle(.plain)
+    }
+
+    private var foregroundColor: Color {
+        colorScheme == .light ? Color.vibeCanvasInk : Color.vibeCanvasAccent
+    }
+
+    private var backgroundColor: Color {
+        colorScheme == .light ? Color.vibeCanvasAccent.opacity(0.24) : Color.vibeCanvasAccent.opacity(0.18)
+    }
+
+    private var strokeColor: Color {
+        colorScheme == .light ? Color.vibeCanvasStroke.opacity(0.26) : .clear
     }
 }
 
