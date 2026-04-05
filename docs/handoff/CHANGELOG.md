@@ -76,6 +76,7 @@
 ## 2026-04-05
 - `continueWriting` now consumes a persisted `continuationSummary` plus a trimmed document tail instead of the full正文, which keeps the continuation prompt compact and makes the model-facing summary separate from the UI-facing summary.
 - Independent review on 2026-04-05 passed the continuation-summary acceptance checks: `WritingAITests/testContinueWritingPromptRequestsConcreteSuggestionChips`, `VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`, `VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`, `VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` all succeeded.
+- A temporary startDraft-only AI debug log now captures the final request payload, the raw streamed assistant text, and the metadata parse classification so we can collect evidence for suggestion-return failures before rolling the log back.
 
 ## 2026-04-05
 - Local edit completion now has a dedicated transient presentation state: the正文 viewport is locked while the replacement lands, then the newly replaced range flashes briefly so users can see exactly what changed without the page jumping away from the edited passage.

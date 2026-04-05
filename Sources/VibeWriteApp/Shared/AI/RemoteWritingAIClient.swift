@@ -54,6 +54,20 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             maxTokens: maxTokens(for: request.action),
             stream: true
         )
+        let shouldCaptureDebugLogs = request.action == .startDraft
+        let requestBodyData = try JSONEncoder.vibeWriteAIRequestEncoder.encode(body)
+        let requestBodyText = String(data: requestBodyData, encoding: .utf8) ?? ""
+
+        if shouldCaptureDebugLogs {
+            VibeWriteLog.ai.info("startDraft request system=\(systemPrompt, privacy: .public)")
+            if let firstUserMessage = userMessages.first?.content.first {
+                switch firstUserMessage {
+                case .text(let userPrompt):
+                    VibeWriteLog.ai.info("startDraft request user=\(userPrompt, privacy: .public)")
+                }
+            }
+            VibeWriteLog.ai.info("startDraft request payload=\(requestBodyText, privacy: .public)")
+        }
 
         var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
         urlRequest.httpMethod = "POST"
@@ -61,7 +75,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
         urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.httpBody = try JSONEncoder.vibeWriteAIRequestEncoder.encode(body)
+        urlRequest.httpBody = requestBodyData
 
         let (bytes, response) = try await session.bytes(for: urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else {
@@ -133,6 +147,22 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         } catch {
             completionMetadata = nil
         }
+
+        if shouldCaptureDebugLogs {
+            let rawResponseText = streamedCompletion.rawText
+            let metadataText = streamedCompletion.metadataText
+            let parseStatus = startDraftMetadataParseStatus(
+                metadataStarted: streamedCompletion.metadataStarted,
+                metadata: completionMetadata
+            )
+
+            VibeWriteLog.ai.info("startDraft raw response=\(rawResponseText, privacy: .public)")
+            VibeWriteLog.ai.info("startDraft metadata raw=\(metadataText, privacy: .public)")
+            VibeWriteLog.ai.info(
+                "startDraft metadata parse=\(parseStatus.rawValue, privacy: .public) summary=\(completionMetadata?.summary ?? "", privacy: .public) nextFocus=\(completionMetadata?.nextFocus ?? "", privacy: .public) suggestionChipsCount=\(completionMetadata?.suggestionChips.count ?? 0, privacy: .public)"
+            )
+        }
+
         let finalResponse = WritingProjectResponseBuilder.response(
             for: request,
             documentText: finalDocumentText,
@@ -224,16 +254,18 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 private struct WritingAICompletionStreamBuffer {
     private static let metadataMarker = "[[VIBEWRITE_METADATA]]"
 
+    private(set) var rawText: String = ""
     private(set) var bodyText: String = ""
     private(set) var metadataText: String = ""
+    private(set) var metadataStarted = false
     private var pendingText: String = ""
-    private var metadataStarted = false
 
     mutating func append(_ chunk: String) -> [String] {
         guard !chunk.isEmpty else {
             return []
         }
 
+        rawText += chunk
         pendingText += chunk
 
         if metadataStarted {
@@ -278,6 +310,28 @@ private struct WritingAICompletionStreamBuffer {
 
         pendingText.removeAll(keepingCapacity: true)
     }
+}
+
+private enum StartDraftMetadataParseStatus: String {
+    case noMarker = "no_marker"
+    case markerPresentJSONFailed = "marker_present_json_failed"
+    case jsonSuccessSuggestionChipsEmpty = "json_success_suggestionChips_empty"
+    case success = "success"
+}
+
+private func startDraftMetadataParseStatus(
+    metadataStarted: Bool,
+    metadata: WritingAICompletionMetadata?
+) -> StartDraftMetadataParseStatus {
+    guard metadataStarted else {
+        return .noMarker
+    }
+
+    guard let metadata else {
+        return .markerPresentJSONFailed
+    }
+
+    return metadata.suggestionChips.isEmpty ? .jsonSuccessSuggestionChipsEmpty : .success
 }
 
 private struct AnthropicCompatibleRequest: Codable {
