@@ -3,6 +3,8 @@
 .DS_Store
 Config/VibeWrite.local.xcconfig
 .derivedData/
+.derivedData-dmg/
+dist/
 VibeWrite.xcodeproj/project.xcworkspace/xcuserdata/
 *.xcuserstate
 :-
