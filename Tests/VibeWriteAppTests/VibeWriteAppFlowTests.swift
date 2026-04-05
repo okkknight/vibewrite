@@ -229,6 +229,50 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
     }
 
+    func testMetadataPhaseCanRunWhileProsePreviewFinishes() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(
+            storageURL: storageURL,
+            aiClient: DelayedMetadataWritingAIClient()
+        )
+        flow.openProject(
+            WritingProject.entryShell(
+                prompt: "写一篇关于成年人孤独感的公众号文章",
+                mode: .collaboration,
+                automationKey: "project.metadata.concurrent"
+            )
+        )
+
+        let task = Task { @MainActor in
+            try await flow.performWritingAction(
+                .startDraft,
+                userMessage: "写一篇关于成年人孤独感的公众号文章",
+                selectionText: nil
+            )
+        }
+
+        let metadataPhaseObserved = await waitUntil(timeout: 4) {
+            !flow.isProseRequestInFlight && flow.isMetadataRequestInFlight
+        }
+        XCTAssertTrue(metadataPhaseObserved)
+        XCTAssertTrue(flow.isAIRequestInFlight)
+        XCTAssertFalse(flow.isProseRequestInFlight)
+        XCTAssertTrue(flow.isMetadataRequestInFlight)
+        XCTAssertFalse(flow.activeProject.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        XCTAssertTrue(flow.activeProject.suggestionChips.isEmpty)
+
+        try await task.value
+
+        XCTAssertFalse(flow.isAIRequestInFlight)
+        XCTAssertFalse(flow.isProseRequestInFlight)
+        XCTAssertFalse(flow.isMetadataRequestInFlight)
+        XCTAssertFalse(flow.activeProject.suggestionChips.isEmpty)
+    }
+
     func testEditAppliesPatchAtCompletionWhilePreservingPatchBoundaries() async throws {
         let storageURL = try makeTempStorageURL()
         defer {
@@ -950,6 +994,31 @@ private struct MetadataFailingWritingAIClient: WritingAIClient {
     func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
         if request.kind == .metadata {
             throw WritingAIClientError.requestFailed("metadata request failed")
+        }
+
+        return WritingProjectResponseBuilder.response(
+            for: request,
+            documentText: MockWritingEngine.streamedDocumentText(for: request)
+        )
+    }
+}
+
+private struct DelayedMetadataWritingAIClient: WritingAIClient {
+    private let streamClient = StubWritingAIClient()
+    private let metadataDelayNanoseconds: UInt64 = 250_000_000
+
+    func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        streamClient.streamResponse(for: request)
+    }
+
+    func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
+        if request.kind == .metadata {
+            try await Task.sleep(nanoseconds: metadataDelayNanoseconds)
+            return WritingProjectResponseBuilder.response(
+                for: request,
+                documentText: request.project.documentText,
+                metadata: MockWritingEngine.completionMetadata(for: request)
+            )
         }
 
         return WritingProjectResponseBuilder.response(

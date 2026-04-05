@@ -108,7 +108,8 @@ struct ProjectAISidebarView: View {
             return "AI 正在协作，侧栏保留最新上下文。"
         }
 
-        return project.context.nextFocus
+        let nextFocus = project.context.nextFocus.trimmingCharacters(in: .whitespacesAndNewlines)
+        return nextFocus.isEmpty ? project.mode.stageDescription : nextFocus
     }
 
     private var conversationPreview: [ConversationMessage] {

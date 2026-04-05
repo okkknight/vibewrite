@@ -9,6 +9,8 @@ struct ProjectComposerBar: View {
     let assistantSuggestionChips: [String]
     let isComposerLocked: Bool
     let isRequestInFlight: Bool
+    let isPrimaryActionInFlight: Bool
+    let isSuggestionGenerationInFlight: Bool
     let messageFieldFocused: FocusState<Bool>.Binding
     let isMessageFieldHighlighted: Bool
     let accessibilityIdentifier: String
@@ -26,6 +28,10 @@ struct ProjectComposerBar: View {
                         icon: actionIcon,
                         tint: .vibeCanvasAccent
                     )
+
+                    if shouldShowSuggestionLoadingPill {
+                        suggestionLoadingPill
+                    }
 
                     ForEach(normalizedAssistantSuggestionChips, id: \.self) { chip in
                         AssistantSuggestionChip(title: chip) {
@@ -55,7 +61,7 @@ struct ProjectComposerBar: View {
                     .padding(.vertical, 12)
                     .padding(.leading, 12)
                     .padding(.trailing, 8)
-                    .background {
+                .background {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .fill(Color.vibeCanvasLift.opacity(backgroundOpacity))
                             .overlay(
@@ -78,10 +84,10 @@ struct ProjectComposerBar: View {
                             )
                             .shadow(color: highlightShadowColor, radius: highlightShadowRadius, x: 0, y: 0)
                     }
-                    .foregroundStyle(isComposerLocked ? Color.vibeCanvasInkMuted : Color.vibeCanvasInk)
+                    .foregroundStyle(isPrimaryActionInFlight ? Color.vibeCanvasInkMuted : Color.vibeCanvasInk)
                     .disabled(isComposerLocked)
                     .overlay(alignment: .topLeading) {
-                        if isComposerLocked {
+                        if isPrimaryActionInFlight {
                             ComposerThinkingGlow()
                                 .frame(width: 320, height: 42, alignment: .leading)
                                 .offset(x: 2, y: -16)
@@ -93,7 +99,7 @@ struct ProjectComposerBar: View {
                     .accessibilityIdentifier(messageInputIdentifier)
 
                 Button(action: onSubmit) {
-                    SubmitGlyph(isThinking: isComposerLocked || isRequestInFlight)
+                    SubmitGlyph(isThinking: isPrimaryActionInFlight)
                         .background {
                             Circle()
                                 .fill(Color.vibeCanvasLift.opacity(isRequestInFlight || isComposerLocked ? 0.72 : 0.96))
@@ -141,7 +147,7 @@ struct ProjectComposerBar: View {
     }
 
     private var backgroundOpacity: Double {
-        if isComposerLocked {
+        if isPrimaryActionInFlight {
             return 0.66
         }
 
@@ -149,7 +155,7 @@ struct ProjectComposerBar: View {
     }
 
     private var gradientOpacity: Double {
-        if isComposerLocked {
+        if isPrimaryActionInFlight {
             return 0.008
         }
 
@@ -157,7 +163,7 @@ struct ProjectComposerBar: View {
     }
 
     private var strokeOpacity: Double {
-        if isComposerLocked {
+        if isPrimaryActionInFlight {
             return 0.48
         }
 
@@ -165,11 +171,11 @@ struct ProjectComposerBar: View {
     }
 
     private var highlightShadowColor: Color {
-        isMessageFieldHighlighted && !isComposerLocked ? Color.vibeCanvasAccent.opacity(0.18) : .clear
+        isMessageFieldHighlighted && !isPrimaryActionInFlight ? Color.vibeCanvasAccent.opacity(0.18) : .clear
     }
 
     private var highlightShadowRadius: CGFloat {
-        isMessageFieldHighlighted && !isComposerLocked ? 10 : 0
+        isMessageFieldHighlighted && !isPrimaryActionInFlight ? 10 : 0
     }
 
     private var normalizedAssistantNextFocus: String? {
@@ -187,6 +193,10 @@ struct ProjectComposerBar: View {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
+    }
+
+    private var shouldShowSuggestionLoadingPill: Bool {
+        normalizedAssistantSuggestionChips.isEmpty && isSuggestionGenerationInFlight
     }
 
     private var composerPlaceholderText: String {
@@ -210,6 +220,31 @@ struct ProjectComposerBar: View {
         default:
             return "text.cursor"
         }
+    }
+
+    private var suggestionLoadingPill: some View {
+        HStack(spacing: 6) {
+            Text("建议生成中")
+                .font(.system(size: 11.8, weight: .semibold, design: .default))
+                .foregroundStyle(Color.vibeCanvasInkSoft)
+                .lineLimit(1)
+
+            Circle()
+                .fill(Color.vibeCanvasAccent.opacity(0.32))
+                .frame(width: 5.5, height: 5.5)
+        }
+        .padding(.vertical, 7)
+        .padding(.horizontal, 12)
+        .background {
+            Capsule(style: .continuous)
+                .fill(Color.vibeCanvasLift.opacity(0.56))
+                .overlay(
+                    Capsule(style: .continuous)
+                        .strokeBorder(Color.vibeCanvasStroke.opacity(0.30), lineWidth: 1)
+                )
+        }
+        .accessibilityLabel("建议生成中")
+        .accessibilityHidden(false)
     }
 }
 

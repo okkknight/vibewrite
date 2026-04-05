@@ -339,7 +339,7 @@ struct WritingProjectView: View {
                 .truncationMode(.tail)
                 .multilineTextAlignment(.center)
 
-            if flow.isAIRequestInFlight {
+            if flow.isProseRequestInFlight {
                 ThinkingDots()
                     .font(.system(size: 11.5, weight: .medium, design: .default))
                     .foregroundStyle(Color.vibeCanvasInkSoft)
@@ -370,7 +370,7 @@ struct WritingProjectView: View {
                     selectionPopoverOrigin: $selectionPopoverOrigin,
                     isEditable: !flow.isAIRequestInFlight && flow.activeEditLock == nil,
                     accessibilityIdentifier: VibeWriteAutomationID.projectBodyEditor,
-                    shouldAutoScrollToDocumentEnd: flow.isAIRequestInFlight,
+                    shouldAutoScrollToDocumentEnd: flow.isProseRequestInFlight,
                     textFont: NSFont.systemFont(ofSize: 16, weight: .regular),
                     textColor: NSColor.vibeCanvasInk,
                     insertionPointColor: NSColor.vibeAccent,
@@ -445,7 +445,7 @@ struct WritingProjectView: View {
             project: project,
             isExpanded: true,
             presentation: shellLayoutMode.isCompact ? .drawer : .column,
-            isRequestInFlight: flow.isAIRequestInFlight,
+            isRequestInFlight: flow.isProseRequestInFlight,
             errorMessage: flow.aiErrorMessage,
             accessibilityIdentifier: VibeWriteAutomationID.projectAssistantRailShell,
             onToggle: toggleAssistantLayer,
@@ -459,7 +459,7 @@ struct WritingProjectView: View {
             isExpanded: true,
             presentation: shellLayoutMode.isCompact ? .drawer : .column,
             isComparisonVisible: showComparison,
-            isRequestInFlight: flow.isAIRequestInFlight,
+            isRequestInFlight: flow.isProseRequestInFlight,
             accessibilityIdentifier: VibeWriteAutomationID.projectHistoryRailShell,
             onToggle: toggleHistoryLayer,
             onUndo: undoLastChange,
@@ -578,6 +578,8 @@ struct WritingProjectView: View {
             assistantSuggestionChips: project.suggestionChips,
             isComposerLocked: isComposerLocked,
             isRequestInFlight: flow.isAIRequestInFlight,
+            isPrimaryActionInFlight: flow.isProseRequestInFlight,
+            isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
             isMessageFieldHighlighted: isSelectionCustomInputHighlighted,
             accessibilityIdentifier: VibeWriteAutomationID.projectComposerBar,

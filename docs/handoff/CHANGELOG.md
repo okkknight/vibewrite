@@ -4,7 +4,7 @@
 - `.edit` now preserves the currently visible assistant suggestion chips when they already exist, and only uses edit-returned chips when the suggestion area was empty before the edit completed.
 
 ## 2026-04-06
-- `startDraft` and `continueWriting` now run as a two-phase AI flow: prose streams first, then a separate metadata request fills `summary`, `nextFocus`, and `suggestionChips` after the prose phase completes. Metadata failures stay silent and leave the assistant suggestion area empty instead of fabricating fallback chips.
+- `startDraft` and `continueWriting` now run as a two-phase AI flow: prose streams first, then a separate metadata request starts as soon as the prose stream completes and can overlap the preview renderer's tail finish. Metadata fills `summary`, `nextFocus`, and `suggestionChips` after the prose phase completes, metadata failures stay silent and leave the assistant suggestion area empty instead of fabricating fallback chips, and the composer now shows a lightweight `建议生成中` pill while metadata is pending.
 - `.edit` keeps the legacy combined prose-plus-metadata request path unchanged.
 - Verification for this change passed with `swift test`, plus targeted filters for the new prompt, remote metadata, prose streaming, metadata failure, and flow-request split coverage.
 
