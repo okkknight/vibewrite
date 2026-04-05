@@ -41,8 +41,6 @@ struct WritingAIPromptBuilder {
         - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
         - For "startDraft", keep summary concise and state the opening's current condition, keep nextFocus concrete, and keep suggestionChips directly actionable.
-        - When the action is "continueWriting", the response is not complete unless the metadata block is present and valid.
-        - When the action is "continueWriting", the response must end with one and only one metadata block.
         - When the action is "continueWriting", suggestionChips must contain exactly 3 items.
         - When the action is "continueWriting", prefer 3 concise chips that follow the current正文 naturally, are concrete, and help the app suggest what to do next.
         - When the action is "continueWriting", suggestionChips must not be generic continuation prompts.
@@ -103,8 +101,6 @@ struct WritingAIPromptBuilder {
             lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
         } else if request.action == .continueWriting {
-            lines.append("For continueWriting, the response is incomplete without `[[VIBEWRITE_METADATA]]` and a valid JSON object at the end.")
-            lines.append("For continueWriting, do not stop after the prose; the response must end with exactly one metadata block.")
             lines.append("Use the document summary as global context and the document tail as the continuation anchor.")
             lines.append("Use the project state as the working memory for this continuation.")
             lines.append("Do not restart from the beginning of the article.")
@@ -116,6 +112,7 @@ struct WritingAIPromptBuilder {
         lines.append("<prose>")
         lines.append("")
         lines.append("[[VIBEWRITE_METADATA]]")
+        lines.append("exactly one JSON object with summary, nextFocus, and suggestionChips")
         lines.append("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}")
         lines.append("Write the metadata in the same language as the current正文 and user request; for Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
         lines.append("Do not wrap the metadata JSON in markdown fences.")
