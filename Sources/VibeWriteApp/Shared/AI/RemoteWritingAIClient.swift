@@ -69,25 +69,16 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
         case .metadata:
             VibeWriteLog.ai.info(
-                "Remote metadata request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
+                "Remote metadata structured request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
             )
 
-            let metadataText = try await collectMetadataText(
+            let metadata = try await requestStructuredMetadata(
                 for: request,
                 apiKey: apiKey
             )
-            let metadata: WritingAICompletionMetadata
-            do {
-                metadata = try WritingAICompletionMetadataDecoder.decode(from: metadataText)
-            } catch {
-                VibeWriteLog.ai.error(
-                    "Remote metadata parse failed action=\(request.action.rawValue, privacy: .public) rawCount=\(metadataText.count, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
-                )
-                throw error
-            }
 
             VibeWriteLog.ai.info(
-                "Remote metadata request finished action=\(request.action.rawValue, privacy: .public) rawCount=\(metadataText.count, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+                "Remote metadata structured request finished action=\(request.action.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
             )
             let finalResponse = WritingProjectResponseBuilder.response(
                 for: request,
@@ -97,6 +88,64 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             continuation.yield(.completed(finalResponse))
             continuation.finish()
         }
+    }
+
+    private func requestStructuredMetadata(
+        for request: WritingAIRequest,
+        apiKey: String
+    ) async throws -> WritingAICompletionMetadata {
+        let metadataTool = AnthropicToolDefinition.metadata
+        let urlRequest = try makeRequest(
+            for: request,
+            apiKey: apiKey,
+            stream: false,
+            tools: [metadataTool],
+            toolChoice: .tool(name: metadataTool.name)
+        )
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WritingAIClientError.requestFailed("AI request did not return an HTTP response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            if let decodedError = try? JSONDecoder.vibeWriteAIErrorDecoder.decode(AnthropicErrorEnvelope.self, from: data) {
+                throw mapError(statusCode: httpResponse.statusCode, message: decodedError.errorMessage)
+            }
+
+            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
+                throw mappedError
+            }
+
+            throw WritingAIClientError.requestFailed("AI request failed with HTTP \(httpResponse.statusCode).")
+        }
+
+        let decodedResponse: AnthropicMessagesResponse
+        do {
+            decodedResponse = try JSONDecoder().decode(AnthropicMessagesResponse.self, from: data)
+        } catch {
+            let rawText = String(data: data, encoding: .utf8) ?? ""
+            let rawCount = rawText.count
+            VibeWriteLog.ai.error(
+                "Remote metadata structured decode failed action=\(request.action.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            throw WritingAIClientError.invalidResponse("AI metadata response was not valid JSON.")
+        }
+
+        guard let toolUse = decodedResponse.firstToolUse(named: metadataTool.name) else {
+            let rawText = String(data: data, encoding: .utf8) ?? ""
+            let rawCount = rawText.count
+            VibeWriteLog.ai.error(
+                "Remote metadata structured tool use missing action=\(request.action.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
+            )
+            throw WritingAIClientError.invalidResponse("AI metadata response did not include the expected tool call.")
+        }
+
+        VibeWriteLog.ai.info(
+            "Remote metadata structured tool use decoded action=\(request.action.rawValue, privacy: .public) toolName=\(toolUse.name, privacy: .public) summaryCount=\(toolUse.input.summary.count, privacy: .public) nextFocusCount=\(toolUse.input.nextFocus.count, privacy: .public) suggestionCount=\(toolUse.input.suggestionChips.count, privacy: .public)"
+        )
+
+        return toolUse.input
     }
 
     private func streamLegacyEditRequest(
@@ -239,59 +288,6 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         return trimmed
     }
 
-    private func collectMetadataText(
-        for request: WritingAIRequest,
-        apiKey: String
-    ) async throws -> String {
-        let bytes = try await openStream(for: request, apiKey: apiKey, stream: true)
-        var pendingDataLines: [String] = []
-        var collectedText = ""
-
-        for try await line in bytes.lines {
-            if line.isEmpty {
-                try flushStreamEvent(
-                    dataLines: &pendingDataLines,
-                    collectedText: &collectedText,
-                    yieldChunk: { _ in }
-                )
-                continue
-            }
-
-            if line.hasPrefix("data:") {
-                var dataLine = String(line.dropFirst("data:".count))
-                if dataLine.first == " " {
-                    dataLine.removeFirst()
-                }
-                pendingDataLines.append(dataLine)
-                continue
-            }
-
-            if line.hasPrefix("event:") {
-                if !pendingDataLines.isEmpty {
-                    try flushStreamEvent(
-                        dataLines: &pendingDataLines,
-                        collectedText: &collectedText,
-                        yieldChunk: { _ in }
-                    )
-                }
-                continue
-            }
-        }
-
-        try flushStreamEvent(
-            dataLines: &pendingDataLines,
-            collectedText: &collectedText,
-            yieldChunk: { _ in }
-        )
-
-        let trimmed = collectedText.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty else {
-            throw WritingAIClientError.invalidResponse("AI metadata request did not produce any content.")
-        }
-
-        return trimmed
-    }
-
     private func flushStreamEvent(
         dataLines: inout [String],
         collectedText: inout String,
@@ -351,6 +347,38 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         apiKey: String,
         stream: Bool
     ) async throws -> URLSession.AsyncBytes {
+        let urlRequest = try makeRequest(
+            for: request,
+            apiKey: apiKey,
+            stream: stream
+        )
+
+        let (bytes, response) = try await session.bytes(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WritingAIClientError.requestFailed("AI request did not return an HTTP response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let data = try await collectData(from: bytes)
+            if let decodedError = try? JSONDecoder.vibeWriteAIErrorDecoder.decode(AnthropicErrorEnvelope.self, from: data) {
+                throw mapError(statusCode: httpResponse.statusCode, message: decodedError.errorMessage)
+            }
+            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
+                throw mappedError
+            }
+            throw WritingAIClientError.requestFailed("AI request failed with HTTP \(httpResponse.statusCode).")
+        }
+
+        return bytes
+    }
+
+    private func makeRequest(
+        for request: WritingAIRequest,
+        apiKey: String,
+        stream: Bool,
+        tools: [AnthropicToolDefinition]? = nil,
+        toolChoice: AnthropicToolChoice? = nil
+    ) throws -> URLRequest {
         let promptMessages = promptBuilder.messages(
             for: request,
             provider: configuration.provider,
@@ -373,34 +401,19 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             messages: userMessages,
             temperature: request.kind == .metadata ? 0.1 : 0.2,
             maxTokens: maxTokens(for: request),
-            stream: stream
+            stream: stream,
+            tools: tools,
+            toolChoice: toolChoice
         )
 
         var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
         urlRequest.httpMethod = "POST"
         urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        urlRequest.setValue(stream ? "text/event-stream" : "application/json", forHTTPHeaderField: "Accept")
         urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
         urlRequest.httpBody = try JSONEncoder.vibeWriteAIRequestEncoder.encode(body)
-
-        let (bytes, response) = try await session.bytes(for: urlRequest)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw WritingAIClientError.requestFailed("AI request did not return an HTTP response.")
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let data = try await collectData(from: bytes)
-            if let decodedError = try? JSONDecoder.vibeWriteAIErrorDecoder.decode(AnthropicErrorEnvelope.self, from: data) {
-                throw mapError(statusCode: httpResponse.statusCode, message: decodedError.errorMessage)
-            }
-            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
-                throw mappedError
-            }
-            throw WritingAIClientError.requestFailed("AI request failed with HTTP \(httpResponse.statusCode).")
-        }
-
-        return bytes
+        return urlRequest
     }
 
     private func collectData(from bytes: URLSession.AsyncBytes) async throws -> Data {
@@ -510,13 +523,15 @@ private struct WritingAICompletionStreamBuffer {
     }
 }
 
-private struct AnthropicCompatibleRequest: Codable {
+struct AnthropicCompatibleRequest: Encodable {
     let model: String
     let system: String
     let messages: [AnthropicMessage]
     let temperature: Double
     let maxTokens: Int
     let stream: Bool
+    let tools: [AnthropicToolDefinition]?
+    let toolChoice: AnthropicToolChoice?
 
     enum CodingKeys: String, CodingKey {
         case model
@@ -525,6 +540,131 @@ private struct AnthropicCompatibleRequest: Codable {
         case temperature
         case maxTokens = "max_tokens"
         case stream
+        case tools
+        case toolChoice = "tool_choice"
+    }
+}
+
+struct AnthropicToolDefinition: Encodable {
+    let name: String
+    let description: String
+    let inputSchema: AnthropicToolInputSchema
+
+    enum CodingKeys: String, CodingKey {
+        case name
+        case description
+        case inputSchema = "input_schema"
+    }
+
+    static let metadata = AnthropicToolDefinition(
+        name: "emit_metadata",
+        description: "Emit the collaboration metadata for the completed prose as a single tool call.",
+        inputSchema: AnthropicToolInputSchema()
+    )
+}
+
+struct AnthropicToolInputSchema: Encodable {
+    let type = "object"
+    let properties = Properties()
+    let required = ["summary", "nextFocus", "suggestionChips"]
+    let additionalProperties = false
+
+    init() {}
+
+    struct Properties: Encodable {
+        let summary = StringProperty(
+            description: "A concise summary of the completed prose."
+        )
+
+        let nextFocus = StringProperty(
+            description: "The next concrete step after the current prose."
+        )
+
+        let suggestionChips = SuggestionChipsProperty(
+            description: "Exactly three concise suggestion chips for the next step."
+        )
+    }
+
+    struct StringProperty: Encodable {
+        let type = "string"
+        let description: String
+    }
+
+    struct SuggestionChipsProperty: Encodable {
+        let type = "array"
+        let description: String
+        let items = Item()
+        let minItems = 3
+        let maxItems = 3
+
+        struct Item: Encodable {
+            let type = "string"
+        }
+    }
+}
+
+struct AnthropicToolChoice: Encodable {
+    let type = "tool"
+    let name: String
+
+    init(name: String) {
+        self.name = name
+    }
+
+    static func tool(name: String) -> AnthropicToolChoice {
+        AnthropicToolChoice(name: name)
+    }
+}
+
+struct AnthropicMessagesResponse: Decodable {
+    let content: [AnthropicResponseContentBlock]
+
+    func firstToolUse(named name: String) -> AnthropicToolUseBlock? {
+        for block in content {
+            if case .toolUse(let toolUse) = block, toolUse.name == name {
+                return toolUse
+            }
+        }
+
+        return nil
+    }
+}
+
+enum AnthropicResponseContentBlock: Decodable {
+    case text(String)
+    case toolUse(AnthropicToolUseBlock)
+    case unknown
+
+    init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let type = try container.decode(String.self, forKey: .type)
+        switch type {
+        case "text":
+            self = .text(try container.decodeIfPresent(String.self, forKey: .text) ?? "")
+        case "tool_use":
+            self = .toolUse(try AnthropicToolUseBlock(from: decoder))
+        default:
+            self = .unknown
+        }
+    }
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case text
+    }
+}
+
+struct AnthropicToolUseBlock: Decodable {
+    let type: String
+    let id: String?
+    let name: String
+    let input: WritingAICompletionMetadata
+
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case id
+        case name
+        case input
     }
 }
 
@@ -551,7 +691,7 @@ private struct AnthropicErrorEnvelope: Decodable {
     }
 }
 
-private struct AnthropicMessage: Codable {
+struct AnthropicMessage: Encodable {
     let role: Role
     let content: [ContentBlock]
 

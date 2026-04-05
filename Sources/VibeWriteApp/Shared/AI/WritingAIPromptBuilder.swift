@@ -119,10 +119,9 @@ struct WritingAIPromptBuilder {
 
         return """
         You are VibeWrite metadata-only response builder.
-        Return only a single JSON object.
+        Use the provided `emit_metadata` tool to return the metadata for the completed prose.
         Do not output prose, markdown fences, or commentary.
-        Do not include any keys other than summary, nextFocus, and suggestionChips.
-        The JSON is incomplete unless all three keys are present.
+        Do not answer in plain text.
 
         \(actionInstructions)
 
@@ -130,7 +129,6 @@ struct WritingAIPromptBuilder {
         - Match the metadata language to the language of the current正文 and user request.
         - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
         - suggestionChips must be concise, concrete, and non-generic.
-        - The JSON object must be valid and standalone.
 
         Provider: \(provider)
         Model: \(model)
@@ -214,13 +212,10 @@ struct WritingAIPromptBuilder {
             lines.append("Selection: \(selection)")
         }
 
-        lines.append("Return exactly one JSON object with summary, nextFocus, and suggestionChips.")
-        lines.append("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}")
+        lines.append("Use the `emit_metadata` tool to return summary, nextFocus, and suggestionChips.")
         lines.append("Do not include prose, markdown fences, or commentary.")
         lines.append("For Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
-        if request.action != .edit {
-            lines.append("Return exactly 3 concise suggestion chips.")
-        }
+        lines.append("Return exactly 3 concise suggestion chips.")
 
         return lines.joined(separator: "\n")
     }

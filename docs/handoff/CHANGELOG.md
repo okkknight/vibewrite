@@ -1,6 +1,13 @@
 # Changelog
 
 ## 2026-04-06
+- Remote AI metadata now uses a structured Anthropic tool call: the metadata request forces `emit_metadata` and decodes the tool arguments directly, which removes the old text JSON parse failure mode for `summary`, `nextFocus`, and `suggestionChips`.
+
+## 2026-04-06
+- Prose streaming completion now pins the正文 caret to the end of the newly streamed text and keeps the viewport anchored there briefly, so the document no longer snaps back to the earlier selection position when the stream finishes.
+- Verification note: the current worktree still has an unrelated `RemoteWritingAIClient.swift` access-control mismatch, so the full-project build remains blocked outside this localized prose-end follow change.
+
+## 2026-04-06
 - Added runtime diagnostics for the prose/metadata split: each action now gets a short trace id, and the logs record prose network duration, prose playback tail wait duration, metadata request duration, and metadata parse failures with raw payload size.
 
 ## 2026-04-06

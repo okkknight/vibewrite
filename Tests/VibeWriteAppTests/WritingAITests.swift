@@ -155,12 +155,11 @@ final class WritingAITests: XCTestCase {
         let metadataSystemPrompt = metadataMessages.first?.content ?? ""
         let metadataUserPrompt = metadataMessages.last?.content ?? ""
         XCTAssertTrue(metadataSystemPrompt.contains("metadata-only response builder"))
-        XCTAssertTrue(metadataSystemPrompt.contains("Return only a single JSON object"))
+        XCTAssertTrue(metadataSystemPrompt.contains("emit_metadata"))
         XCTAssertFalse(metadataSystemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(metadataUserPrompt.contains("Action: startDraft metadata"))
         XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
-        XCTAssertTrue(metadataUserPrompt.contains("Return exactly one JSON object with summary, nextFocus, and suggestionChips."))
-        XCTAssertTrue(metadataUserPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
+        XCTAssertTrue(metadataUserPrompt.contains("Use the `emit_metadata` tool"))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
     }
 
@@ -249,7 +248,89 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(metadataUserPrompt.contains("Action: continueWriting metadata"))
         XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
         XCTAssertTrue(metadataUserPrompt.contains("Document summary:"))
+        XCTAssertTrue(metadataUserPrompt.contains("Use the `emit_metadata` tool"))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
+    }
+
+    func testRemoteClientMetadataUsesStructuredToolOutput() async throws {
+        let configuration = WritingAIConfiguration.configuration(from: [
+            "VIBEWRITE_AI_DEFAULT_MODE": "real",
+            "VIBEWRITE_AI_PROVIDER": "minimax",
+            "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_API_KEY": "bundle-key-123"
+        ])
+
+        let session = makeAnthropicMockSession { request in
+            let body = try XCTUnwrap(self.requestBodyData(from: request))
+            let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
+
+            XCTAssertFalse(payload.stream)
+            XCTAssertEqual(payload.tools?.first?.name, "emit_metadata")
+            XCTAssertEqual(payload.toolChoice?.type, "tool")
+            XCTAssertEqual(payload.toolChoice?.name, "emit_metadata")
+            XCTAssertEqual(payload.tools?.first?.inputSchema.required, ["summary", "nextFocus", "suggestionChips"])
+            XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.minItems, 3)
+            XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.maxItems, 3)
+            XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
+            XCTAssertTrue(payload.system.contains("emit_metadata"))
+
+            let response = """
+            {
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_01",
+                  "name": "emit_metadata",
+                  "input": {
+                    "summary": "已生成开头",
+                    "nextFocus": "继续推进第一段",
+                    "suggestionChips": ["继续写", "编辑这段", "补一段"]
+                  }
+                }
+              ]
+            }
+            """
+
+            return (
+                self.makeHTTPResponse(statusCode: 200, headerFields: ["Content-Type": "application/json"]),
+                response.data(using: .utf8)!
+            )
+        }
+
+        let client = RemoteWritingAIClient(configuration: configuration, session: session)
+        let project = WritingProject(
+            title: "结构化建议测试",
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration,
+            summary: "给人看的摘要可以保留原样",
+            continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
+            context: ProjectContext(
+                intentSummary: "当前要把结尾收紧，并保持人物气口一致。",
+                styleConstraints: ["克制", "平静", "非鸡汤"],
+                currentGoal: "继续推进结尾",
+                recentDecisions: ["不重写前文", "保留余味"],
+                workingMemory: ["人物已经进入收束阶段", "后面只需要再往前推一点"],
+                nextFocus: "补一段收束"
+            ),
+            conversation: [],
+            documentText: "前文第一段。\n\n前文第二段。",
+            suggestionChips: ["继续写", "编辑这段", "补一段"]
+        ).aiSnapshot
+        let request = WritingAIRequest(
+            action: .continueWriting,
+            project: project,
+            userMessage: "继续往下写",
+            selectionText: nil,
+            kind: .metadata
+        )
+
+        let response = try await client.generateResponse(for: request)
+
+        XCTAssertEqual(response.documentText, request.project.documentText)
+        XCTAssertEqual(response.summary, "已生成开头")
+        XCTAssertEqual(response.nextFocus, "继续推进第一段")
+        XCTAssertEqual(response.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
 
     func testRemoteClientUsesWiderMaxTokensAndDocumentTailForContinueWriting() async throws {
@@ -902,6 +983,8 @@ private struct AnthropicRequestEnvelope: Decodable {
     let messages: [Message]
     let maxTokens: Int
     let stream: Bool
+    let tools: [Tool]?
+    let toolChoice: ToolChoice?
 
     enum CodingKeys: String, CodingKey {
         case model
@@ -909,6 +992,8 @@ private struct AnthropicRequestEnvelope: Decodable {
         case messages
         case maxTokens = "max_tokens"
         case stream
+        case tools
+        case toolChoice = "tool_choice"
     }
 
     struct Message: Decodable {
@@ -919,5 +1004,52 @@ private struct AnthropicRequestEnvelope: Decodable {
     struct Content: Decodable {
         let type: String
         let text: String
+    }
+
+    struct Tool: Decodable {
+        let name: String
+        let description: String
+        let inputSchema: InputSchema
+
+        enum CodingKeys: String, CodingKey {
+            case name
+            case description
+            case inputSchema = "input_schema"
+        }
+    }
+
+    struct ToolChoice: Decodable {
+        let type: String
+        let name: String
+    }
+
+    struct InputSchema: Decodable {
+        let type: String
+        let properties: Properties
+        let required: [String]
+        let additionalProperties: Bool
+
+        struct Properties: Decodable {
+            let summary: StringProperty
+            let nextFocus: StringProperty
+            let suggestionChips: SuggestionChipsProperty
+        }
+
+        struct StringProperty: Decodable {
+            let type: String
+            let description: String
+        }
+
+        struct SuggestionChipsProperty: Decodable {
+            let type: String
+            let description: String
+            let items: Items
+            let minItems: Int
+            let maxItems: Int
+
+            struct Items: Decodable {
+                let type: String
+            }
+        }
     }
 }

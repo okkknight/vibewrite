@@ -11,7 +11,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
-- `startDraft` / `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request that starts as soon as prose streaming finishes and can overlap the preview renderer's tail finish. The prose path still streams normally and keeps the subtitle/send-button thinking state alive until the streaming preview tail has fully played; metadata is applied only after the prose phase succeeds; the composer shows a lightweight `建议生成中` pill during the metadata wait; `.edit` keeps the legacy combined-response path unchanged.
+- `startDraft` / `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request that starts as soon as prose streaming finishes and can overlap the preview renderer's tail finish. The prose path still streams normally and keeps the subtitle/send-button thinking state alive until the streaming preview tail has fully played; metadata is applied only after the prose phase succeeds; the composer shows a lightweight `建议生成中` pill during the metadata wait; metadata is now obtained through a forced structured `emit_metadata` tool call instead of a text JSON blob; `.edit` keeps the legacy combined-response path unchanged.
 - Diagnostic logs now carry a short per-action trace id plus separate timing markers for prose network streaming, prose playback tail waiting, and metadata request/parse completion, so future prose/metadata timing regressions can be triaged from runtime logs.
 - The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset while the visible vertical scroll bar is rendered in a reserved far-right lane at the edge of the app, with the internal text-container width staying consistent with that inset so the正文 no longer clips on the right, and the bar now fades in on scroll activity before fading back out after a short idle period.
 - The project title header now uses a tighter bottom spacing before正文, so the title background feels shorter and the正文 sits closer without changing colors, typography, or other shell styling.
@@ -48,6 +48,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - User文本 stays in the Markdown file, while collaboration state, `continuationSummary`, and conversation history live in the app-side metadata store. Only lightweight recent-document entries remain app-owned for convenience.
 - The正文 editor bridge now preserves live user text when the NSTextView is the active first responder and the visible buffer has diverged from the SwiftUI binding, which keeps selection/focus refreshes from wiping freshly typed text before save.
 - The live-text preservation guard was narrowed again so an empty focused editor no longer overrides the first-open body of an external document; it now only preserves text when there is actual uncommitted user input, which keeps the first-open hydration path from blanking the正文 while still allowing manual typing to save normally.
+- After prose streaming finishes, the正文 editor now pins the insertion point to the end of the freshly streamed text and keeps the viewport anchored there briefly, so completion no longer snaps the view back to the earlier caret position.
+- The current full-project build in this worktree is still blocked by an unrelated `RemoteWritingAIClient.swift` access-control mismatch that predates this prose-end follow fix; the new cursor/scroll behavior itself is localized to `WritingProjectView`.
 - Closing the window via the macOS title-bar `×` now reuses the same dirty-check confirmation flow as Open/New, so unsaved正文 changes prompt before the app closes.
 - `task/TASK_20260403_024.md` completed the visual restyle pass: the app keeps the same structure and interactions, but the shell/theme now uses a clearer Apple-style visual system.
 - The post-submit hang in `UITests/VibeWriteUITests.swift` was not an XCTest idle problem. Direct sampling showed a SwiftUI/AppKit feedback loop in the AppKit-backed editor bridge:
@@ -119,6 +121,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `swift build`
 - `swift test`
 - `swift test --filter WritingAITests/testPromptBuilderSeparatesProseAndMetadataPrompts`
+- `swift test --filter WritingAITests/testRemoteClientMetadataUsesStructuredToolOutput`
 - `swift test --filter WritingAITests/testRemoteClientMetadataRequestParsesStructuredMetadata`
 - `swift test --filter WritingAITests/testRemoteClientUsesAnthropicCompatibleRequestAndStreamsTextDeltas`
 - `swift test --filter WritingAITests/testRemoteClientUsesWiderMaxTokensAndDocumentTailForContinueWriting`
@@ -130,6 +133,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
 - `swift test --filter VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`
 - `swift test --filter SelectableTextEditorTests/testLiveUserTextPreservationRequiresUncommittedText`
+- `swift test --filter VibeWriteAppFlowTests/testContinueWritingStreamsIncrementallyBeforeCompletion`
 - `swift test --filter VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`
 - `swift test --filter VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`
 - `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`
