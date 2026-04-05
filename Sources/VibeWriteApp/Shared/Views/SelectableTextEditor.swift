@@ -104,11 +104,14 @@ struct SelectableTextEditor: NSViewRepresentable {
         return scrollView
     }
 
-    func updateNSView(_ scrollView: NSScrollView, context: Context) {
-        guard let textView = scrollView.documentView as? NSTextView else {
-            return
-        }
+        func updateNSView(_ scrollView: NSScrollView, context: Context) {
+            guard let textView = scrollView.documentView as? NSTextView else {
+                return
+            }
 
+        context.coordinator.logTextEvent(
+            "update nsview start bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) selection=\(context.coordinator.debugRange(textView.selectedRange())) editable=\(textView.isEditable)"
+        )
         context.coordinator.textView = textView
         context.coordinator.setSelectionOverlayPreservationDuringPendingLocalEdit(
             shouldPreserveSelectionOverlayDuringPendingLocalEdit
@@ -121,7 +124,13 @@ struct SelectableTextEditor: NSViewRepresentable {
             selectedTextBackgroundColor: selectedTextBackgroundColor,
             in: textView
         )
-        let didMutateText = context.coordinator.syncText(text, in: textView)
+        let didMutateText: Bool
+        if context.coordinator.shouldPreserveLiveUserText(in: textView, bindingText: text) {
+            context.coordinator.syncLiveUserTextFromView(textView)
+            didMutateText = false
+        } else {
+            didMutateText = context.coordinator.syncText(text, in: textView)
+        }
         context.coordinator.syncAccessibilityValue(in: textView)
         context.coordinator.syncLayout(
             in: textView,
@@ -141,6 +150,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             localEditFlash,
             in: textView,
             scrollView: scrollView
+        )
+        context.coordinator.logTextEvent(
+            "update nsview end bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) didMutateText=\(didMutateText) selection=\(context.coordinator.debugRange(textView.selectedRange()))"
         )
     }
 
@@ -405,6 +417,23 @@ struct SelectableTextEditor: NSViewRepresentable {
             return true
         }
 
+        func shouldPreserveLiveUserText(in textView: NSTextView, bindingText: String) -> Bool {
+            guard textView.isEditable else { return false }
+            guard textView.string != bindingText else { return false }
+            guard textView.window?.firstResponder === textView else { return false }
+            guard !isApplyingProgrammaticChange else { return false }
+
+            return true
+        }
+
+        func syncLiveUserTextFromView(_ textView: NSTextView) {
+            let currentText = textView.string
+            logTextEvent(
+                "live user text preserved viewCount=\(currentText.utf16.count) bindingCount=\(text.utf16.count) selection=\(debugRange(textView.selectedRange()))"
+            )
+            setTextIfNeeded(currentText)
+        }
+
         func syncSelectionOverlayState(from textView: NSTextView) {
             guard !isApplyingProgrammaticChange else { return }
             guard !isPerformingLayoutSync else { return }
@@ -622,7 +651,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             syncSelectionOverlayState(from: textView)
         }
 
-        private func setTextIfNeeded(_ newText: String) {
+        fileprivate func setTextIfNeeded(_ newText: String) {
             guard text != newText else {
                 logTextEvent("binding text unchanged count=\(newText.utf16.count)")
                 return
@@ -768,12 +797,12 @@ struct SelectableTextEditor: NSViewRepresentable {
             VibeWriteLog.launch.info("selection editor \(message, privacy: .public)")
         }
 
-        private func logTextEvent(_ message: String) {
+        fileprivate func logTextEvent(_ message: String) {
             VibeWriteDebugTrace.append("text editor binding \(message)")
             VibeWriteLog.launch.info("text editor binding \(message, privacy: .public)")
         }
 
-        private func debugRange(_ range: NSRange) -> String {
+        fileprivate func debugRange(_ range: NSRange) -> String {
             "loc=\(range.location) len=\(range.length)"
         }
 

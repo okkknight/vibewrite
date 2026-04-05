@@ -38,6 +38,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The app now launches in day mode by default, and the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - External document opens now pass through a short hydration window so the freshly loaded正文 is not immediately overwritten by an empty binding sync on the first render.
 - The latest repo commit before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
+- The正文 editor bridge now preserves live user text when the NSTextView is the active first responder and its content diverges from the SwiftUI binding, so selection/focus refreshes no longer overwrite freshly typed text before save.
 - The duplicate top-level `File` menu was traced to a standalone `CommandMenu("File")` in `VibeWriteCommands`; the current fix routes those actions through standard `CommandGroup` placement so the app keeps one top-level File menu.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
 - The document storage model now keeps正文 and collaboration state separate: the Markdown file stores正文 plus a hidden identity marker, `xattr` carries the primary `docID`, and the app-side metadata store keeps conversation history, a `continuationSummary`, and the latest collaboration context. Save As creates a fresh `docID`, and malformed metadata falls back to正文-only editing instead of blocking open/save.

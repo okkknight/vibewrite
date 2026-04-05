@@ -1,4 +1,7 @@
 ## 2026-04-05
+- The正文 editor bridge now keeps live user text intact when `NSTextView` is the active first responder and its visible buffer has drifted ahead of the SwiftUI binding, so selection/focus refreshes no longer wipe freshly typed text before save.
+
+## 2026-04-05
 - Fixed the duplicate top-level `File` menu on macOS by moving VibeWrite's document actions out of a standalone `CommandMenu("File")` and into standard `CommandGroup` insertion, so the app keeps one File menu instead of creating a second one.
 
 ## 2026-04-05

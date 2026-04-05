@@ -47,6 +47,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The page header subtitle still surfaces `project.summary` when the body is non-empty, so if the text under the title looks off-topic the real bug is upstream in the model output or summary writeback path, not the subtitle component itself.
 - The app now keeps正文 and collaboration history in separate stores: the Markdown file holds正文 plus a hidden marker, `xattr` stores the primary document identity, and the app-side metadata store keeps the latest collaboration state, `continuationSummary`, and recent conversation history.
 - User文本 stays in the Markdown file, while collaboration state, `continuationSummary`, and conversation history live in the app-side metadata store. Only lightweight recent-document entries remain app-owned for convenience.
+- The正文 editor bridge now preserves live user text when the NSTextView is the active first responder and the visible buffer has diverged from the SwiftUI binding, which keeps selection/focus refreshes from wiping freshly typed text before save.
 - `task/TASK_20260403_024.md` completed the visual restyle pass: the app keeps the same structure and interactions, but the shell/theme now uses a clearer Apple-style visual system.
 - The post-submit hang in `UITests/VibeWriteUITests.swift` was not an XCTest idle problem. Direct sampling showed a SwiftUI/AppKit feedback loop in the AppKit-backed editor bridge:
   - `SelectableTextEditor.updateNSView(...)` kept mutating `NSTextView` properties and syncing selection/accessibility state
@@ -128,6 +129,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `VIBEWRITE_UI_TEST_RESET_STORAGE=1` resets the app's own container-local store for UI runs.
 - `--clean-launch` and `VIBEWRITE_FORCE_BLANK_STARTUP=1` still force a blank start for acceptance runs.
 - Keep local Xcode-generated files, `Config/VibeWrite.local.xcconfig`, and user workspace state out of commits; `.gitignore` now covers them, but double-check before staging if the repo status looks noisy.
+- `swift test` currently fails in `WritingAITests.testRemoteClientUsesWiderMaxTokensAndProjectStateForContinueWriting`; treat that as an unrelated prompt-budget regression when validating the正文 bridge fix.
 - Avoid adding UI-test waits that depend on app idle or repeated `exists` / snapshot polling around the editor bridge; that was the area that hid the real hang.
 - If you touch `SelectableTextEditor` or the AI writeback path, rerun the targeted UI test before assuming the post-submit flow is safe.
 - If you touch the edit streaming preview path, check both `startDraft` and `edit` so the stream still reveals from the intended region.
