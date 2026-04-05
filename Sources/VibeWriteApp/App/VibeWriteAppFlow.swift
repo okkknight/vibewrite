@@ -277,13 +277,97 @@ final class VibeWriteAppFlow: ObservableObject {
             }
         }
 
-        let request = WritingAIRequest(
-            action: action,
-            project: project.aiSnapshot,
-            userMessage: requestUserMessage,
-            selectionText: normalizedSelectionText ?? selectionText,
-            selectionRange: selectionRange
-        )
+        if action == .edit {
+            let request = WritingAIRequest(
+                action: action,
+                project: project.aiSnapshot,
+                userMessage: requestUserMessage,
+                selectionText: normalizedSelectionText ?? selectionText,
+                selectionRange: selectionRange
+            )
+
+            do {
+                let beforeSnapshot = project.aiSnapshot
+                var liveProject = project
+                if let requestUserMessage {
+                    let alreadyHasMatchingUserMessage = action == .startDraft && project.conversation.contains { message in
+                        message.role == .user && message.text.trimmingCharacters(in: .whitespacesAndNewlines) == requestUserMessage
+                    }
+
+                    if !alreadyHasMatchingUserMessage {
+                        liveProject.appendUserMessage(requestUserMessage)
+                    }
+
+                    if action == .startDraft {
+                        liveProject.prompt = requestUserMessage
+                    }
+                }
+                liveProject.summary = streamingSummary(for: action)
+                replaceActiveProject(liveProject, persist: false)
+
+                var streamedText = ""
+                let previewRenderer: WritingStreamingPreviewRenderer? = nil
+                var finalResponse: WritingAIResponse?
+                for try await event in aiClient.streamResponse(for: request) {
+                    switch event {
+                    case .textDelta(let delta):
+                        streamedText += delta
+                        if let previewRenderer {
+                            previewRenderer.updateTargetText(
+                                previewDocumentText(
+                                    for: action,
+                                    baseDocumentText: beforeSnapshot.documentText,
+                                    selectionRange: selectionRange,
+                                    streamedText: streamedText
+                                ),
+                                revealFromCharacterCount: action == .continueWriting ? beforeSnapshot.documentText.count : 0
+                            )
+                        }
+
+                    case .completed(let response):
+                        finalResponse = response
+                    }
+                }
+
+                if let previewRenderer {
+                    previewRenderer.markStreamCompleted()
+                    await previewRenderer.waitForCompletion()
+                }
+
+                guard let response = finalResponse else {
+                    throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
+                }
+                let patch = try WritingEditPatch.build(
+                    action: action,
+                    before: beforeSnapshot,
+                    after: response.snapshotByApplyingDocumentText(response.documentText, to: beforeSnapshot),
+                    selectionRange: selectionRange,
+                    userMessage: requestUserMessage
+                )
+                let updatedDocumentText = try patch.apply(
+                    to: beforeSnapshot.documentText,
+                    lock: activeEditLock
+                )
+                liveProject.apply(aiResponse: response, documentText: updatedDocumentText)
+                liveProject.recordRevision(
+                    patch: patch,
+                    before: beforeSnapshot,
+                    after: liveProject.aiSnapshot
+                )
+                replaceActiveProject(liveProject, persist: false)
+                if let currentDocumentURL {
+                    _ = saveCurrentDocument(to: currentDocumentURL)
+                }
+            } catch {
+                VibeWriteLog.ai.error(
+                    "Flow AI request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+                replaceActiveProject(project, persist: false)
+                aiErrorMessage = error.localizedDescription
+                throw error
+            }
+            return
+        }
 
         do {
             let beforeSnapshot = project.aiSnapshot
@@ -302,39 +386,49 @@ final class VibeWriteAppFlow: ObservableObject {
                 }
             }
             liveProject.summary = streamingSummary(for: action)
+            liveProject.nextFocus = ""
+            liveProject.suggestionChips = []
             replaceActiveProject(liveProject, persist: false)
 
+            let proseRequest = WritingAIRequest(
+                action: action,
+                project: liveProject.aiSnapshot,
+                userMessage: requestUserMessage,
+                selectionText: normalizedSelectionText ?? selectionText,
+                selectionRange: selectionRange,
+                kind: .prose
+            )
+
             var streamedText = ""
-            let previewRenderer: WritingStreamingPreviewRenderer? = action == .edit ? nil : WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
+            let previewRenderer = WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
                 liveProject.documentText = renderedText
                 self.replaceActiveProject(liveProject, persist: false)
             }
             var finalResponse: WritingAIResponse?
-            for try await event in aiClient.streamResponse(for: request) {
+            VibeWriteLog.ai.info(
+                "Flow prose request start action=\(action.rawValue, privacy: .public)"
+            )
+            for try await event in aiClient.streamResponse(for: proseRequest) {
                 switch event {
                 case .textDelta(let delta):
                     streamedText += delta
-                    if let previewRenderer {
-                        previewRenderer.updateTargetText(
-                            previewDocumentText(
-                                for: action,
-                                baseDocumentText: beforeSnapshot.documentText,
-                                selectionRange: selectionRange,
-                                streamedText: streamedText
-                            ),
-                            revealFromCharacterCount: action == .continueWriting ? beforeSnapshot.documentText.count : 0
-                        )
-                    }
+                    previewRenderer.updateTargetText(
+                        previewDocumentText(
+                            for: action,
+                            baseDocumentText: beforeSnapshot.documentText,
+                            selectionRange: selectionRange,
+                            streamedText: streamedText
+                        ),
+                        revealFromCharacterCount: action == .continueWriting ? beforeSnapshot.documentText.count : 0
+                    )
 
                 case .completed(let response):
                     finalResponse = response
                 }
             }
 
-            if let previewRenderer {
-                previewRenderer.markStreamCompleted()
-                await previewRenderer.waitForCompletion()
-            }
+            previewRenderer.markStreamCompleted()
+            await previewRenderer.waitForCompletion()
 
             guard let response = finalResponse else {
                 throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
@@ -350,7 +444,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 to: beforeSnapshot.documentText,
                 lock: activeEditLock
             )
-            liveProject.apply(aiResponse: response, documentText: updatedDocumentText)
+            liveProject.applyWritingProseResponse(response, documentText: updatedDocumentText)
             liveProject.recordRevision(
                 patch: patch,
                 before: beforeSnapshot,
@@ -359,6 +453,37 @@ final class VibeWriteAppFlow: ObservableObject {
             replaceActiveProject(liveProject, persist: false)
             if let currentDocumentURL {
                 _ = saveCurrentDocument(to: currentDocumentURL)
+            }
+            VibeWriteLog.ai.info(
+                "Flow prose response complete action=\(action.rawValue, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
+            )
+
+            let metadataRequest = WritingAIRequest(
+                action: action,
+                project: liveProject.aiSnapshot,
+                userMessage: requestUserMessage,
+                selectionText: normalizedSelectionText ?? selectionText,
+                selectionRange: selectionRange,
+                kind: .metadata
+            )
+            do {
+                VibeWriteLog.ai.info(
+                    "Flow metadata request start action=\(action.rawValue, privacy: .public)"
+                )
+                let metadataResponse = try await aiClient.generateResponse(for: metadataRequest)
+                let metadata = metadataResponse.completionMetadata
+                liveProject.applyWritingMetadata(metadata)
+                replaceActiveProject(liveProject, persist: false)
+                if let currentDocumentURL {
+                    _ = saveCurrentDocument(to: currentDocumentURL)
+                }
+                VibeWriteLog.ai.info(
+                    "Flow metadata response complete action=\(action.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+                )
+            } catch {
+                VibeWriteLog.ai.error(
+                    "Flow metadata request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
             }
         } catch {
             VibeWriteLog.ai.error(

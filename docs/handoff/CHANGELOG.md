@@ -1,3 +1,10 @@
+# Changelog
+
+## 2026-04-06
+- `startDraft` and `continueWriting` now run as a two-phase AI flow: prose streams first, then a separate metadata request fills `summary`, `nextFocus`, and `suggestionChips` after the prose phase completes. Metadata failures stay silent and leave the assistant suggestion area empty instead of fabricating fallback chips.
+- `.edit` keeps the legacy combined prose-plus-metadata request path unchanged.
+- Verification for this change passed with `swift test`, plus targeted filters for the new prompt, remote metadata, prose streaming, metadata failure, and flow-request split coverage.
+
 ## 2026-04-06
 - `continueWriting` now advances only a little, avoids a fully closed ending, and relies on the persisted continuation summary plus the document tail instead of the fuller project-state block, so the continuation path stays softer and leaves room for the next turn.
 
@@ -64,7 +71,10 @@
 - The selection-preset loading state is now treated as a real busy/disabled state in the chips, and the targeted UI test waits for the preset button to disable rather than probing a fragile accessibility spinner node.
 - Verification for this refinement passed with `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
 
-# Changelog
+## 2026-04-06
+- `startDraft` and `continueWriting` now run as a two-phase AI flow: prose streams first, then a separate metadata request fills `summary`, `nextFocus`, and `suggestionChips` after the prose phase completes. Metadata failures stay silent and leave the assistant suggestion area empty instead of fabricating fallback chips.
+- `.edit` keeps the legacy combined prose-plus-metadata request path unchanged.
+- Verification for this change passed with `swift test`, plus targeted filters for the new prompt, remote metadata, prose streaming, metadata failure, and flow-request split coverage.
 
 ## 2026-04-05
 - Opening an external document now enters a short hydration window before the project body/title bindings are allowed to write back, which keeps the first open from being blanked out by an empty editor sync while still leaving real user edits untouched.

@@ -16,6 +16,12 @@ struct WritingAIRequest: Codable, Hashable {
     var userMessage: String?
     var selectionText: String?
     var selectionRange: WritingTextSelectionRange? = nil
+    var kind: WritingAIRequestKind = .prose
+}
+
+enum WritingAIRequestKind: String, Codable, Hashable {
+    case prose
+    case metadata
 }
 
 struct WritingProjectSnapshot: Codable, Hashable {
@@ -45,6 +51,14 @@ struct WritingAIResponse: Codable, Hashable {
     var nextFocus: String
     var suggestionChips: [String]
     var mode: WritingProjectMode
+
+    var completionMetadata: WritingAICompletionMetadata {
+        WritingAICompletionMetadata(
+            summary: summary,
+            nextFocus: nextFocus,
+            suggestionChips: suggestionChips
+        )
+    }
 }
 
 struct WritingAICompletionMetadata: Codable, Hashable {
@@ -208,6 +222,30 @@ extension WritingProject {
                 timestamp: "AI · 刚刚"
             )
         )
+        refreshUpdatedAt()
+    }
+
+    mutating func applyWritingProseResponse(_ response: WritingAIResponse, documentText: String) {
+        if mode != response.mode {
+            mode = response.mode
+        }
+
+        self.documentText = documentText
+        conversation.append(
+            ConversationMessage(
+                role: .assistant,
+                text: response.assistantMessage,
+                timestamp: "AI · 刚刚"
+            )
+        )
+        refreshUpdatedAt()
+    }
+
+    mutating func applyWritingMetadata(_ metadata: WritingAICompletionMetadata) {
+        summary = metadata.summary
+        continuationSummary = metadata.summary
+        nextFocus = metadata.nextFocus
+        suggestionChips = metadata.suggestionChips
         refreshUpdatedAt()
     }
 

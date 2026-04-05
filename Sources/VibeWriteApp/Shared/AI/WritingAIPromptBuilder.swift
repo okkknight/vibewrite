@@ -2,70 +2,142 @@ import Foundation
 
 struct WritingAIPromptBuilder {
     func messages(for request: WritingAIRequest, provider: String, model: String) -> [WritingAIChatMessage] {
-        let sanitizedRequest = sanitizedRequest(for: request)
-        let systemPrompt = systemPrompt(provider: provider, model: model)
-        let userPrompt = userPrompt(for: sanitizedRequest)
+        switch request.kind {
+        case .prose:
+            let sanitizedRequest = sanitizedRequest(for: request)
+            return [
+                WritingAIChatMessage(
+                    role: .system,
+                    content: proseSystemPrompt(provider: provider, model: model, action: sanitizedRequest.action)
+                ),
+                WritingAIChatMessage(
+                    role: .user,
+                    content: proseUserPrompt(for: sanitizedRequest)
+                )
+            ]
 
-        return [
-            WritingAIChatMessage(
-                role: .system,
-                content: systemPrompt
-            ),
-            WritingAIChatMessage(
-                role: .user,
-                content: userPrompt
-            )
-        ]
+        case .metadata:
+            return [
+                WritingAIChatMessage(
+                    role: .system,
+                    content: metadataSystemPrompt(provider: provider, model: model, action: request.action)
+                ),
+                WritingAIChatMessage(
+                    role: .user,
+                    content: metadataUserPrompt(for: request)
+                )
+            ]
+        }
     }
 
-    private func systemPrompt(provider: String, model: String) -> String {
-        """
-        You are VibeWrite, a calm macOS writing collaborator.
-        Output the writing text first, then append exactly one metadata block for the app.
-        Do not output commentary outside the writing text and metadata block.
-        A response is incomplete until the metadata block is present.
+    private func proseSystemPrompt(provider: String, model: String, action: WritingAIAction) -> String {
+        switch action {
+        case .startDraft:
+            return """
+            You are VibeWrite, a calm macOS writing collaborator.
+            Output only prose text for the requested action.
+            Do not output metadata, JSON, markdown fences, or commentary.
+            Keep the output short enough to stream quickly.
+            - Write only the opening prose for the first draft.
+            - Keep the opening brief and concrete so it can stand on its own.
+            - Keep the writing voice calm, precise, and native to a macOS writing app.
+            - Preserve the current article's structure unless the action explicitly changes it.
+            - When the action is "startDraft", focus on the first usable opening rather than a full outline.
+            Provider: \(provider)
+            Model: \(model)
+            """
 
-        - When the action is "startDraft", return exactly two parts in order: opening prose, then the metadata block.
-        - Do not stop after the opening prose alone.
-        - Keep the opening brief so there is room for the metadata block.
-        - Even a very short opening still needs the metadata block.
-        - When the action is "continueWriting", continue with the next short paragraph or scene.
-        - Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.
-        - Leave a small amount of forward momentum for the next step.
-        - When the action is "edit", return only the replacement text for the selected segment.
-        - Keep the output short enough to stream quickly.
-        - Do not stop after writing text alone.
-        - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
-        - The metadata JSON must contain: summary, nextFocus, suggestionChips.
+        case .continueWriting:
+            return """
+            You are VibeWrite, a calm macOS writing collaborator.
+            Output only prose text for the requested action.
+            Do not output metadata, JSON, markdown fences, or commentary.
+            Keep the output short enough to stream quickly.
+            - Continue the current正文 with the next short paragraph or scene.
+            - Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.
+            - Leave a small amount of forward momentum for the next step.
+            - Keep the writing voice calm, precise, and native to a macOS writing app.
+            - Preserve the current article's structure unless the action explicitly changes it.
+            - When the action is "continueWriting", continue the existing正文 instead of restarting the article.
+            Provider: \(provider)
+            Model: \(model)
+            """
+
+        case .edit:
+            return """
+            You are VibeWrite, a calm macOS writing collaborator.
+            Output the writing text first, then append exactly one metadata block for the app.
+            Do not output commentary outside the writing text and metadata block.
+            A response is incomplete until the metadata block is present.
+            - When the action is "edit", return only the replacement text for the selected segment.
+            - Keep the output short enough to stream quickly.
+            - Do not stop after writing text alone.
+            - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
+            - The metadata JSON must contain: summary, nextFocus, suggestionChips.
+            - Keep the metadata specific to the current正文 and actionable for the next step.
+            - Match the metadata language to the language of the current正文 and user request.
+            - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
+            - The metadata block is not part of the正文 and must not be mixed into the prose.
+            - Every response must end with exactly one metadata block.
+            - When the action is "edit", rewrite only the selected passage or local region whenever practical.
+            - Keep the prose concise enough for streaming.
+            - The metadata JSON should stay concise and concrete, not templated.
+
+            Rules:
+            - Keep the writing voice calm, precise, and native to a macOS writing app.
+            - Preserve the current article's structure unless the action explicitly changes it.
+            - When the action is "edit", rewrite only the selected passage or local region whenever practical.
+
+            Provider: \(provider)
+            Model: \(model)
+            """
+        }
+    }
+
+    private func metadataSystemPrompt(provider: String, model: String, action: WritingAIAction) -> String {
+        let actionInstructions: String
+        switch action {
+        case .startDraft:
+            actionInstructions = """
+            - Describe the current opening state.
+            - Suggest the next concrete step after the opening exists.
+            - Return exactly 3 concise suggestion chips.
+            """
+        case .continueWriting:
+            actionInstructions = """
+            - Summarize the completed正文 after the continuation.
+            - Suggest the next concrete step after the continuation.
+            - Return exactly 3 concise suggestion chips.
+            """
+        case .edit:
+            actionInstructions = """
+            - Summarize the completed change.
+            - Suggest the next concrete step after the edit.
+            - Return exactly 3 concise suggestion chips.
+            """
+        }
+
+        return """
+        You are VibeWrite metadata-only response builder.
+        Return only a single JSON object.
+        Do not output prose, markdown fences, or commentary.
+        Do not include any keys other than summary, nextFocus, and suggestionChips.
+        The JSON is incomplete unless all three keys are present.
+
+        \(actionInstructions)
+
         - Keep the metadata specific to the current正文 and actionable for the next step.
         - Match the metadata language to the language of the current正文 and user request.
         - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
-        - The metadata block is not part of the正文 and must not be mixed into the prose.
-        - Every response must end with exactly one metadata block.
-        - When the action is "startDraft", always return a complete metadata block even if the opening is short.
-        - When the action is "startDraft", make sure suggestionChips describe concrete next steps after the first draft exists, so the app can show useful follow-up suggestions immediately after the opening is generated.
-        - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
-        - For "startDraft", keep summary concise and state the opening's current condition, keep nextFocus concrete, and keep suggestionChips directly actionable.
-        - When the action is "continueWriting", suggestionChips must contain exactly 3 items.
-        - When the action is "continueWriting", prefer 3 concise chips that follow the current正文 naturally, are concrete, and help the app suggest what to do next.
-        - When the action is "continueWriting", suggestionChips must not be generic continuation prompts.
-        - When the action is "continueWriting", treat the document summary as global context and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
-
-        Rules:
-        - Keep the writing voice calm, precise, and native to a macOS writing app.
-        - Preserve the current article's structure unless the action explicitly changes it.
-        - When the action is "startDraft", focus on the first usable opening rather than a full outline.
-        - When the action is "continueWriting", continue the existing正文 instead of restarting the article.
-        - When the action is "edit", rewrite only the selected passage or local region whenever practical.
-        - Keep the prose concise enough for streaming.
-        - The metadata JSON should stay concise and concrete, not templated.
+        - suggestionChips must be concise, concrete, and non-generic.
+        - The JSON object must be valid and standalone.
 
         Provider: \(provider)
         Model: \(model)
         """
     }
 
-    private func userPrompt(for request: WritingAIRequest) -> String {
+    private func proseUserPrompt(for request: WritingAIRequest) -> String {
         let prompt = request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
         let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -93,34 +165,62 @@ struct WritingAIPromptBuilder {
             lines.append("Selection: \(selection)")
         }
 
-        if request.action == .startDraft {
-            lines.append("For startDraft, the response is incomplete without the metadata block.")
-            lines.append("Return exactly two parts in order: the opening prose, then the metadata block.")
-            lines.append("Do not stop after the opening prose alone.")
-            lines.append("Keep the opening brief so there is room for the metadata block.")
-            lines.append("Even a very short opening still needs the metadata block.")
-            lines.append("For startDraft, the metadata block is required and must include summary, nextFocus, and exactly 3 concise suggestion chips.")
-            lines.append("The summary should briefly describe the current opening state, nextFocus should name the next concrete step, and suggestionChips should be the most useful immediate follow-up actions.")
-            lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
-            lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
-        } else if request.action == .continueWriting {
+        if request.action == .continueWriting {
             lines.append("Use the document summary as global context and the document tail as the continuation anchor.")
             lines.append("Do not restart from the beginning of the article.")
             lines.append("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.")
             lines.append("Leave a small amount of forward momentum for the next step.")
             lines.append("Keep the continuation brief so the next move still feels natural.")
-            lines.append("For continueWriting, suggestionChips must contain exactly 3 concise items.")
-            lines.append("Those chips should be concrete next steps that naturally follow the current正文 and should not be generic continuation prompts.")
+        } else if request.action == .edit {
+            lines.append("Return only the replacement text for the selected segment.")
+            lines.append("Rewrite only the selected passage or local region whenever practical.")
+            lines.append("After the prose, append a blank line, then [[VIBEWRITE_METADATA]], then a single JSON object with summary, nextFocus, and suggestionChips.")
+            lines.append("Do not mix the metadata into the prose.")
+            lines.append("The metadata must be concise, concrete, and in the same language as the current正文.")
         }
 
-        lines.append("Required output shape:")
-        lines.append("<prose>")
-        lines.append("")
-        lines.append("[[VIBEWRITE_METADATA]]")
-        lines.append("exactly one JSON object with summary, nextFocus, and suggestionChips")
+        return lines.joined(separator: "\n")
+    }
+
+    private func metadataUserPrompt(for request: WritingAIRequest) -> String {
+        let prompt = request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
+        let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
+
+        var lines: [String] = []
+        lines.append("Action: \(request.action.rawValue) metadata")
+        lines.append("Project title: \(request.project.title)")
+
+        switch request.action {
+        case .startDraft:
+            lines.append("Completed prose:")
+            lines.append(documentExcerpt(for: request.project.documentText))
+
+        case .continueWriting:
+            lines.append("Completed prose:")
+            lines.append(documentTail(for: request.project.documentText))
+            lines.append("Document summary:")
+            lines.append(nonEmptyText(request.project.continuationSummary, fallback: "(empty)"))
+
+        case .edit:
+            lines.append("Completed prose:")
+            lines.append(documentExcerpt(for: request.project.documentText))
+        }
+
+        if let prompt, !prompt.isEmpty {
+            lines.append("User message: \(prompt)")
+        }
+
+        if let selection, !selection.isEmpty {
+            lines.append("Selection: \(selection)")
+        }
+
+        lines.append("Return exactly one JSON object with summary, nextFocus, and suggestionChips.")
         lines.append("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}")
-        lines.append("Write the metadata in the same language as the current正文 and user request; for Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
-        lines.append("Do not wrap the metadata JSON in markdown fences.")
+        lines.append("Do not include prose, markdown fences, or commentary.")
+        lines.append("For Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
+        if request.action != .edit {
+            lines.append("Return exactly 3 concise suggestion chips.")
+        }
 
         return lines.joined(separator: "\n")
     }
@@ -165,6 +265,19 @@ struct WritingAIPromptBuilder {
         return trimmed.isEmpty ? fallback : trimmed
     }
 
+    private func documentExcerpt(for text: String, maximumCharacterCount: Int = 900) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return "(empty)"
+        }
+
+        if trimmed.count <= maximumCharacterCount {
+            return trimmed
+        }
+
+        return String(trimmed.prefix(maximumCharacterCount))
+    }
+
     private func documentTail(for text: String, maximumCharacterCount: Int = 900) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
@@ -197,17 +310,5 @@ struct WritingAIPromptBuilder {
         }
 
         return String(joined.suffix(maximumCharacterCount))
-    }
-
-    private func joinedOrFallback(_ items: [String], fallback: String) -> String {
-        let cleaned = items
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        guard !cleaned.isEmpty else {
-            return fallback
-        }
-
-        return cleaned.joined(separator: " · ")
     }
 }

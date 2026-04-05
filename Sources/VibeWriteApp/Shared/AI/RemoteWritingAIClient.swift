@@ -30,61 +30,91 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             throw WritingAIClientError.missingConfiguration
         }
 
-        let promptMessages = promptBuilder.messages(
-            for: request,
-            provider: configuration.provider,
-            model: configuration.model
-        )
-
-        let systemPrompt = promptMessages.first(where: { $0.role == .system })?.content ?? ""
-        let userMessages = promptMessages
-            .filter { $0.role != .system }
-            .map { message in
-                AnthropicMessage(
-                    role: message.role.anthropicRole,
-                    content: [.text(message.content)]
+        switch request.kind {
+        case .prose:
+            if request.action == .edit {
+                try await streamLegacyEditRequest(
+                    for: request,
+                    apiKey: apiKey,
+                    continuation: continuation
                 )
+                return
             }
 
-        let body = AnthropicCompatibleRequest(
-            model: configuration.model,
-            system: systemPrompt,
-            messages: userMessages,
-            temperature: 0.2,
-            maxTokens: maxTokens(for: request.action),
-            stream: true
+            VibeWriteLog.ai.info(
+                "Remote prose request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public)"
+            )
+
+            let finalBodyText = try await collectProseText(
+                for: request,
+                apiKey: apiKey
+            ) { chunk in
+                continuation.yield(.textDelta(chunk))
+            }
+
+            let finalDocumentText = WritingProjectResponseBuilder.finalDocumentText(
+                for: request,
+                streamedText: finalBodyText
+            )
+            let finalResponse = WritingProjectResponseBuilder.response(
+                for: request,
+                documentText: finalDocumentText,
+                metadata: nil
+            )
+            VibeWriteLog.ai.info(
+                "Remote prose request finished action=\(request.action.rawValue, privacy: .public) bodyCount=\(finalBodyText.count, privacy: .public)"
+            )
+            continuation.yield(.completed(finalResponse))
+            continuation.finish()
+
+        case .metadata:
+            VibeWriteLog.ai.info(
+                "Remote metadata request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public)"
+            )
+
+            let metadataText = try await collectMetadataText(
+                for: request,
+                apiKey: apiKey
+            )
+            let metadata: WritingAICompletionMetadata
+            do {
+                metadata = try WritingAICompletionMetadataDecoder.decode(from: metadataText)
+            } catch {
+                VibeWriteLog.ai.error(
+                    "Remote metadata parse failed action=\(request.action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+                throw error
+            }
+
+            VibeWriteLog.ai.info(
+                "Remote metadata request finished action=\(request.action.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+            )
+            let finalResponse = WritingProjectResponseBuilder.response(
+                for: request,
+                documentText: request.project.documentText,
+                metadata: metadata
+            )
+            continuation.yield(.completed(finalResponse))
+            continuation.finish()
+        }
+    }
+
+    private func streamLegacyEditRequest(
+        for request: WritingAIRequest,
+        apiKey: String,
+        continuation: AsyncThrowingStream<WritingAIStreamEvent, Error>.Continuation
+    ) async throws {
+        VibeWriteLog.ai.info(
+            "Remote edit request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public)"
         )
 
-        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
-        urlRequest.httpMethod = "POST"
-        urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
-        urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
-        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
-        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        urlRequest.httpBody = try JSONEncoder.vibeWriteAIRequestEncoder.encode(body)
-
-        let (bytes, response) = try await session.bytes(for: urlRequest)
-        guard let httpResponse = response as? HTTPURLResponse else {
-            throw WritingAIClientError.requestFailed("AI request did not return an HTTP response.")
-        }
-
-        guard (200...299).contains(httpResponse.statusCode) else {
-            let data = try await collectData(from: bytes)
-            if let decodedError = try? JSONDecoder.vibeWriteAIErrorDecoder.decode(AnthropicErrorEnvelope.self, from: data) {
-                throw mapError(statusCode: httpResponse.statusCode, message: decodedError.errorMessage)
-            }
-            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
-                throw mappedError
-            }
-            throw WritingAIClientError.requestFailed("AI request failed with HTTP \(httpResponse.statusCode).")
-        }
-
+        let bytes = try await openStream(for: request, apiKey: apiKey, stream: true)
         var pendingDataLines: [String] = []
         var streamedCompletion = WritingAICompletionStreamBuffer()
 
         for try await line in bytes.lines {
             if line.isEmpty {
-                try flushStreamEvent(
+                try flushLegacyStreamEvent(
                     dataLines: &pendingDataLines,
                     completionBuffer: &streamedCompletion,
                     continuation: continuation
@@ -103,7 +133,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
             if line.hasPrefix("event:") {
                 if !pendingDataLines.isEmpty {
-                    try flushStreamEvent(
+                    try flushLegacyStreamEvent(
                         dataLines: &pendingDataLines,
                         completionBuffer: &streamedCompletion,
                         continuation: continuation
@@ -113,7 +143,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             }
         }
 
-        try flushStreamEvent(
+        try flushLegacyStreamEvent(
             dataLines: &pendingDataLines,
             completionBuffer: &streamedCompletion,
             continuation: continuation
@@ -125,24 +155,162 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             throw WritingAIClientError.invalidResponse("AI stream did not produce any正文。")
         }
 
-        let finalDocumentText = MockWritingEngine.finalDocumentText(for: request, streamedText: finalBodyText)
+        let finalDocumentText = WritingProjectResponseBuilder.finalDocumentText(
+            for: request,
+            streamedText: finalBodyText
+        )
 
         let completionMetadata: WritingAICompletionMetadata?
         do {
             completionMetadata = try WritingAICompletionMetadataDecoder.decode(from: streamedCompletion.metadataText)
+            VibeWriteLog.ai.info(
+                "Remote edit metadata parsed action=\(request.action.rawValue, privacy: .public) summaryCount=\(completionMetadata?.summary.count ?? 0, privacy: .public) nextFocusCount=\(completionMetadata?.nextFocus.count ?? 0, privacy: .public) suggestionCount=\(completionMetadata?.suggestionChips.count ?? 0, privacy: .public)"
+            )
         } catch {
+            VibeWriteLog.ai.error(
+                "Remote edit metadata parse failed action=\(request.action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
             completionMetadata = nil
         }
+
         let finalResponse = WritingProjectResponseBuilder.response(
             for: request,
             documentText: finalDocumentText,
             metadata: completionMetadata
         )
+        VibeWriteLog.ai.info(
+            "Remote edit request finished action=\(request.action.rawValue, privacy: .public) bodyCount=\(finalBodyText.count, privacy: .public)"
+        )
         continuation.yield(.completed(finalResponse))
         continuation.finish()
     }
 
+    private func collectProseText(
+        for request: WritingAIRequest,
+        apiKey: String,
+        yieldChunk: @escaping (String) -> Void
+    ) async throws -> String {
+        let bytes = try await openStream(for: request, apiKey: apiKey, stream: true)
+        var pendingDataLines: [String] = []
+        var collectedText = ""
+
+        for try await line in bytes.lines {
+            if line.isEmpty {
+                try flushStreamEvent(
+                    dataLines: &pendingDataLines,
+                    collectedText: &collectedText,
+                    yieldChunk: yieldChunk
+                )
+                continue
+            }
+
+            if line.hasPrefix("data:") {
+                var dataLine = String(line.dropFirst("data:".count))
+                if dataLine.first == " " {
+                    dataLine.removeFirst()
+                }
+                pendingDataLines.append(dataLine)
+                continue
+            }
+
+            if line.hasPrefix("event:") {
+                if !pendingDataLines.isEmpty {
+                    try flushStreamEvent(
+                        dataLines: &pendingDataLines,
+                        collectedText: &collectedText,
+                        yieldChunk: yieldChunk
+                    )
+                }
+                continue
+            }
+        }
+
+        try flushStreamEvent(
+            dataLines: &pendingDataLines,
+            collectedText: &collectedText,
+            yieldChunk: yieldChunk
+        )
+
+        let trimmed = collectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw WritingAIClientError.invalidResponse("AI stream did not produce any正文。")
+        }
+
+        return trimmed
+    }
+
+    private func collectMetadataText(
+        for request: WritingAIRequest,
+        apiKey: String
+    ) async throws -> String {
+        let bytes = try await openStream(for: request, apiKey: apiKey, stream: true)
+        var pendingDataLines: [String] = []
+        var collectedText = ""
+
+        for try await line in bytes.lines {
+            if line.isEmpty {
+                try flushStreamEvent(
+                    dataLines: &pendingDataLines,
+                    collectedText: &collectedText,
+                    yieldChunk: { _ in }
+                )
+                continue
+            }
+
+            if line.hasPrefix("data:") {
+                var dataLine = String(line.dropFirst("data:".count))
+                if dataLine.first == " " {
+                    dataLine.removeFirst()
+                }
+                pendingDataLines.append(dataLine)
+                continue
+            }
+
+            if line.hasPrefix("event:") {
+                if !pendingDataLines.isEmpty {
+                    try flushStreamEvent(
+                        dataLines: &pendingDataLines,
+                        collectedText: &collectedText,
+                        yieldChunk: { _ in }
+                    )
+                }
+                continue
+            }
+        }
+
+        try flushStreamEvent(
+            dataLines: &pendingDataLines,
+            collectedText: &collectedText,
+            yieldChunk: { _ in }
+        )
+
+        let trimmed = collectedText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            throw WritingAIClientError.invalidResponse("AI metadata request did not produce any content.")
+        }
+
+        return trimmed
+    }
+
     private func flushStreamEvent(
+        dataLines: inout [String],
+        collectedText: inout String,
+        yieldChunk: (String) -> Void
+    ) throws {
+        let payload = dataLines.joined(separator: "\n").trimmingCharacters(in: .whitespacesAndNewlines)
+        dataLines.removeAll(keepingCapacity: true)
+
+        guard !payload.isEmpty else {
+            return
+        }
+
+        if let streamedChunk = try decodeTextChunk(from: payload) {
+            collectedText += streamedChunk
+            yieldChunk(streamedChunk)
+        }
+    }
+
+    private func flushLegacyStreamEvent(
         dataLines: inout [String],
         completionBuffer: inout WritingAICompletionStreamBuffer,
         continuation: AsyncThrowingStream<WritingAIStreamEvent, Error>.Continuation
@@ -178,6 +346,63 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         return nil
     }
 
+    private func openStream(
+        for request: WritingAIRequest,
+        apiKey: String,
+        stream: Bool
+    ) async throws -> URLSession.AsyncBytes {
+        let promptMessages = promptBuilder.messages(
+            for: request,
+            provider: configuration.provider,
+            model: configuration.model
+        )
+
+        let systemPrompt = promptMessages.first(where: { $0.role == .system })?.content ?? ""
+        let userMessages = promptMessages
+            .filter { $0.role != .system }
+            .map { message in
+                AnthropicMessage(
+                    role: message.role.anthropicRole,
+                    content: [.text(message.content)]
+                )
+            }
+
+        let body = AnthropicCompatibleRequest(
+            model: configuration.model,
+            system: systemPrompt,
+            messages: userMessages,
+            temperature: request.kind == .metadata ? 0.1 : 0.2,
+            maxTokens: maxTokens(for: request),
+            stream: stream
+        )
+
+        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
+        urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
+        urlRequest.setValue("text/event-stream", forHTTPHeaderField: "Accept")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.httpBody = try JSONEncoder.vibeWriteAIRequestEncoder.encode(body)
+
+        let (bytes, response) = try await session.bytes(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WritingAIClientError.requestFailed("AI request did not return an HTTP response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let data = try await collectData(from: bytes)
+            if let decodedError = try? JSONDecoder.vibeWriteAIErrorDecoder.decode(AnthropicErrorEnvelope.self, from: data) {
+                throw mapError(statusCode: httpResponse.statusCode, message: decodedError.errorMessage)
+            }
+            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
+                throw mappedError
+            }
+            throw WritingAIClientError.requestFailed("AI request failed with HTTP \(httpResponse.statusCode).")
+        }
+
+        return bytes
+    }
+
     private func collectData(from bytes: URLSession.AsyncBytes) async throws -> Data {
         var data = Data()
         for try await byte in bytes {
@@ -209,14 +434,19 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         return nil
     }
 
-    private func maxTokens(for action: WritingAIAction) -> Int {
-        switch action {
-        case .startDraft:
-            return 2048
-        case .continueWriting:
-            return 1536
-        case .edit:
-            return 1024
+    private func maxTokens(for request: WritingAIRequest) -> Int {
+        switch request.kind {
+        case .prose:
+            switch request.action {
+            case .startDraft:
+                return 2048
+            case .continueWriting:
+                return 1536
+            case .edit:
+                return 1024
+            }
+        case .metadata:
+            return 512
         }
     }
 }

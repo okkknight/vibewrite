@@ -219,6 +219,31 @@ enum MockWritingEngine {
         }
     }
 
+    static func completionMetadata(for request: WritingAIRequest) -> WritingAICompletionMetadata {
+        switch request.action {
+        case .startDraft:
+            return WritingAICompletionMetadata(
+                summary: "已生成开头",
+                nextFocus: "继续推进第一段",
+                suggestionChips: ["继续写", "编辑这段", "补一段"]
+            )
+
+        case .continueWriting:
+            return WritingAICompletionMetadata(
+                summary: "已续写一段",
+                nextFocus: "继续顺着当前主线往下写",
+                suggestionChips: ["继续写", "编辑这段", "补一段"]
+            )
+
+        case .edit:
+            return WritingAICompletionMetadata(
+                summary: "已完成局部修改",
+                nextFocus: "检查选中文段是否还需要继续调整",
+                suggestionChips: ["继续写", "编辑这段", "补一段"]
+            )
+        }
+    }
+
     private static func revisedSegment(
         _ segment: String,
         action: MockWritingAction,

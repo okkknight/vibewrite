@@ -11,6 +11,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
+- `startDraft` / `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request after prose completion. The prose path still streams normally; metadata is applied only after the prose phase succeeds; `.edit` keeps the legacy combined-response path unchanged.
 - The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset while the visible vertical scroll bar is rendered in a reserved far-right lane at the edge of the app, with the internal text-container width staying consistent with that inset so the正文 no longer clips on the right, and the bar now fades in on scroll activity before fading back out after a short idle period.
 - The project title header now uses a tighter bottom spacing before正文, so the title background feels shorter and the正文 sits closer without changing colors, typography, or other shell styling.
 - The capsule system now distinguishes fixed chips from clickable chips in both day and night themes, and the header title/subtitle block is vertically centered more evenly inside the shortened top area.
@@ -28,15 +29,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps revealing the remaining text one character at a time instead of flushing the tail in one jump.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
 - Remote AI completion metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay aligned with the document language instead of drifting into English.
-- `startDraft` now has a harder metadata requirement in the prompt: the opening is still short, but the model is explicitly told to always return `summary`, `nextFocus`, and exactly 3 concise follow-up chips.
-- `startDraft` now also frames the response as a two-part protocol: opening prose first, then the required metadata block, so the model is less likely to stop after the opening alone.
-- `startDraft` now also uses a wider request budget than the default path, so the opening and trailing metadata have more room than before.
-- `continueWriting` now reads a persisted `continuationSummary`, a trimmed document tail, and a compact project-state block instead of the full正文, so long documents stay within a smaller continuation context while still giving the model its recent working memory.
-- `continueWriting` now has an explicit prompt-level requirement for complete metadata and 3 concise follow-up chips, so suggestion output is encouraged more strongly on the continuation path without adding any fallback behavior.
-- `continueWriting` now uses a slightly wider request budget than the other actions, so the trailing metadata block has more room to survive long continuation generations.
-- `continueWriting`'s prompt was tightened again to treat the trailing metadata block as a completion condition, remove the "writing text only" conflict, and spell out the exact `[[VIBEWRITE_METADATA]]` + JSON output skeleton so `suggestionChips` are more likely to survive.
-- `continueWriting`'s latest prompt micro-tune removed a bit of duplicated wording and replaced the abstract `valid JSON` phrasing with a more structural `exactly one JSON object` description while keeping the same output protocol.
-- `continueWriting` now omits the project-state block entirely and relies only on the continuation summary and document tail as context, to test whether less state pressure produces more stable metadata output.
+- `startDraft` prose is now metadata-free; the metadata prompt is a separate request that runs after the prose phase completes.
+- `continueWriting` prose is now metadata-free; the metadata prompt is a separate request that runs after the prose phase completes, while the prose prompt still uses the persisted `continuationSummary` and document tail as context.
 - `continueWriting` now also tells the model to advance only a little and avoid a full ending, so the passage keeps some forward momentum for the next step instead of closing itself too hard.
 - Continue-writing playback now reveals from the end of the current正文 rather than from character 0, so the streamed preview stays anchored to the latest paragraph instead of replaying the whole document from the top.
 - Local edit requests now carry a stable `selectionRange`, and the patch/revision/mock/preview layers resolve edits from that exact range instead of re-matching by string content. That keeps repeated local edits anchored to the intended passage even when the same words appear elsewhere.
@@ -120,6 +114,15 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 ## Verified commands
 - `swift build`
 - `swift test`
+- `swift test --filter WritingAITests/testPromptBuilderSeparatesProseAndMetadataPrompts`
+- `swift test --filter WritingAITests/testRemoteClientMetadataRequestParsesStructuredMetadata`
+- `swift test --filter WritingAITests/testRemoteClientUsesAnthropicCompatibleRequestAndStreamsTextDeltas`
+- `swift test --filter WritingAITests/testRemoteClientUsesWiderMaxTokensAndDocumentTailForContinueWriting`
+- `swift test --filter VibeWriteAppFlowTests/testStartDraftKeepsMatchingPromptInRequestWithoutDuplicatingConversation`
+- `swift test --filter VibeWriteAppFlowTests/testMetadataFailureLeavesAssistantSuggestionsEmpty`
+- `swift test --filter VibeWriteAppFlowTests/testStartDraftStreamsIncrementallyBeforeCompletion`
+- `swift test --filter VibeWriteAppFlowTests/testContinueWritingStreamsIncrementallyBeforeCompletion`
+- `swift test --filter VibeWriteAppFlowTests/testDirectQuickStartCreatesRevisionHistoryAndCanUndoConsistently`
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
 - `swift test --filter VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`
 - `swift test --filter VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`

@@ -103,7 +103,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(overriddenConfiguration.charactersPerSecond, 900)
     }
 
-    func testPromptBuilderUsesShortOutputProtocol() {
+    func testPromptBuilderSeparatesProseAndMetadataPrompts() {
         let prompt = "写一篇关于成年人孤独感的公众号文章"
         let project = WritingProject.quickStart(
             prompt: prompt,
@@ -125,33 +125,43 @@ final class WritingAITests: XCTestCase {
 
         let systemPrompt = messages.first?.content ?? ""
         let userPrompt = messages.last?.content ?? ""
-        XCTAssertTrue(systemPrompt.contains("Output the writing text first"))
-        XCTAssertTrue(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
-        XCTAssertTrue(systemPrompt.contains("summary, nextFocus, suggestionChips"))
-        XCTAssertTrue(systemPrompt.contains("Chinese writing tasks"))
-        XCTAssertTrue(systemPrompt.contains("A response is incomplete until the metadata block is present."))
-        XCTAssertTrue(systemPrompt.contains("When the action is \"startDraft\", return exactly two parts in order: opening prose, then the metadata block."))
-        XCTAssertTrue(systemPrompt.contains("Do not stop after the opening prose alone."))
-        XCTAssertTrue(systemPrompt.contains("Keep the opening brief so there is room for the metadata block."))
-        XCTAssertTrue(systemPrompt.contains("Even a very short opening still needs the metadata block."))
-        XCTAssertTrue(systemPrompt.contains("Every response must end with exactly one metadata block."))
-        XCTAssertTrue(systemPrompt.contains("Do not stop after writing text alone."))
-        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", suggestionChips must contain exactly 3 items."))
+        XCTAssertTrue(systemPrompt.contains("Output only prose text for the requested action"))
+        XCTAssertFalse(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
+        XCTAssertFalse(systemPrompt.contains("summary, nextFocus, suggestionChips"))
+        XCTAssertFalse(systemPrompt.contains("A response is incomplete until the metadata block is present."))
+        XCTAssertFalse(systemPrompt.contains("Every response must end with exactly one metadata block."))
         XCTAssertTrue(userPrompt.contains("Action: startDraft"))
         XCTAssertTrue(userPrompt.contains("User message: \(prompt)"))
-        XCTAssertTrue(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
-        XCTAssertTrue(userPrompt.contains("Required output shape:"))
-        XCTAssertTrue(userPrompt.contains("exactly one JSON object with summary, nextFocus, and suggestionChips"))
-        XCTAssertTrue(userPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
-        XCTAssertTrue(userPrompt.contains("For startDraft, the response is incomplete without the metadata block."))
-        XCTAssertTrue(userPrompt.contains("Return exactly two parts in order: the opening prose, then the metadata block."))
-        XCTAssertTrue(userPrompt.contains("Do not stop after the opening prose alone."))
-        XCTAssertTrue(userPrompt.contains("Keep the opening brief so there is room for the metadata block."))
-        XCTAssertTrue(userPrompt.contains("Even a very short opening still needs the metadata block."))
-        XCTAssertTrue(userPrompt.contains("For startDraft, the metadata block is required"))
-        XCTAssertTrue(userPrompt.contains("exactly 3 concise suggestion chips"))
+        XCTAssertFalse(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
+        XCTAssertFalse(userPrompt.contains("Required output shape:"))
+        XCTAssertFalse(userPrompt.contains("exactly one JSON object with summary, nextFocus, and suggestionChips"))
+        XCTAssertFalse(userPrompt.contains("exactly 3 concise suggestion chips"))
         XCTAssertFalse(userPrompt.contains("assistantMessage"))
         XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
+
+        let metadataRequest = WritingAIRequest(
+            action: .startDraft,
+            project: project.aiSnapshot,
+            userMessage: prompt,
+            selectionText: nil,
+            kind: .metadata
+        )
+        let metadataMessages = WritingAIPromptBuilder().messages(
+            for: metadataRequest,
+            provider: "minimax",
+            model: "MiniMax-M2.7"
+        )
+
+        let metadataSystemPrompt = metadataMessages.first?.content ?? ""
+        let metadataUserPrompt = metadataMessages.last?.content ?? ""
+        XCTAssertTrue(metadataSystemPrompt.contains("metadata-only response builder"))
+        XCTAssertTrue(metadataSystemPrompt.contains("Return only a single JSON object"))
+        XCTAssertFalse(metadataSystemPrompt.contains("[[VIBEWRITE_METADATA]]"))
+        XCTAssertTrue(metadataUserPrompt.contains("Action: startDraft metadata"))
+        XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
+        XCTAssertTrue(metadataUserPrompt.contains("Return exactly one JSON object with summary, nextFocus, and suggestionChips."))
+        XCTAssertTrue(metadataUserPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
+        XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
     }
 
     func testContinueWritingPromptRequestsConcreteSuggestionChips() {
@@ -198,7 +208,8 @@ final class WritingAITests: XCTestCase {
         let systemPrompt = messages.first?.content ?? ""
         let userPrompt = messages.last?.content ?? ""
 
-        XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", suggestionChips must contain exactly 3 items."))
+        XCTAssertTrue(systemPrompt.contains("Output only prose text for the requested action"))
+        XCTAssertFalse(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(systemPrompt.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph."))
         XCTAssertTrue(systemPrompt.contains("Leave a small amount of forward momentum for the next step."))
         XCTAssertTrue(userPrompt.contains("Document summary:"))
@@ -214,11 +225,31 @@ final class WritingAITests: XCTestCase {
         XCTAssertFalse(userPrompt.contains("Next focus:"))
         XCTAssertFalse(userPrompt.contains("Style constraints:"))
         XCTAssertFalse(userPrompt.contains("Current document:"))
-        XCTAssertTrue(userPrompt.contains("For continueWriting, suggestionChips must contain exactly 3 concise items."))
-        XCTAssertTrue(userPrompt.contains("Required output shape:"))
-        XCTAssertTrue(userPrompt.contains("exactly one JSON object with summary, nextFocus, and suggestionChips"))
-        XCTAssertTrue(userPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
+        XCTAssertFalse(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
+        XCTAssertFalse(userPrompt.contains("Required output shape:"))
+        XCTAssertFalse(userPrompt.contains("exactly one JSON object with summary, nextFocus, and suggestionChips"))
         XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
+
+        let metadataRequest = WritingAIRequest(
+            action: .continueWriting,
+            project: project,
+            userMessage: "继续往下写",
+            selectionText: nil,
+            kind: .metadata
+        )
+        let metadataMessages = WritingAIPromptBuilder().messages(
+            for: metadataRequest,
+            provider: "minimax",
+            model: "MiniMax-M2.7"
+        )
+        let metadataSystemPrompt = metadataMessages.first?.content ?? ""
+        let metadataUserPrompt = metadataMessages.last?.content ?? ""
+        XCTAssertTrue(metadataSystemPrompt.contains("metadata-only response builder"))
+        XCTAssertTrue(metadataSystemPrompt.contains("Summarize the completed正文 after the continuation"))
+        XCTAssertTrue(metadataUserPrompt.contains("Action: continueWriting metadata"))
+        XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
+        XCTAssertTrue(metadataUserPrompt.contains("Document summary:"))
+        XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
     }
 
     func testRemoteClientUsesWiderMaxTokensAndDocumentTailForContinueWriting() async throws {
@@ -235,6 +266,7 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.maxTokens, 1536)
+            XCTAssertTrue(payload.system.contains("Output only prose text for the requested action"))
             XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Project state:") ?? true)
             XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Current goal:") ?? true)
             XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Next focus:") ?? true)
@@ -243,13 +275,15 @@ final class WritingAITests: XCTestCase {
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.") ?? false)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Leave a small amount of forward momentum for the next step.") ?? false)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Keep the continuation brief so the next move still feels natural.") ?? false)
+            XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
+            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Required output shape:") ?? true)
 
             let response = """
             event: message_start
             data: {"type":"message_start"}
 
             event: content_block_delta
-            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"续写正文。\\n\\n[[VIBEWRITE_METADATA]]\\n{\\\"summary\\\":\\\"新的摘要\\\",\\\"nextFocus\\\":\\\"下一步\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"续写正文。"}}
 
             event: message_stop
             data: {"type":"message_stop"}
@@ -297,9 +331,10 @@ final class WritingAITests: XCTestCase {
             }
         }
 
-        XCTAssertEqual(finalResponse?.summary, "新的摘要")
-        XCTAssertEqual(finalResponse?.nextFocus, "下一步")
-        XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
+        XCTAssertEqual(finalResponse?.documentText, "前文第一段。\n\n前文第二段。续写正文。")
+        XCTAssertTrue(finalResponse?.summary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.nextFocus.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
     }
 
     func testRemoteClientUsesWiderMaxTokensForStartDraft() async throws {
@@ -316,6 +351,8 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.maxTokens, 2048)
+            XCTAssertTrue(payload.system.contains("Output only prose text for the requested action"))
+            XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Action: startDraft") ?? false)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("User message: 写一篇关于成年人孤独感的公众号文章") ?? false)
 
@@ -324,7 +361,7 @@ final class WritingAITests: XCTestCase {
             data: {"type":"message_start"}
 
             event: content_block_delta
-            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"成年人真正感到孤独的时候，未必是在深夜。\\n\\n[[VIBEWRITE_METADATA]]\\n{\\\"summary\\\":\\\"已生成开头\\\",\\\"nextFocus\\\":\\\"继续推进第一段\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"成年人真正感到孤独的时候，未必是在深夜。"}}
 
             event: message_stop
             data: {"type":"message_stop"}
@@ -354,9 +391,71 @@ final class WritingAITests: XCTestCase {
             }
         }
 
+        XCTAssertEqual(finalResponse?.documentText, "成年人真正感到孤独的时候，未必是在深夜。")
+        XCTAssertTrue(finalResponse?.summary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.nextFocus.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
+    }
+
+    func testRemoteClientMetadataRequestParsesStructuredMetadata() async throws {
+        let configuration = WritingAIConfiguration.configuration(from: [
+            "VIBEWRITE_AI_DEFAULT_MODE": "real",
+            "VIBEWRITE_AI_PROVIDER": "minimax",
+            "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_API_KEY": "bundle-key-123"
+        ])
+
+        let session = makeAnthropicMockSession { request in
+            let body = try XCTUnwrap(self.requestBodyData(from: request))
+            let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
+
+            XCTAssertEqual(payload.maxTokens, 512)
+            XCTAssertTrue(payload.system.contains("metadata-only response builder"))
+            XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Action: startDraft metadata") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Completed prose:") ?? false)
+
+            let response = """
+            event: message_start
+            data: {"type":"message_start"}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\\"summary\\\":\\\"已生成开头\\\",\\\"nextFocus\\\":\\\"继续推进第一段\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """
+
+            return (
+                self.makeHTTPResponse(
+                    statusCode: 200,
+                    headerFields: ["Content-Type": "text/event-stream"]
+                ),
+                response.data(using: .utf8)!
+            )
+        }
+
+        let client = RemoteWritingAIClient(configuration: configuration, session: session)
+        let request = WritingAIRequest(
+            action: .startDraft,
+            project: WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot,
+            userMessage: "写一篇关于成年人孤独感的公众号文章",
+            selectionText: nil,
+            kind: .metadata
+        )
+
+        var finalResponse: WritingAIResponse?
+        for try await event in client.streamResponse(for: request) {
+            if case .completed(let response) = event {
+                finalResponse = response
+            }
+        }
+
         XCTAssertEqual(finalResponse?.summary, "已生成开头")
         XCTAssertEqual(finalResponse?.nextFocus, "继续推进第一段")
         XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
+        XCTAssertEqual(finalResponse?.documentText, request.project.documentText)
     }
 
     func testStreamingPreviewRendererStartsContinuationFromRevealOffset() async {
@@ -427,14 +526,15 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.model, "MiniMax-M2.5-highspeed")
-            XCTAssertTrue(payload.system.contains("Output the writing text first"))
-            XCTAssertTrue(payload.system.contains("[[VIBEWRITE_METADATA]]"))
+            XCTAssertTrue(payload.system.contains("Output only prose text for the requested action"))
+            XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
             XCTAssertEqual(payload.messages.count, 1)
             XCTAssertEqual(payload.messages.first?.role, "user")
             XCTAssertEqual(payload.messages.first?.content.first?.type, "text")
             XCTAssertEqual(payload.messages.first?.content.first?.text.contains("Action: startDraft"), true)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("User message: 写一篇关于成年人孤独感的公众号文章") ?? false)
             XCTAssertTrue(payload.stream)
+            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("[[VIBEWRITE_METADATA]]") ?? true)
 
             let response = """
             event: message_start
@@ -444,7 +544,7 @@ final class WritingAITests: XCTestCase {
             data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"成年人真正感到孤独的时候，未必是在深夜。"}}
 
             event: content_block_delta
-            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"更多时候，是在一个很普通的傍晚。\\n\\n[[VIBEWRITE_METADATA]]\\n{\\\"summary\\\":\\\"已生成第一稿，正在收紧开头\\\",\\\"nextFocus\\\":\\\"继续推进第一段\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"更多时候，是在一个很普通的傍晚。"}}
 
             event: message_stop
             data: {"type":"message_stop"}
@@ -487,9 +587,9 @@ final class WritingAITests: XCTestCase {
         )
         XCTAssertEqual(finalResponse?.documentText, "成年人真正感到孤独的时候，未必是在深夜。更多时候，是在一个很普通的傍晚。")
         XCTAssertEqual(finalResponse?.mode, .collaboration)
-        XCTAssertEqual(finalResponse?.summary, "已生成第一稿，正在收紧开头")
-        XCTAssertEqual(finalResponse?.nextFocus, "继续推进第一段")
-        XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
+        XCTAssertTrue(finalResponse?.summary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.nextFocus.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
         XCTAssertFalse(finalResponse?.assistantMessage.isEmpty ?? true)
     }
 

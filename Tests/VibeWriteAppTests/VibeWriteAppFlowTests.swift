@@ -778,13 +778,44 @@ final class VibeWriteAppFlowTests: XCTestCase {
             selectionText: nil
         )
 
-        let request = await recorder.lastRequest()
-        XCTAssertEqual(request?.userMessage, prompt)
+        let requests = await recorder.allRequests()
+        XCTAssertEqual(requests.count, 2)
+        XCTAssertEqual(requests.first?.kind, .prose)
+        XCTAssertEqual(requests.last?.kind, .metadata)
+        XCTAssertEqual(requests.first?.userMessage, prompt)
+        XCTAssertEqual(requests.last?.userMessage, prompt)
+        XCTAssertTrue(requests.last?.project.documentText.contains("成年人真正感到孤独的时候") ?? false)
 
         let matchingUserMessages = flow.activeProject.conversation.filter {
             $0.role == .user && $0.text == prompt
         }
         XCTAssertEqual(matchingUserMessages.count, 1)
+    }
+
+    func testMetadataFailureLeavesAssistantSuggestionsEmpty() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: MetadataFailingWritingAIClient())
+        let project = WritingProject.quickStart(
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration,
+            automationKey: "project.metadata.failure"
+        )
+        flow.openProject(project)
+
+        try await flow.performWritingAction(
+            .startDraft,
+            userMessage: "写一篇关于成年人孤独感的公众号文章",
+            selectionText: nil
+        )
+
+        XCTAssertFalse(flow.activeProject.documentText.isEmpty)
+        XCTAssertTrue(flow.activeProject.suggestionChips.isEmpty)
+        XCTAssertTrue(flow.activeProject.nextFocus.isEmpty)
+        XCTAssertNil(flow.aiErrorMessage)
     }
 
     func testRenameAndDeleteActiveProjectUseLocalFlowActions() throws {
@@ -867,6 +898,10 @@ private actor RequestRecorder {
     func lastRequest() -> WritingAIRequest? {
         requests.last
     }
+
+    func allRequests() -> [WritingAIRequest] {
+        requests
+    }
 }
 
 private struct RecordingWritingAIClient: WritingAIClient {
@@ -874,6 +909,14 @@ private struct RecordingWritingAIClient: WritingAIClient {
 
     func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
         await recorder.record(request)
+        if request.kind == .metadata {
+            return WritingProjectResponseBuilder.response(
+                for: request,
+                documentText: request.project.documentText,
+                metadata: MockWritingEngine.completionMetadata(for: request)
+            )
+        }
+
         return WritingProjectResponseBuilder.response(for: request)
     }
 }
@@ -899,6 +942,19 @@ private struct NonLocalWritingAIClient: WritingAIClient {
             nextFocus: snapshot.context.nextFocus,
             suggestionChips: snapshot.suggestionChips,
             mode: snapshot.mode
+        )
+    }
+}
+
+private struct MetadataFailingWritingAIClient: WritingAIClient {
+    func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
+        if request.kind == .metadata {
+            throw WritingAIClientError.requestFailed("metadata request failed")
+        }
+
+        return WritingProjectResponseBuilder.response(
+            for: request,
+            documentText: MockWritingEngine.streamedDocumentText(for: request)
         )
     }
 }
