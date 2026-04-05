@@ -12,6 +12,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 ## Current state
 - V2 docs under `docs/V2/` are the source of truth.
 - The正文 editor now uses the same outer content column as the bottom composer. The editor bridge no longer centers its own readable-width block; instead it keeps a fixed text inset while the visible vertical scroll bar is rendered in a reserved far-right lane at the edge of the app, with the internal text-container width staying consistent with that inset so the正文 no longer clips on the right, and the bar now fades in on scroll activity before fading back out after a short idle period.
+- The project title header now uses a tighter bottom spacing before正文, so the title background feels shorter and the正文 sits closer without changing colors, typography, or other shell styling.
 - Clicking selection-popover `自定义` now reveals a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the old popover while the user stays in the custom-edit flow.
 - The selection/context and assistant suggestion capsules now use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.

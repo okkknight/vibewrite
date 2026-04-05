@@ -1,4 +1,7 @@
 ## 2026-04-05
+- The title header spacing above正文 was tightened so the title background feels shorter and the正文 sits closer, without changing any other shell styling.
+
+## 2026-04-05
 - The app now launches in day mode by default.
 - Fixed capsules stay more muted than clickable suggestion chips in both day and night themes, while the suggestion chips themselves keep a warmer but lighter gold-brown day-mode tone.
 

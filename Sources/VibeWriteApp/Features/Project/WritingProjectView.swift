@@ -40,6 +40,7 @@ struct WritingProjectView: View {
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
     private var bodyEditorScrollerLaneWidth: CGFloat { 12 }
+    private var projectHeaderBottomSpacing: CGFloat { 4 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
@@ -155,12 +156,12 @@ struct WritingProjectView: View {
             projectHeader
                 .padding(.horizontal, 22)
                 .padding(.top, 10)
-                .padding(.bottom, 8)
+                .padding(.bottom, projectHeaderBottomSpacing)
                 .simultaneousGesture(TapGesture().onEnded {
                     dismissSelectionCustomInputContext()
                 })
 
-            writingBodyPane(topPadding: 26, bottomPadding: 18)
+            writingBodyPane(topPadding: 20, bottomPadding: 18)
 
             composerSection(verticalPadding: 16)
         }
@@ -192,13 +193,13 @@ struct WritingProjectView: View {
             projectHeader
                 .padding(.horizontal, shellLayoutMode.isCompact ? 18 : 22)
                 .padding(.top, shellLayoutMode.isCompact ? 10 : 10)
-                .padding(.bottom, shellLayoutMode.isCompact ? 8 : 8)
+                .padding(.bottom, projectHeaderBottomSpacing)
                 .simultaneousGesture(TapGesture().onEnded {
                     dismissSelectionCustomInputContext()
                 })
 
             writingBodyPane(
-                topPadding: shellLayoutMode.isCompact ? 22 : 28,
+                topPadding: shellLayoutMode.isCompact ? 18 : 20,
                 bottomPadding: 18
             )
 
