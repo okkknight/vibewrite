@@ -279,6 +279,63 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
 
+    func testRemoteClientUsesWiderMaxTokensForStartDraft() async throws {
+        let configuration = WritingAIConfiguration.configuration(from: [
+            "VIBEWRITE_AI_DEFAULT_MODE": "real",
+            "VIBEWRITE_AI_PROVIDER": "minimax",
+            "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_API_KEY": "bundle-key-123"
+        ])
+
+        let session = makeAnthropicMockSession { request in
+            let body = try XCTUnwrap(self.requestBodyData(from: request))
+            let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
+
+            XCTAssertEqual(payload.maxTokens, 2048)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Action: startDraft") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("User message: 写一篇关于成年人孤独感的公众号文章") ?? false)
+
+            let response = """
+            event: message_start
+            data: {"type":"message_start"}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"成年人真正感到孤独的时候，未必是在深夜。\\n\\n[[VIBEWRITE_METADATA]]\\n{\\\"summary\\\":\\\"已生成开头\\\",\\\"nextFocus\\\":\\\"继续推进第一段\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """
+
+            return (
+                self.makeHTTPResponse(
+                    statusCode: 200,
+                    headerFields: ["Content-Type": "text/event-stream"]
+                ),
+                response.data(using: .utf8)!
+            )
+        }
+
+        let client = RemoteWritingAIClient(configuration: configuration, session: session)
+        let request = WritingAIRequest(
+            action: .startDraft,
+            project: WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot,
+            userMessage: "写一篇关于成年人孤独感的公众号文章",
+            selectionText: nil
+        )
+
+        var finalResponse: WritingAIResponse?
+        for try await event in client.streamResponse(for: request) {
+            if case .completed(let response) = event {
+                finalResponse = response
+            }
+        }
+
+        XCTAssertEqual(finalResponse?.summary, "已生成开头")
+        XCTAssertEqual(finalResponse?.nextFocus, "继续推进第一段")
+        XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
+    }
+
     func testStreamingPreviewRendererStartsContinuationFromRevealOffset() async {
         let configuration = WritingStreamingConfiguration.configuration(
             from: [

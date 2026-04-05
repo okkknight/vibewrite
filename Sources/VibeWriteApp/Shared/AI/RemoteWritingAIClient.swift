@@ -219,9 +219,11 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
     private func maxTokens(for action: WritingAIAction) -> Int {
         switch action {
+        case .startDraft:
+            return 2048
         case .continueWriting:
             return 1536
-        case .startDraft, .edit:
+        case .edit:
             return 1024
         }
     }

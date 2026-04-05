@@ -43,6 +43,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The流式 cadence is code-configurable through `WritingStreamingConfiguration` plus the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`, so we can tune the feel without scattering constants through the app.
 - Remote AI metadata is now explicitly constrained to the current document language for Chinese writing tasks, which keeps `summary`, `nextFocus`, and `suggestionChips` aligned with the prose language instead of drifting into English.
 - `startDraft` now has a harder metadata requirement in the prompt: it is explicitly told to always return `summary`, `nextFocus`, and exactly 3 concise follow-up chips even when the opening is short.
+- `startDraft` now also uses a wider request budget than the default path, so the opening and trailing metadata have more room than before.
 - `continueWriting` now uses a persisted `continuationSummary`, a trimmed document tail, and a compact project-state block, so the continuation prompt stays compact even when the正文 grows long while still giving the model recent working memory.
 - `continueWriting` now also asks for a complete metadata block and 3 concise follow-up chips on the continuation path, so the model has a stronger prompt to return suggestions without introducing fallback behavior.
 - `continueWriting` uses a slightly wider request budget than the other actions, so long continuations have more room to keep their trailing metadata block intact.

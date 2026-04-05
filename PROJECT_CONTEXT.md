@@ -22,6 +22,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
 - Remote AI completion metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay aligned with the document language instead of drifting into English.
 - `startDraft` now has a harder metadata requirement in the prompt: the opening is still short, but the model is explicitly told to always return `summary`, `nextFocus`, and exactly 3 concise follow-up chips.
+- `startDraft` now also uses a wider request budget than the default path, so the opening and trailing metadata have more room than before.
 - `continueWriting` now reads a persisted `continuationSummary`, a trimmed document tail, and a compact project-state block instead of the full正文, so long documents stay within a smaller continuation context while still giving the model its recent working memory.
 - `continueWriting` now has an explicit prompt-level requirement for complete metadata and 3 concise follow-up chips, so suggestion output is encouraged more strongly on the continuation path without adding any fallback behavior.
 - `continueWriting` now uses a slightly wider request budget than the other actions, so the trailing metadata block has more room to survive long continuation generations.

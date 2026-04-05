@@ -1,5 +1,6 @@
 ## 2026-04-05
 - `startDraft` now carries a harder metadata prompt: the model is explicitly told to always return `summary`, `nextFocus`, and exactly 3 concise follow-up chips even when the opening itself is short.
+- `startDraft` now uses a wider request budget than the default path so the opening and trailing metadata have more room than before.
 
 ## 2026-04-05
 - `continueWriting` now includes a compact project-state block in addition to the persisted `continuationSummary` and trimmed document tail, and the remote request gives continuation a slightly wider token budget so the trailing metadata has more room to survive long generations.
