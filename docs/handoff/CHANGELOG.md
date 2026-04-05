@@ -1,5 +1,6 @@
 ## 2026-04-05
 - Fixed the duplicate top-level `File` menu on macOS by moving VibeWrite's document actions out of a standalone `CommandMenu("File")` and into standard `CommandGroup` insertion, so the app keeps one File menu instead of creating a second one.
+- Added a local sample log at `docs/handoff/ai-samples.md` so successful and failed AI continuation requests can be compared in one place.
 
 ## 2026-04-05
 - Fixed the blank-start / first-open regression: the app now seeds its saved snapshot from the blank collaboration shell, and the project view ignores stale title/body writebacks from inactive project instances so opening an external file no longer gets overwritten by an empty buffer on the first pass.

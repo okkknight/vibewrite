@@ -24,6 +24,7 @@ This directory is the compact handoff layer for VibeWrite.
 19. `task/TASK_20260402_022.md`
 20. `task/TASK_20260403_023.md`
 21. `task/TASK_20260403_024.md`
+22. `docs/handoff/ai-samples.md`
 
 ## Purpose
 - keep the project easy to resume
