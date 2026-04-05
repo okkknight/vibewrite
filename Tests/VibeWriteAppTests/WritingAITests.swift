@@ -207,7 +207,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
     }
 
-    func testRemoteClientUsesWiderMaxTokensAndDocumentTailForContinueWriting() async throws {
+    func testRemoteClientUsesWiderMaxTokensAndProjectStateForContinueWriting() async throws {
         let configuration = WritingAIConfiguration.configuration(from: [
             "VIBEWRITE_AI_DEFAULT_MODE": "real",
             "VIBEWRITE_AI_PROVIDER": "minimax",
@@ -221,10 +221,10 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.maxTokens, 1536)
-            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Project state:") ?? true)
-            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Current goal:") ?? true)
-            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Next focus:") ?? true)
-            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Style constraints:") ?? true)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Project state:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Current goal:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Next focus:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Style constraints:") ?? false)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Document tail:") ?? false)
 
             let response = """
