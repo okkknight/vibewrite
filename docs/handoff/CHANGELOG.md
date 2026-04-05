@@ -42,6 +42,10 @@
 - Verification for this follow-up passed with `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit`.
 
 ## 2026-04-05
+- The正文 editor now buffers real user text changes that arrive during layout sync and flushes the pending binding update once layout settles, so save operations persist the latest visible正文 instead of an older model snapshot.
+- Verification for this follow-up passed with `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` and `swift test`.
+
+## 2026-04-05
 - The正文 scroll indicator is now rendered as a separate overlay at the far right edge of the app instead of inside the正文 editing column, so the正文 width itself stays unchanged while the chrome moves outward.
 - Verified with `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 

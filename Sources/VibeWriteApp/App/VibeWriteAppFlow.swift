@@ -403,6 +403,10 @@ final class VibeWriteAppFlow: ObservableObject {
     ) -> Bool {
         let document = VibeWriteMarkdownDocument(project: project)
         let renderedText = document.renderedText()
+        let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        VibeWriteDebugTrace.append(
+            "flow saveCurrentDocument start projectID=\(project.id.uuidString) title=\(project.title) documentCount=\(project.documentText.count) renderedCount=\(renderedText.count) updateActiveProject=\(updateActiveProject) currentURL=\(currentDocumentURLName)"
+        )
 
         do {
             try ensureDocumentParentDirectoryExists(for: url)
@@ -416,6 +420,9 @@ final class VibeWriteAppFlow: ObservableObject {
             }
             currentDocumentURL = url
             savedDocumentContents = renderedText
+            VibeWriteDebugTrace.append(
+                "flow saveCurrentDocument applied projectID=\(project.id.uuidString) savedCount=\(savedDocumentContents?.count ?? -1) currentURL=\(url.lastPathComponent)"
+            )
             recordRecentDocument(url: url, title: project.title)
             return true
         } catch {
