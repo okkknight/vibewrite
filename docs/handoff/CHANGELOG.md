@@ -1,4 +1,7 @@
 ## 2026-04-05
+- Fixed the blank-start / first-open regression: the app now seeds its saved snapshot from the blank collaboration shell, and the project view ignores stale title/body writebacks from inactive project instances so opening an external file no longer gets overwritten by an empty buffer on the first pass.
+
+## 2026-04-05
 - The selection popover loading state now says `思考中` and keeps only the spinner, so the state still reads as busy without the longer `AI 正在思考` label.
 
 ## 2026-04-05

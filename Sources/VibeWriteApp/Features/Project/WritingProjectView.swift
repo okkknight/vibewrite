@@ -28,7 +28,6 @@ struct WritingProjectView: View {
     @FocusState private var messageFieldFocused: Bool
 
     private var project: WritingProject { flow.activeProject }
-    private var projectBinding: Binding<WritingProject> { flow.activeProjectBinding }
     private var currentRevision: WritingProjectRevision? { project.revisionHistory.last }
     private var assistantDrawerWidth: CGFloat { shellLayoutMode.isCompact ? 300 : 280 }
     private var historyDrawerWidth: CGFloat { shellLayoutMode.isCompact ? 372 : 344 }
@@ -44,6 +43,32 @@ struct WritingProjectView: View {
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
+    }
+
+    private var projectTitleBinding: Binding<String> {
+        let projectID = project.id
+        return Binding(
+            get: { project.title },
+            set: { newTitle in
+                guard flow.activeProject.id == projectID else { return }
+                var updatedProject = flow.activeProject
+                updatedProject.title = newTitle
+                flow.openProject(updatedProject)
+            }
+        )
+    }
+
+    private var projectDocumentTextBinding: Binding<String> {
+        let projectID = project.id
+        return Binding(
+            get: { project.documentText },
+            set: { newText in
+                guard flow.activeProject.id == projectID else { return }
+                var updatedProject = flow.activeProject
+                updatedProject.documentText = newText
+                flow.openProject(updatedProject)
+            }
+        )
     }
 
     init(
@@ -234,7 +259,7 @@ struct WritingProjectView: View {
     private var projectHeader: some View {
         ZStack(alignment: .center) {
             VStack(spacing: 4) {
-                TextField("未命名写作", text: projectBinding.title)
+                TextField("未命名写作", text: projectTitleBinding)
                     .font(.system(size: 17, weight: .semibold, design: .default))
                     .foregroundStyle(Color.vibeCanvasInk)
                     .lineLimit(1)
@@ -319,7 +344,7 @@ struct WritingProjectView: View {
         VStack(alignment: .leading, spacing: 18) {
             ZStack(alignment: .topLeading) {
                 SelectableTextEditor(
-                    text: projectBinding.documentText,
+                    text: projectDocumentTextBinding,
                     selectedText: $selectedText,
                     selectedTextRange: $selectedTextRange,
                     selectionPopoverOrigin: $selectionPopoverOrigin,

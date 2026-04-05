@@ -51,6 +51,7 @@ final class VibeWriteAppFlow: ObservableObject {
         self.streamingConfiguration = streamingConfiguration
         self.emptyProjectShell = WritingProject.entryShell(mode: .collaboration)
         self.recentDocumentEntries = resolvedStore.load()
+        self.savedDocumentContents = VibeWriteMarkdownDocument(project: self.emptyProjectShell).renderedText()
 
         if forceBlankStartup || shouldResetStorage {
             self.projects = []
@@ -58,12 +59,11 @@ final class VibeWriteAppFlow: ObservableObject {
             resolvedStore.clear()
             documentMetadataStore.clear()
             self.recentDocumentEntries = []
-            self.savedDocumentContents = nil
+            self.savedDocumentContents = VibeWriteMarkdownDocument(project: self.emptyProjectShell).renderedText()
             self.currentDocumentURL = nil
         } else {
             self.projects = []
             self.activeProjectID = nil
-            self.savedDocumentContents = nil
             self.currentDocumentURL = nil
         }
     }
@@ -524,8 +524,8 @@ final class VibeWriteAppFlow: ObservableObject {
             let fallbackTitle = url.deletingPathExtension().lastPathComponent
             let fallbackAutomationKey = url.deletingPathExtension().lastPathComponent
             let resolvedMarker = documentIdentityStore.readDocumentID(from: url) ?? parsedDocument.identityMarker
-            let project = resolvedMarker
-                .flatMap { documentMetadataStore.loadRecord(documentID: $0.documentID) }?
+            let metadataRecord = resolvedMarker.flatMap { documentMetadataStore.loadRecord(documentID: $0.documentID) }
+            let project = metadataRecord?
                 .makeProject(
                     documentText: parsedDocument.body,
                     fallbackTitle: fallbackTitle,

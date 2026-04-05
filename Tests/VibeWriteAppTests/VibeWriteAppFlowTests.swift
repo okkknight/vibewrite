@@ -30,6 +30,17 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(flow.recentProjects.isEmpty)
     }
 
+    func testBlankStartupStartsCleanBeforeEditing() throws {
+        let flow = VibeWriteAppFlow()
+
+        XCTAssertFalse(flow.isCurrentDocumentDirty)
+
+        flow.createNewProject()
+
+        XCTAssertFalse(flow.isCurrentDocumentDirty)
+        XCTAssertEqual(flow.activeProject.documentText, "")
+    }
+
     func testEmptyActiveProjectFallsBackToCollaborationShell() {
         let flow = VibeWriteAppFlow(forceBlankStartup: true)
 
