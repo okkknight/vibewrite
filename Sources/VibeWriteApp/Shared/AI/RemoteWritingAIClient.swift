@@ -55,7 +55,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             system: systemPrompt,
             messages: userMessages,
             temperature: 0.2,
-            maxTokens: 1024,
+            maxTokens: maxTokens(for: request.action),
             stream: true
         )
 
@@ -215,6 +215,15 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
 
         return nil
+    }
+
+    private func maxTokens(for action: WritingAIAction) -> Int {
+        switch action {
+        case .continueWriting:
+            return 1536
+        case .startDraft, .edit:
+            return 1024
+        }
     }
 }
 

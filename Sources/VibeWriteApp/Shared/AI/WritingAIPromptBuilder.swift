@@ -37,7 +37,7 @@ struct WritingAIPromptBuilder {
         - For "startDraft", prefer 3 concise chips that naturally continue the current opening rather than generic start-drafting prompts.
         - When the action is "continueWriting", still return a complete metadata block and make suggestionChips describe the most useful next steps after this continuation, not generic continuation prompts.
         - For "continueWriting", prefer 3 concise chips that follow the current正文 naturally and help the app suggest what to do next.
-        - When the action is "continueWriting", treat the document summary as global context and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
+        - When the action is "continueWriting", treat the document summary as global context, the project state as the current working memory, and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
 
         Rules:
         - Keep the writing voice calm, precise, and native to a macOS writing app.
@@ -67,6 +67,13 @@ struct WritingAIPromptBuilder {
             lines.append(nonEmptyText(request.project.continuationSummary, fallback: "(empty)"))
             lines.append("Document tail:")
             lines.append(documentTail(for: request.project.documentText))
+            lines.append("Project state:")
+            lines.append("Intent summary: \(nonEmptyText(request.project.context.intentSummary, fallback: "(empty)"))")
+            lines.append("Current goal: \(nonEmptyText(request.project.context.currentGoal, fallback: "(empty)"))")
+            lines.append("Next focus: \(nonEmptyText(request.project.context.nextFocus, fallback: "(empty)"))")
+            lines.append("Recent decisions: \(joinedOrFallback(request.project.context.recentDecisions, fallback: "(empty)"))")
+            lines.append("Working memory: \(joinedOrFallback(request.project.context.workingMemory, fallback: "(empty)"))")
+            lines.append("Style constraints: \(joinedOrFallback(request.project.context.styleConstraints, fallback: "(empty)"))")
 
         case .startDraft, .edit:
             lines.append("Current document:")
@@ -86,6 +93,7 @@ struct WritingAIPromptBuilder {
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
         } else if request.action == .continueWriting {
             lines.append("For continueWriting, use the document summary as global context and the document tail as the continuation anchor.")
+            lines.append("Use the project state as the working memory for this continuation.")
             lines.append("Do not restart from the beginning of the article.")
             lines.append("For continueWriting, return 3 concise suggestion chips that describe the most useful next steps after this continuation.")
             lines.append("Those chips should follow the current正文 naturally and should not be generic continuation prompts.")
@@ -139,7 +147,7 @@ struct WritingAIPromptBuilder {
         return trimmed.isEmpty ? fallback : trimmed
     }
 
-    private func documentTail(for text: String, maximumCharacterCount: Int = 1200) -> String {
+    private func documentTail(for text: String, maximumCharacterCount: Int = 900) -> String {
         let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else {
             return "(empty)"
@@ -171,5 +179,17 @@ struct WritingAIPromptBuilder {
         }
 
         return String(joined.suffix(maximumCharacterCount))
+    }
+
+    private func joinedOrFallback(_ items: [String], fallback: String) -> String {
+        let cleaned = items
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        guard !cleaned.isEmpty else {
+            return fallback
+        }
+
+        return cleaned.joined(separator: " · ")
     }
 }

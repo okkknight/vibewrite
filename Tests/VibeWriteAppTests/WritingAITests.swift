@@ -146,13 +146,21 @@ final class WritingAITests: XCTestCase {
             "尾部第二段要真正作为继续写的起点。"
         ]
         let documentText = (headParagraphs + tailParagraphs).joined(separator: "\n\n")
+        let context = ProjectContext(
+            intentSummary: "当前要把结尾收紧，并保持人物气口一致。",
+            styleConstraints: ["克制", "平静", "非鸡汤"],
+            currentGoal: "继续推进结尾",
+            recentDecisions: ["不重写前文", "保留余味"],
+            workingMemory: ["人物已经进入收束阶段", "后面只需要再往前推一点"],
+            nextFocus: "补一段收束"
+        )
         let project = WritingProject(
             title: "续写测试",
             prompt: "写一篇关于成年人孤独感的公众号文章",
             mode: .collaboration,
             summary: "给人看的摘要可以保留原样",
             continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
-            context: ProjectContext.collaboration(prompt: "写一篇关于成年人孤独感的公众号文章"),
+            context: context,
             conversation: [],
             documentText: documentText,
             suggestionChips: ["继续写", "编辑这段", "补一段"]
@@ -177,12 +185,94 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(systemPrompt.contains("prefer 3 concise chips"))
         XCTAssertTrue(userPrompt.contains("Document summary:"))
         XCTAssertTrue(userPrompt.contains("Document tail:"))
+        XCTAssertTrue(userPrompt.contains("Project state:"))
         XCTAssertTrue(userPrompt.contains("给模型看的压缩摘要要更短、更偏状态"))
         XCTAssertTrue(userPrompt.contains("尾部第二段要真正作为继续写的起点。"))
+        XCTAssertTrue(userPrompt.contains("Current goal: 继续推进结尾"))
+        XCTAssertTrue(userPrompt.contains("Next focus: 补一段收束"))
+        XCTAssertTrue(userPrompt.contains("Style constraints: 克制 · 平静 · 非鸡汤"))
         XCTAssertFalse(userPrompt.contains("前文第1段用来铺陈背景和细节"))
         XCTAssertFalse(userPrompt.contains("Current document:"))
         XCTAssertTrue(userPrompt.contains("For continueWriting, return 3 concise suggestion chips"))
         XCTAssertTrue(userPrompt.contains("should follow the current正文 naturally"))
+    }
+
+    func testRemoteClientUsesWiderMaxTokensAndProjectStateForContinueWriting() async throws {
+        let configuration = WritingAIConfiguration.configuration(from: [
+            "VIBEWRITE_AI_DEFAULT_MODE": "real",
+            "VIBEWRITE_AI_PROVIDER": "minimax",
+            "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_API_KEY": "bundle-key-123"
+        ])
+
+        let session = makeAnthropicMockSession { request in
+            let body = try XCTUnwrap(self.requestBodyData(from: request))
+            let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
+
+            XCTAssertEqual(payload.maxTokens, 1536)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Project state:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Current goal:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Next focus:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Style constraints:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Document tail:") ?? false)
+
+            let response = """
+            event: message_start
+            data: {"type":"message_start"}
+
+            event: content_block_delta
+            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"续写正文。\\n\\n[[VIBEWRITE_METADATA]]\\n{\\\"summary\\\":\\\"新的摘要\\\",\\\"nextFocus\\\":\\\"下一步\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
+
+            event: message_stop
+            data: {"type":"message_stop"}
+            """
+
+            return (
+                self.makeHTTPResponse(
+                    statusCode: 200,
+                    headerFields: ["Content-Type": "text/event-stream"]
+                ),
+                response.data(using: .utf8)!
+            )
+        }
+
+        let client = RemoteWritingAIClient(configuration: configuration, session: session)
+        let project = WritingProject(
+            title: "续写测试",
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration,
+            summary: "给人看的摘要可以保留原样",
+            continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
+            context: ProjectContext(
+                intentSummary: "当前要把结尾收紧，并保持人物气口一致。",
+                styleConstraints: ["克制", "平静", "非鸡汤"],
+                currentGoal: "继续推进结尾",
+                recentDecisions: ["不重写前文", "保留余味"],
+                workingMemory: ["人物已经进入收束阶段", "后面只需要再往前推一点"],
+                nextFocus: "补一段收束"
+            ),
+            conversation: [],
+            documentText: "前文第一段。\n\n前文第二段。",
+            suggestionChips: ["继续写", "编辑这段", "补一段"]
+        ).aiSnapshot
+        let request = WritingAIRequest(
+            action: .continueWriting,
+            project: project,
+            userMessage: "继续往下写",
+            selectionText: nil
+        )
+
+        var finalResponse: WritingAIResponse?
+        for try await event in client.streamResponse(for: request) {
+            if case .completed(let response) = event {
+                finalResponse = response
+            }
+        }
+
+        XCTAssertEqual(finalResponse?.summary, "新的摘要")
+        XCTAssertEqual(finalResponse?.nextFocus, "下一步")
+        XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
 
     func testStreamingPreviewRendererStartsContinuationFromRevealOffset() async {
@@ -599,7 +689,16 @@ private struct AnthropicRequestEnvelope: Decodable {
     let model: String
     let system: String
     let messages: [Message]
+    let maxTokens: Int
     let stream: Bool
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case system
+        case messages
+        case maxTokens = "max_tokens"
+        case stream
+    }
 
     struct Message: Decodable {
         let role: String
