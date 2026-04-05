@@ -37,10 +37,11 @@ This directory is the compact handoff layer for VibeWrite.
 - The selection context capsule and assistant suggestion chips now use a warmer gold-brown day-mode foreground with slightly stronger light-mode contrast so the day theme stays readable while the night theme remains unchanged.
 - The app now launches in day mode by default, and the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - External document opens now pass through a short hydration window so the freshly loaded正文 is not immediately overwritten by an empty binding sync on the first render.
-- The latest repo commit before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
+- The latest repo commit before this update is `66b43f2`, which softens `continueWriting` endings so the model advances only a little and uses the persisted continuation summary plus the document tail instead of the fuller project-state block.
 - The正文 editor bridge now preserves live user text when the NSTextView is the active first responder and its content diverges from the SwiftUI binding, so selection/focus refreshes no longer overwrite freshly typed text before save.
 - The duplicate top-level `File` menu was traced to a standalone `CommandMenu("File")` in `VibeWriteCommands`; the current fix routes those actions through standard `CommandGroup` placement so the app keeps one top-level File menu.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
+- `scripts/package_dmg.sh` is now the simple friend-trial packaging path: it builds a Release app with `ENABLE_DEBUG_DYLIB=NO` and stages it with an `/Applications` shortcut, so the current build can be turned into a DMG without adding a full installer flow.
 - The document storage model now keeps正文 and collaboration state separate: the Markdown file stores正文 plus a hidden identity marker, `xattr` carries the primary `docID`, and the app-side metadata store keeps conversation history, a `continuationSummary`, and the latest collaboration context. Save As creates a fresh `docID`, and malformed metadata falls back to正文-only editing instead of blocking open/save.
 - The selection popover bridge was narrowed so update sync no longer clears a live NSTextView selection when the SwiftUI binding is nil, which lets the non-empty selection stabilize for popover display.
 - Streaming正文 preview now uses a dedicated playback renderer: the first visible chunk is emitted immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps finishing the remaining text character by character instead of flushing the tail in one jump.
@@ -69,6 +70,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The app-owned local store now only keeps lightweight recent-document entries; the actual writing state lives in the Markdown file, and the collaboration state lives in the app-side metadata store keyed by `docID`.
 - Edit streaming now starts from the selected passage instead of replaying from the top of the document, so local patch responses feel anchored to the user’s selection.
 - The page header subtitle continues to use `project.summary`; if the text under the title is off-topic, the issue is in the summary source, not the subtitle component.
+- The current head is `66b43f2`, so `continueWriting` is now intentionally a little softer and less conclusive than before.
 - `task/TASK_20260403_024.md` completed the visual restyle pass, but the deeper post-submit diagnosis found an app-side hang rather than an XCTest idle issue.
 - The hang was fixed in `SelectableTextEditor` and `VibeWriteAppFlow`, and the targeted UI test now gets past the second submit.
 - The latest prompt-path fix restored `startDraft` user input into the actual LLM payload, and the正文 editor now applies a clearer, larger AppKit text style so remote drafts are readable on the dark shell.

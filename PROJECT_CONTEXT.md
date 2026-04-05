@@ -19,9 +19,10 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection popover preview now collapses blank lines out of multi-paragraph selections before displaying them, so the top preview shows the selected content as a continuous excerpt instead of stopping at the first paragraph.
 - The selection/context and assistant suggestion capsules now use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
-- The latest committed change before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.
+- The latest committed change before this update is `66b43f2`, which softens `continueWriting` endings so the model advances only a little, keeps the response open for the next turn, and relies on the persisted continuation summary plus the document tail instead of the fuller project-state block.
 - The duplicate top-level `File` menu in macOS was traced to `CommandMenu("File")` inside `VibeWriteCommands`; the fix switched that menu wiring to standard `CommandGroup` insertion so we keep the same actions without creating a second top-level `File` menu.
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
+- `scripts/package_dmg.sh` now builds a Release app with `ENABLE_DEBUG_DYLIB=NO` and stages it with an `/Applications` link, so we have a simple friend-test DMG path when we want to ship the current build without large-scale distribution.
 - The document storage model has been redesigned so the Markdown file carries only正文 plus a hidden identity marker, while the collaboration metadata lives in an app-side metadata store keyed by `docID`. `xattr` owns the primary identity marker, the body marker is a fallback, Save As generates a fresh `docID`, and malformed metadata always degrades to正文-only editing.
 - The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps revealing the remaining text one character at a time instead of flushing the tail in one jump.
@@ -107,6 +108,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `Sources/VibeWriteApp/Shared/AI/WritingStreamingPreviewRenderer.swift`
 - `Sources/VibeWriteApp/Shared/AI/RemoteWritingAIClient.swift`
 - `Sources/VibeWriteApp/Shared/AI/StubWritingAIClient.swift`
+- `Resources/VibeWriteIcon.icns`
+- `scripts/package_dmg.sh`
 - `UITests/VibeWriteUITests.swift`
 - `Tests/VibeWriteAppTests/VibeWriteAppFlowTests.swift`
 - `Tests/VibeWriteAppTests/WritingAITests.swift`

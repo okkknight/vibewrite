@@ -1,3 +1,6 @@
+## 2026-04-06
+- `continueWriting` now advances only a little, avoids a fully closed ending, and relies on the persisted continuation summary plus the document tail instead of the fuller project-state block, so the continuation path stays softer and leaves room for the next turn.
+
 ## 2026-04-05
 - The正文 editor bridge now keeps live user text intact when `NSTextView` is the active first responder and its visible buffer has drifted ahead of the SwiftUI binding, so selection/focus refreshes no longer wipe freshly typed text before save.
 
