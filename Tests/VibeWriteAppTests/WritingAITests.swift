@@ -707,6 +707,33 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(project.conversation.last?.text, "继续推进")
     }
 
+    func testApplyingEditResponsePreservesExistingSuggestionChips() {
+        var project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        let originalSuggestionChips = project.suggestionChips
+        let response = WritingAIResponse(
+            assistantMessage: "继续推进",
+            documentText: "新的正文",
+            summary: "新的摘要",
+            intentSummary: "新的意图",
+            styleConstraints: ["克制", "平静"],
+            currentGoal: "新的目标",
+            recentDecisions: ["新的决策"],
+            workingMemory: ["新的记忆"],
+            nextFocus: "新的下一步",
+            suggestionChips: ["编辑后建议 1", "编辑后建议 2"],
+            mode: .collaboration
+        )
+
+        project.applyEditingResponse(response, documentText: "新的正文")
+
+        XCTAssertEqual(project.documentText, "新的正文")
+        XCTAssertEqual(project.currentGoal, "新的目标")
+        XCTAssertEqual(project.intentSummary, "新的意图")
+        XCTAssertEqual(project.suggestionChips, originalSuggestionChips)
+        XCTAssertEqual(project.mode, .collaboration)
+        XCTAssertEqual(project.conversation.last?.text, "继续推进")
+    }
+
     func testStartDraftPromptBuilderKeepsUserMessageVisibleToModel() {
         let prompt = "写一篇关于成年人孤独感的公众号文章"
         let project = WritingProject.quickStart(

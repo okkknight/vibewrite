@@ -249,6 +249,18 @@ extension WritingProject {
         refreshUpdatedAt()
     }
 
+    mutating func applyEditingResponse(_ response: WritingAIResponse, documentText: String) {
+        let existingSuggestionChips = suggestionChips
+        let shouldPreserveExistingSuggestionChips = hasRenderableSuggestionChips(existingSuggestionChips)
+
+        apply(aiResponse: response, documentText: documentText)
+
+        if shouldPreserveExistingSuggestionChips {
+            suggestionChips = existingSuggestionChips
+            refreshUpdatedAt()
+        }
+    }
+
     func responseMetadata() -> WritingAICompletionMetadata {
         WritingAICompletionMetadata(
             summary: responseValue(summary: summary),
@@ -282,6 +294,10 @@ extension WritingProject {
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .filter { seen.insert($0).inserted }
+    }
+
+    private func hasRenderableSuggestionChips(_ chips: [String]) -> Bool {
+        chips.contains { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }
     }
 }
 

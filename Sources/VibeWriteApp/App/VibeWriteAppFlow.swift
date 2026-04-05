@@ -8,6 +8,8 @@ final class VibeWriteAppFlow: ObservableObject {
     @Published private(set) var projects: [WritingProject]
     @Published private(set) var activeProjectID: UUID?
     @Published private(set) var isAIRequestInFlight = false
+    @Published private(set) var isProseRequestInFlight = false
+    @Published private(set) var isMetadataRequestInFlight = false
     @Published private(set) var activeEditLock: WritingEditLock?
     @Published private(set) var aiErrorMessage: String?
     @Published private(set) var currentDocumentURL: URL?
@@ -220,6 +222,8 @@ final class VibeWriteAppFlow: ObservableObject {
         activeEditLock = nil
         aiErrorMessage = nil
         isAIRequestInFlight = false
+        isProseRequestInFlight = false
+        isMetadataRequestInFlight = false
     }
 
     @discardableResult
@@ -245,6 +249,8 @@ final class VibeWriteAppFlow: ObservableObject {
 
         let project = activeProject
         isAIRequestInFlight = true
+        isProseRequestInFlight = true
+        isMetadataRequestInFlight = false
         activeEditLock = WritingEditLock(
             action: action,
             lockedSelectionText: selectionRange.flatMap { $0.substring(in: project.documentText)?.trimmingCharacters(in: .whitespacesAndNewlines) } ?? selectionText,
@@ -253,6 +259,8 @@ final class VibeWriteAppFlow: ObservableObject {
         aiErrorMessage = nil
         defer {
             isAIRequestInFlight = false
+            isProseRequestInFlight = false
+            isMetadataRequestInFlight = false
             activeEditLock = nil
         }
 
@@ -348,7 +356,7 @@ final class VibeWriteAppFlow: ObservableObject {
                     to: beforeSnapshot.documentText,
                     lock: activeEditLock
                 )
-                liveProject.apply(aiResponse: response, documentText: updatedDocumentText)
+                liveProject.applyEditingResponse(response, documentText: updatedDocumentText)
                 liveProject.recordRevision(
                     patch: patch,
                     before: beforeSnapshot,
@@ -427,9 +435,9 @@ final class VibeWriteAppFlow: ObservableObject {
                 }
             }
 
-            previewRenderer.markStreamCompleted()
-            await previewRenderer.waitForCompletion()
+            isProseRequestInFlight = false
 
+            previewRenderer.markStreamCompleted()
             guard let response = finalResponse else {
                 throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
             }
@@ -466,11 +474,18 @@ final class VibeWriteAppFlow: ObservableObject {
                 selectionRange: selectionRange,
                 kind: .metadata
             )
+            VibeWriteLog.ai.info(
+                "Flow metadata request start action=\(action.rawValue, privacy: .public)"
+            )
+            isMetadataRequestInFlight = true
+            let metadataTask = Task {
+                try await aiClient.generateResponse(for: metadataRequest)
+            }
+
+            await previewRenderer.waitForCompletion()
+
             do {
-                VibeWriteLog.ai.info(
-                    "Flow metadata request start action=\(action.rawValue, privacy: .public)"
-                )
-                let metadataResponse = try await aiClient.generateResponse(for: metadataRequest)
+                let metadataResponse = try await metadataTask.value
                 let metadata = metadataResponse.completionMetadata
                 liveProject.applyWritingMetadata(metadata)
                 replaceActiveProject(liveProject, persist: false)
@@ -485,6 +500,7 @@ final class VibeWriteAppFlow: ObservableObject {
                     "Flow metadata request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                 )
             }
+            isMetadataRequestInFlight = false
         } catch {
             VibeWriteLog.ai.error(
                 "Flow AI request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
