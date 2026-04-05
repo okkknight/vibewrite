@@ -134,7 +134,25 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
 
         let finalDocumentText = MockWritingEngine.finalDocumentText(for: request, streamedText: finalBodyText)
-        let completionMetadata = try? WritingAICompletionMetadataDecoder.decode(from: streamedCompletion.metadataText)
+        VibeWriteLog.ai.notice(
+            "Remote AI stream finished action=\(request.action.rawValue, privacy: .public) bodyLength=\(streamedCompletion.bodyText.count, privacy: .public) metadataLength=\(streamedCompletion.metadataText.count, privacy: .public) bodyPreview=\(streamedCompletion.bodyText.vibewriteLogPreview(maxLength: 120), privacy: .public) metadataPreview=\(streamedCompletion.metadataText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
+        )
+        VibeWriteLog.ai.debug(
+            "Remote AI raw tail action=\(request.action.rawValue, privacy: .public) bodyTail=\(streamedCompletion.bodyText.vibewriteRawTail(maxLength: 280), privacy: .public) metadataTail=\(streamedCompletion.metadataText.vibewriteRawTail(maxLength: 280), privacy: .public)"
+        )
+
+        let completionMetadata: WritingAICompletionMetadata?
+        do {
+            completionMetadata = try WritingAICompletionMetadataDecoder.decode(from: streamedCompletion.metadataText)
+        } catch {
+            VibeWriteLog.ai.error(
+                "Remote AI metadata decode failed action=\(request.action.rawValue, privacy: .public) metadataLength=\(streamedCompletion.metadataText.count, privacy: .public) metadataPreview=\(streamedCompletion.metadataText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            VibeWriteLog.ai.debug(
+                "Remote AI metadata missing tail action=\(request.action.rawValue, privacy: .public) bodyTail=\(streamedCompletion.bodyText.vibewriteRawTail(maxLength: 320), privacy: .public)"
+            )
+            completionMetadata = nil
+        }
         VibeWriteLog.ai.notice(
             "Remote AI metadata parsed action=\(request.action.rawValue, privacy: .public) present=\(completionMetadata != nil, privacy: .public) summaryLength=\(completionMetadata?.summary.count ?? 0, privacy: .public) nextFocusLength=\(completionMetadata?.nextFocus.count ?? 0, privacy: .public) suggestionCount=\(completionMetadata?.suggestionChips.count ?? 0, privacy: .public)"
         )
@@ -144,7 +162,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             metadata: completionMetadata
         )
         VibeWriteLog.ai.notice(
-            "Remote AI response completed action=\(request.action.rawValue, privacy: .public) documentPreview=\(finalDocumentText.vibewriteLogPreview(maxLength: 120), privacy: .public)"
+            "Remote AI response completed action=\(request.action.rawValue, privacy: .public) documentPreview=\(finalDocumentText.vibewriteLogPreview(maxLength: 120), privacy: .public) summaryLength=\(finalResponse.summary.count, privacy: .public) nextFocusLength=\(finalResponse.nextFocus.count, privacy: .public) suggestionCount=\(finalResponse.suggestionChips.count, privacy: .public)"
         )
         continuation.yield(.completed(finalResponse))
         continuation.finish()

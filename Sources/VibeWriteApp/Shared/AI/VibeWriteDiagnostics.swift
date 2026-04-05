@@ -44,4 +44,13 @@ extension String {
 
         return String(collapsed.prefix(maxLength - 1)) + "…"
     }
+
+    func vibewriteRawTail(maxLength: Int = 120) -> String {
+        guard count > maxLength else {
+            return trimmingCharacters(in: .whitespacesAndNewlines)
+        }
+
+        let tail = suffix(maxLength)
+        return "…" + tail.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
 }
