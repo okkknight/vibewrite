@@ -288,13 +288,6 @@ final class VibeWriteAppFlow: ObservableObject {
         do {
             let beforeSnapshot = project.aiSnapshot
             var liveProject = project
-            VibeWriteLog.ai.notice(
-                "Flow preparing patch action=\(action.rawValue, privacy: .public) beforeCount=\(beforeSnapshot.documentText.count, privacy: .public) selectionRange=\(selectionRange?.nsRange.debugDescription ?? "nil", privacy: .public) selectionPreview=\(normalizedSelectionText?.vibewriteLogPreview(maxLength: 80) ?? "nil", privacy: .public) requestMessagePreview=\(requestUserMessage?.vibewriteLogPreview(maxLength: 80) ?? "nil", privacy: .public)"
-            )
-            let clientType = String(describing: type(of: aiClient))
-            VibeWriteLog.ai.info(
-                "Flow sending AI request client=\(clientType, privacy: .public) action=\(action.rawValue, privacy: .public) projectTitle=\(project.title, privacy: .public) promptPreview=\(requestUserMessage?.vibewriteLogPreview(maxLength: 80) ?? "", privacy: .public)"
-            )
             if let requestUserMessage {
                 let alreadyHasMatchingUserMessage = action == .startDraft && project.conversation.contains { message in
                     message.role == .user && message.text.trimmingCharacters(in: .whitespacesAndNewlines) == requestUserMessage
@@ -353,9 +346,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 selectionRange: selectionRange,
                 userMessage: requestUserMessage
             )
-            VibeWriteLog.ai.notice(
-                "Flow patch built action=\(action.rawValue, privacy: .public) patchSummary=\(patch.summary.vibewriteLogPreview(maxLength: 100), privacy: .public) sourceTextPreview=\(patch.sourceText?.vibewriteLogPreview(maxLength: 60) ?? "nil", privacy: .public) replacementCount=\(patch.replacementText.count, privacy: .public) sourceRange=\(patch.sourceRange?.nsRange.debugDescription ?? "nil", privacy: .public)"
-            )
             let updatedDocumentText = try patch.apply(
                 to: beforeSnapshot.documentText,
                 lock: activeEditLock
@@ -365,9 +355,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 patch: patch,
                 before: beforeSnapshot,
                 after: liveProject.aiSnapshot
-            )
-            VibeWriteLog.ai.notice(
-                "Flow completed AI request action=\(action.rawValue, privacy: .public) finalDocumentPreview=\(liveProject.documentText.vibewriteLogPreview(maxLength: 120), privacy: .public)"
             )
             replaceActiveProject(liveProject, persist: false)
             if let currentDocumentURL {

@@ -4,12 +4,14 @@ struct VibeWriteCommands: Commands {
     @ObservedObject var flow: VibeWriteAppFlow
 
     var body: some Commands {
-        CommandMenu("File") {
+        CommandGroup(replacing: .newItem) {
             Button("New") {
                 flow.createNewProject()
             }
             .keyboardShortcut("n")
+        }
 
+        CommandGroup(after: .newItem) {
             Button("Open...") {
                 _ = flow.openDocumentFromPanel()
             }

@@ -142,7 +142,6 @@
 ## 2026-04-04
 - The app no longer synthesizes fallback next-step suggestions when the model omits metadata: `summary`, `nextFocus`, and `suggestionChips` now stay empty unless the remote response provides them, and the sidebar/composer render only real model output.
 - Runtime AI logs now record whether completion metadata was actually parsed, along with the parsed summary/next-focus/suggestion counts, so the next real request can confirm whether the remote model is returning suggestions or the UI is simply receiving an empty block.
-- Runtime AI logs now also include raw tail snippets for the streamed正文 and metadata, and they log the正文 tail again when metadata is missing so we can tell whether the model omitted the protocol block or the parser lost it.
 
 ## 2026-04-04
 - The composer guidance row is now intentionally minimal in the blank/start-draft state: the composer shows only the primary `生成开场` pill, and the assistant guidance chips remain on a single line instead of wrapping into a second row.

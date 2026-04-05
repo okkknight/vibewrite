@@ -3,15 +3,17 @@ import Foundation
 struct WritingAIPromptBuilder {
     func messages(for request: WritingAIRequest, provider: String, model: String) -> [WritingAIChatMessage] {
         let sanitizedRequest = sanitizedRequest(for: request)
+        let systemPrompt = systemPrompt(provider: provider, model: model)
+        let userPrompt = userPrompt(for: sanitizedRequest)
 
         return [
             WritingAIChatMessage(
                 role: .system,
-                content: systemPrompt(provider: provider, model: model)
+                content: systemPrompt
             ),
             WritingAIChatMessage(
                 role: .user,
-                content: userPrompt(for: sanitizedRequest)
+                content: userPrompt
             )
         ]
     }

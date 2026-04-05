@@ -129,12 +129,6 @@ struct WritingProjectView: View {
             messageDraft = ""
             messageFieldFocused = false
         }
-        .onChange(of: showAssistantLayer) { _, newValue in
-            VibeWriteLog.launch.info("assistant layer visibility changed isVisible=\(newValue, privacy: .public)")
-        }
-        .onChange(of: showHistoryLayer) { _, newValue in
-            VibeWriteLog.launch.info("history layer visibility changed isVisible=\(newValue, privacy: .public)")
-        }
         .onChange(of: selectedText) { _, _ in
             logSelectionOverlayState(trigger: "selectedText changed")
             if normalizedSelectedText == nil {
