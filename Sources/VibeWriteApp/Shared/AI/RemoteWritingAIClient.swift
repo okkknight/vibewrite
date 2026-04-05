@@ -42,7 +42,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             }
 
             VibeWriteLog.ai.info(
-                "Remote prose request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public)"
+                "Remote prose request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) selectionCount=\(request.selectionText?.count ?? 0, privacy: .public)"
             )
 
             let finalBodyText = try await collectProseText(
@@ -69,7 +69,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
         case .metadata:
             VibeWriteLog.ai.info(
-                "Remote metadata request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public)"
+                "Remote metadata request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
             )
 
             let metadataText = try await collectMetadataText(
@@ -81,13 +81,13 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
                 metadata = try WritingAICompletionMetadataDecoder.decode(from: metadataText)
             } catch {
                 VibeWriteLog.ai.error(
-                    "Remote metadata parse failed action=\(request.action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                    "Remote metadata parse failed action=\(request.action.rawValue, privacy: .public) rawCount=\(metadataText.count, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                 )
                 throw error
             }
 
             VibeWriteLog.ai.info(
-                "Remote metadata request finished action=\(request.action.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+                "Remote metadata request finished action=\(request.action.rawValue, privacy: .public) rawCount=\(metadataText.count, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
             )
             let finalResponse = WritingProjectResponseBuilder.response(
                 for: request,

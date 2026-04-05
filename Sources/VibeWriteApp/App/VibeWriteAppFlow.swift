@@ -278,6 +278,7 @@ final class VibeWriteAppFlow: ObservableObject {
 
             return exactSelection
         }()
+        let traceID = Self.shortTraceID()
 
         if action == .edit {
             guard normalizedSelectionText != nil else {
@@ -408,13 +409,14 @@ final class VibeWriteAppFlow: ObservableObject {
             )
 
             var streamedText = ""
+            let proseNetworkStartedAt = Date()
             let previewRenderer = WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
                 liveProject.documentText = renderedText
                 self.replaceActiveProject(liveProject, persist: false)
             }
             var finalResponse: WritingAIResponse?
             VibeWriteLog.ai.info(
-                "Flow prose request start action=\(action.rawValue, privacy: .public)"
+                "Flow prose request start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) docCount=\(proseRequest.project.documentText.count, privacy: .public) selectionCount=\(normalizedSelectionText?.count ?? selectionText?.count ?? 0, privacy: .public)"
             )
             for try await event in aiClient.streamResponse(for: proseRequest) {
                 switch event {
@@ -434,6 +436,10 @@ final class VibeWriteAppFlow: ObservableObject {
                     finalResponse = response
                 }
             }
+            let proseNetworkElapsed = Self.elapsedSeconds(since: proseNetworkStartedAt)
+            VibeWriteLog.ai.info(
+                "Flow prose network stream finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) streamSeconds=\(proseNetworkElapsed, privacy: .public) streamedCount=\(streamedText.count, privacy: .public) previewTailWillContinue=true"
+            )
 
             previewRenderer.markStreamCompleted()
             guard let response = finalResponse else {
@@ -461,7 +467,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 _ = saveCurrentDocument(to: currentDocumentURL)
             }
             VibeWriteLog.ai.info(
-                "Flow prose response complete action=\(action.rawValue, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
+                "Flow prose response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
             )
 
             let metadataRequest = WritingAIRequest(
@@ -472,16 +478,25 @@ final class VibeWriteAppFlow: ObservableObject {
                 selectionRange: selectionRange,
                 kind: .metadata
             )
+            let metadataRequestStartedAt = Date()
             VibeWriteLog.ai.info(
-                "Flow metadata request start action=\(action.rawValue, privacy: .public)"
+                "Flow metadata request start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) docCount=\(metadataRequest.project.documentText.count, privacy: .public) suggestionCount=\(metadataRequest.project.suggestionChips.count, privacy: .public)"
             )
             isMetadataRequestInFlight = true
             let metadataTask = Task {
                 try await aiClient.generateResponse(for: metadataRequest)
             }
 
+            let prosePlaybackWaitStartedAt = Date()
+            VibeWriteLog.ai.info(
+                "Flow prose playback wait start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public)"
+            )
             await previewRenderer.waitForCompletion()
             isProseRequestInFlight = false
+            let prosePlaybackElapsed = Self.elapsedSeconds(since: prosePlaybackWaitStartedAt)
+            VibeWriteLog.ai.info(
+                "Flow prose playback wait finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) waitSeconds=\(prosePlaybackElapsed, privacy: .public)"
+            )
 
             do {
                 let metadataResponse = try await metadataTask.value
@@ -491,12 +506,14 @@ final class VibeWriteAppFlow: ObservableObject {
                 if let currentDocumentURL {
                     _ = saveCurrentDocument(to: currentDocumentURL)
                 }
+                let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
                 VibeWriteLog.ai.info(
-                    "Flow metadata response complete action=\(action.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+                    "Flow metadata response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
                 )
             } catch {
+                let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
                 VibeWriteLog.ai.error(
-                    "Flow metadata request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                    "Flow metadata request failed action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                 )
             }
             isMetadataRequestInFlight = false
@@ -520,6 +537,14 @@ final class VibeWriteAppFlow: ObservableObject {
         }
 
         return trimmedUserMessage
+    }
+
+    private static func shortTraceID() -> String {
+        String(UUID().uuidString.prefix(8))
+    }
+
+    private static func elapsedSeconds(since start: Date) -> String {
+        String(format: "%.2f", Date().timeIntervalSince(start))
     }
 
     private func setActiveProject(_ project: WritingProject) {

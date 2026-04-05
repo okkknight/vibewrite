@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-04-06
+- Added runtime diagnostics for the prose/metadata split: each action now gets a short trace id, and the logs record prose network duration, prose playback tail wait duration, metadata request duration, and metadata parse failures with raw payload size.
+
+## 2026-04-06
 - `startDraft` / `continueWriting` now keep `isProseRequestInFlight` alive until the streaming preview tail finishes, so正文 auto-follow, subtitle thinking dots, and the send-button spinner stay in their thinking state through the full prose playback instead of dropping as soon as the network stream ends.
 - Metadata still starts as soon as prose streaming finishes and continues independently during that tail playback window.
 
@@ -153,6 +156,9 @@
 ## 2026-04-04
 - The repo now ignores local Xcode artifacts, workspace user state, and `Config/VibeWrite.local.xcconfig` so those files stay out of future commits.
 - The local-only `Config/VibeWrite.local.xcconfig` still carries the real `MINIMAX_API_KEY`, which is intentionally not committed and should be treated as a machine-specific secret.
+
+# 2026-04-06
+- The first-open hydration regression came back through the live-text preservation guard in `SelectableTextEditor`. The guard is now narrowed so an empty focused editor no longer overwrites a freshly opened external document, while real uncommitted user text still preserves the live buffer and saves normally.
 
 # 2026-04-06
 - Independent review of `QA_REPORT_2026-04-06.md` did not fully pass: the referenced macOS UI regression test `VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` failed in my environment while waiting for the main window to appear, so the report's completed verification set is not reproducible as written.

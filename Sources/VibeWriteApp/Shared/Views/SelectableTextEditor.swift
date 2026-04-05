@@ -422,8 +422,13 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard textView.string != bindingText else { return false }
             guard textView.window?.firstResponder === textView else { return false }
             guard !isApplyingProgrammaticChange else { return false }
+            guard hasUncommittedUserText(in: textView) else { return false }
 
             return true
+        }
+
+        private func hasUncommittedUserText(in textView: NSTextView) -> Bool {
+            pendingTextBindingUpdateAfterLayoutSync != nil || textView.hasMarkedText()
         }
 
         func syncLiveUserTextFromView(_ textView: NSTextView) {
