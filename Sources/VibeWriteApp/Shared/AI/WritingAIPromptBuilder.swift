@@ -44,7 +44,7 @@ struct WritingAIPromptBuilder {
         - When the action is "continueWriting", suggestionChips must contain exactly 3 items.
         - When the action is "continueWriting", prefer 3 concise chips that follow the current正文 naturally, are concrete, and help the app suggest what to do next.
         - When the action is "continueWriting", suggestionChips must not be generic continuation prompts.
-        - When the action is "continueWriting", treat the document summary as global context, the project state as the current working memory, and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
+        - When the action is "continueWriting", treat the document summary as global context and the document tail as the local anchor for continuation; do not restart from the beginning of the article.
 
         Rules:
         - Keep the writing voice calm, precise, and native to a macOS writing app.
@@ -74,13 +74,6 @@ struct WritingAIPromptBuilder {
             lines.append(nonEmptyText(request.project.continuationSummary, fallback: "(empty)"))
             lines.append("Document tail:")
             lines.append(documentTail(for: request.project.documentText))
-            lines.append("Project state:")
-            lines.append("Intent summary: \(nonEmptyText(request.project.context.intentSummary, fallback: "(empty)"))")
-            lines.append("Current goal: \(nonEmptyText(request.project.context.currentGoal, fallback: "(empty)"))")
-            lines.append("Next focus: \(nonEmptyText(request.project.context.nextFocus, fallback: "(empty)"))")
-            lines.append("Recent decisions: \(joinedOrFallback(request.project.context.recentDecisions, fallback: "(empty)"))")
-            lines.append("Working memory: \(joinedOrFallback(request.project.context.workingMemory, fallback: "(empty)"))")
-            lines.append("Style constraints: \(joinedOrFallback(request.project.context.styleConstraints, fallback: "(empty)"))")
 
         case .startDraft, .edit:
             lines.append("Current document:")
@@ -102,7 +95,6 @@ struct WritingAIPromptBuilder {
             lines.append("Those chips should be concrete follow-up actions for the generated opening, not generic drafting prompts.")
         } else if request.action == .continueWriting {
             lines.append("Use the document summary as global context and the document tail as the continuation anchor.")
-            lines.append("Use the project state as the working memory for this continuation.")
             lines.append("Do not restart from the beginning of the article.")
             lines.append("For continueWriting, suggestionChips must contain exactly 3 concise items.")
             lines.append("Those chips should be concrete next steps that naturally follow the current正文 and should not be generic continuation prompts.")
