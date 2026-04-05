@@ -1,4 +1,8 @@
 ## 2026-04-05
+- Fixed capsules and clickable suggestion chips now use distinct foreground/background tones in both day and night themes, so the non-interactive pills stay more muted while tappable chips read as actionable.
+- The project title and subtitle block now sits more evenly centered inside the shortened header area, instead of drifting toward the top edge after the spacing trim.
+
+## 2026-04-05
 - The title header spacing above正文 was tightened so the title background feels shorter and the正文 sits closer, without changing any other shell styling.
 
 ## 2026-04-05

@@ -43,6 +43,11 @@ enum VibeThemePalette {
     static let accentNSColor = NSColor(calibratedRed: 0.94, green: 0.82, blue: 0.40, alpha: 1)
 }
 
+enum VibeCapsuleTone {
+    case fixed
+    case interactive
+}
+
 private func vibeDynamicNSColor(day: NSColor, night: NSColor) -> NSColor {
     NSColor(name: nil) { appearance in
         switch appearance.bestMatch(from: [.darkAqua, .aqua]) {
@@ -106,6 +111,45 @@ extension Color {
         night: NSColor(calibratedRed: 0.54, green: 0.56, blue: 0.61, alpha: 1)
     )
     static let vibeCanvasAccent = VibeThemePalette.accent
+
+    static func vibeCapsuleForeground(_ tone: VibeCapsuleTone, colorScheme: ColorScheme) -> Color {
+        switch tone {
+        case .fixed:
+            return colorScheme == .light
+                ? Color(red: 0.56, green: 0.43, blue: 0.20)
+                : Color(red: 0.79, green: 0.70, blue: 0.48)
+        case .interactive:
+            return colorScheme == .light
+                ? Color(red: 0.69, green: 0.54, blue: 0.26)
+                : Color(red: 0.96, green: 0.84, blue: 0.50)
+        }
+    }
+
+    static func vibeCapsuleBackground(
+        _ tone: VibeCapsuleTone,
+        tint: Color = .vibeAccent,
+        colorScheme: ColorScheme
+    ) -> Color {
+        switch tone {
+        case .fixed:
+            return colorScheme == .light ? tint.opacity(0.20) : tint.opacity(0.14)
+        case .interactive:
+            return colorScheme == .light ? tint.opacity(0.26) : tint.opacity(0.19)
+        }
+    }
+
+    static func vibeCapsuleStroke(_ tone: VibeCapsuleTone, colorScheme: ColorScheme) -> Color {
+        switch tone {
+        case .fixed:
+            return colorScheme == .light
+                ? Color.vibeCanvasStroke.opacity(0.22)
+                : Color.vibeCanvasStroke.opacity(0.12)
+        case .interactive:
+            return colorScheme == .light
+                ? Color.vibeCanvasStroke.opacity(0.26)
+                : Color.vibeCanvasStroke.opacity(0.18)
+        }
+    }
 }
 
 extension NSColor {
@@ -275,17 +319,15 @@ struct AccentPill: View {
     }
 
     private var foregroundColor: Color {
-        colorScheme == .light
-            ? Color(red: 0.46, green: 0.34, blue: 0.14)
-            : Color(red: 0.88, green: 0.77, blue: 0.46)
+        Color.vibeCapsuleForeground(.fixed, colorScheme: colorScheme)
     }
 
     private var backgroundColor: Color {
-        colorScheme == .light ? tint.opacity(0.24) : tint.opacity(0.18)
+        Color.vibeCapsuleBackground(.fixed, tint: tint, colorScheme: colorScheme)
     }
 
     private var strokeColor: Color {
-        colorScheme == .light ? Color.vibeCanvasStroke.opacity(0.26) : .clear
+        Color.vibeCapsuleStroke(.fixed, colorScheme: colorScheme)
     }
 }
 
@@ -327,17 +369,15 @@ struct ActionChip: View {
     }
 
     private var foregroundColor: Color {
-        colorScheme == .light
-            ? Color(red: 0.60, green: 0.47, blue: 0.22)
-            : tint
+        Color.vibeCapsuleForeground(.interactive, colorScheme: colorScheme)
     }
 
     private var backgroundColor: Color {
-        colorScheme == .light ? tint.opacity(0.24) : tint.opacity(0.18)
+        Color.vibeCapsuleBackground(.interactive, tint: tint, colorScheme: colorScheme)
     }
 
     private var strokeColor: Color {
-        colorScheme == .light ? Color.vibeCanvasStroke.opacity(0.26) : .clear
+        Color.vibeCapsuleStroke(.interactive, colorScheme: colorScheme)
     }
 }
 

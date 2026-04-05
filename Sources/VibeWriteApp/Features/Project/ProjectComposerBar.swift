@@ -308,15 +308,15 @@ private struct AssistantSuggestionChip: View {
     }
 
     private var foregroundColor: Color {
-        colorScheme == .light ? Color.vibeCanvasInk : Color.vibeCanvasAccent
+        Color.vibeCapsuleForeground(.interactive, colorScheme: colorScheme)
     }
 
     private var backgroundColor: Color {
-        colorScheme == .light ? Color.vibeCanvasAccent.opacity(0.24) : Color.vibeCanvasAccent.opacity(0.18)
+        Color.vibeCapsuleBackground(.interactive, tint: .vibeCanvasAccent, colorScheme: colorScheme)
     }
 
     private var strokeColor: Color {
-        colorScheme == .light ? Color.vibeCanvasStroke.opacity(0.26) : .clear
+        Color.vibeCapsuleStroke(.interactive, colorScheme: colorScheme)
     }
 }
 

@@ -40,7 +40,7 @@ struct WritingProjectView: View {
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
     private var bodyEditorScrollerLaneWidth: CGFloat { 12 }
-    private var projectHeaderBottomSpacing: CGFloat { 4 }
+    private var projectHeaderVerticalPadding: CGFloat { shellLayoutMode.isCompact ? 7 : 8 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
@@ -155,13 +155,12 @@ struct WritingProjectView: View {
         VStack(spacing: 0) {
             projectHeader
                 .padding(.horizontal, 22)
-                .padding(.top, 10)
-                .padding(.bottom, projectHeaderBottomSpacing)
+                .padding(.vertical, projectHeaderVerticalPadding)
                 .simultaneousGesture(TapGesture().onEnded {
                     dismissSelectionCustomInputContext()
                 })
 
-            writingBodyPane(topPadding: 20, bottomPadding: 18)
+            writingBodyPane(topPadding: 16, bottomPadding: 18)
 
             composerSection(verticalPadding: 16)
         }
@@ -192,14 +191,13 @@ struct WritingProjectView: View {
         VStack(spacing: 0) {
             projectHeader
                 .padding(.horizontal, shellLayoutMode.isCompact ? 18 : 22)
-                .padding(.top, shellLayoutMode.isCompact ? 10 : 10)
-                .padding(.bottom, projectHeaderBottomSpacing)
+                .padding(.vertical, projectHeaderVerticalPadding)
                 .simultaneousGesture(TapGesture().onEnded {
                     dismissSelectionCustomInputContext()
                 })
 
             writingBodyPane(
-                topPadding: shellLayoutMode.isCompact ? 18 : 20,
+                topPadding: shellLayoutMode.isCompact ? 14 : 16,
                 bottomPadding: 18
             )
 
@@ -976,9 +974,7 @@ struct WritingProjectView: View {
     }
 
     private var selectionCapsuleForegroundColor: Color {
-        appearanceMode == .day
-            ? Color(red: 0.46, green: 0.34, blue: 0.14)
-            : Color(red: 0.88, green: 0.77, blue: 0.46)
+        Color.vibeCapsuleForeground(.fixed, colorScheme: appearanceMode.colorScheme)
     }
 
     private var selectionCapsuleBackgroundColor: Color {
