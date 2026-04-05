@@ -256,11 +256,11 @@ final class VibeWriteAppFlowTests: XCTestCase {
         }
 
         let metadataPhaseObserved = await waitUntil(timeout: 4) {
-            !flow.isProseRequestInFlight && flow.isMetadataRequestInFlight
+            flow.isProseRequestInFlight && flow.isMetadataRequestInFlight
         }
         XCTAssertTrue(metadataPhaseObserved)
         XCTAssertTrue(flow.isAIRequestInFlight)
-        XCTAssertFalse(flow.isProseRequestInFlight)
+        XCTAssertTrue(flow.isProseRequestInFlight)
         XCTAssertTrue(flow.isMetadataRequestInFlight)
         XCTAssertFalse(flow.activeProject.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
         XCTAssertTrue(flow.activeProject.suggestionChips.isEmpty)

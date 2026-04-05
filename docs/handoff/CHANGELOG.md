@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-04-06
+- `startDraft` / `continueWriting` now keep `isProseRequestInFlight` alive until the streaming preview tail finishes, so正文 auto-follow, subtitle thinking dots, and the send-button spinner stay in their thinking state through the full prose playback instead of dropping as soon as the network stream ends.
+- Metadata still starts as soon as prose streaming finishes and continues independently during that tail playback window.
+
+## 2026-04-06
 - `.edit` now preserves the currently visible assistant suggestion chips when they already exist, and only uses edit-returned chips when the suggestion area was empty before the edit completed.
 
 ## 2026-04-06

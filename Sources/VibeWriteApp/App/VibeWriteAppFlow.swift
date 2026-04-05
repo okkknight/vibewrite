@@ -435,8 +435,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 }
             }
 
-            isProseRequestInFlight = false
-
             previewRenderer.markStreamCompleted()
             guard let response = finalResponse else {
                 throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
@@ -483,6 +481,7 @@ final class VibeWriteAppFlow: ObservableObject {
             }
 
             await previewRenderer.waitForCompletion()
+            isProseRequestInFlight = false
 
             do {
                 let metadataResponse = try await metadataTask.value
