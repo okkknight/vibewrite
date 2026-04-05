@@ -15,6 +15,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The project title header now uses a tighter bottom spacing before正文, so the title background feels shorter and the正文 sits closer without changing colors, typography, or other shell styling.
 - The capsule system now distinguishes fixed chips from clickable chips in both day and night themes, and the header title/subtitle block is vertically centered more evenly inside the shortened top area.
 - Clicking selection-popover `自定义` now reveals a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the old popover while the user stays in the custom-edit flow.
+- The selection popover loading label now reads `思考中` instead of `AI 正在思考`, keeping the spinner but removing the extra wording.
 - The selection/context and assistant suggestion capsules now use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - The latest committed change before this update is `0c08f72`, which fixed the local-edit flash fade guard after trace debugging.

@@ -1066,13 +1066,13 @@ private struct SelectionPopover: View {
                 Spacer(minLength: 0)
 
                 if pendingPreset != nil {
-                    HStack(spacing: 6) {
-                        ProgressView()
-                            .progressViewStyle(.circular)
-                            .controlSize(.small)
-                            .tint(Color.vibeCanvasAccent)
+                        HStack(spacing: 6) {
+                            ProgressView()
+                                .progressViewStyle(.circular)
+                                .controlSize(.small)
+                                .tint(Color.vibeCanvasAccent)
 
-                        Text("AI 正在思考")
+                        Text("思考中")
                             .font(.system(size: 11.0, weight: .medium, design: .default))
                             .foregroundStyle(Color.vibeCanvasInkSoft)
                     }
