@@ -47,6 +47,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The流式 cadence is code-configurable through `WritingStreamingConfiguration` plus the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`, so we can tune the feel without scattering constants through the app.
 - Remote AI metadata is now explicitly constrained to the current document language for Chinese writing tasks, which keeps `summary`, `nextFocus`, and `suggestionChips` aligned with the prose language instead of drifting into English.
 - `startDraft` now has a harder metadata requirement in the prompt: it is explicitly told to always return `summary`, `nextFocus`, and exactly 3 concise follow-up chips even when the opening is short.
+- `startDraft` now frames the output as a two-part protocol: opening prose first, then the required metadata block, to make the trailing marker harder to omit.
 - `startDraft` now also uses a wider request budget than the default path, so the opening and trailing metadata have more room than before.
 - `continueWriting` now uses a persisted `continuationSummary`, a trimmed document tail, and a compact project-state block, so the continuation prompt stays compact even when the正文 grows long while still giving the model recent working memory.
 - `continueWriting` now also asks for a complete metadata block and 3 concise follow-up chips on the continuation path, so the model has a stronger prompt to return suggestions without introducing fallback behavior.
@@ -54,6 +55,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The `continueWriting` prompt was tightened again so the metadata block is treated as part of the completion condition, the conflicting "writing text only" phrasing is gone, and the final output skeleton is spelled out as正文 + `[[VIBEWRITE_METADATA]]` + JSON.
 - The latest `continueWriting` prompt pass removed duplicated completion wording and replaced the abstract `valid JSON` phrase with a more structural `exactly one JSON object` description, while keeping the same protocol and compact context shape.
 - `continueWriting` now omits the project-state block entirely and relies only on the continuation summary and document tail as context, to test whether less state pressure produces more stable metadata output.
+- `continueWriting` now also tells the model to advance only a little and avoid a fully closed ending, so the prompt leaves some forward momentum for the next step.
 - Continue-writing streaming playback now reveals from the end of the current正文 instead of starting from character 0, so the visible stream stays anchored to the latest paragraph.
 - Local edit requests now preserve the selected正文 position as a stable `selectionRange`, and the edit/revision/mock/preview layers use that exact range instead of re-finding text by content. That prevents repeated local edits from drifting to earlier duplicate passages.
 - Local edit completion now has its own transient presentation state: the正文 viewport stays anchored while the replacement lands, then the new text flashes briefly so users can see what changed without the page jumping away from the edited paragraph.

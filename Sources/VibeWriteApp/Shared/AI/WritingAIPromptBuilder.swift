@@ -25,8 +25,13 @@ struct WritingAIPromptBuilder {
         Do not output commentary outside the writing text and metadata block.
         A response is incomplete until the metadata block is present.
 
-        - When the action is "startDraft", write a short opening paragraph or two.
+        - When the action is "startDraft", return exactly two parts in order: opening prose, then the metadata block.
+        - Do not stop after the opening prose alone.
+        - Keep the opening brief so there is room for the metadata block.
+        - Even a very short opening still needs the metadata block.
         - When the action is "continueWriting", continue with the next short paragraph or scene.
+        - Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.
+        - Leave a small amount of forward momentum for the next step.
         - When the action is "edit", return only the replacement text for the selected segment.
         - Keep the output short enough to stream quickly.
         - Do not stop after writing text alone.
@@ -89,6 +94,11 @@ struct WritingAIPromptBuilder {
         }
 
         if request.action == .startDraft {
+            lines.append("For startDraft, the response is incomplete without the metadata block.")
+            lines.append("Return exactly two parts in order: the opening prose, then the metadata block.")
+            lines.append("Do not stop after the opening prose alone.")
+            lines.append("Keep the opening brief so there is room for the metadata block.")
+            lines.append("Even a very short opening still needs the metadata block.")
             lines.append("For startDraft, the metadata block is required and must include summary, nextFocus, and exactly 3 concise suggestion chips.")
             lines.append("The summary should briefly describe the current opening state, nextFocus should name the next concrete step, and suggestionChips should be the most useful immediate follow-up actions.")
             lines.append("For startDraft, return 3 concise suggestion chips that would be useful immediately after this opening is written.")
@@ -96,6 +106,9 @@ struct WritingAIPromptBuilder {
         } else if request.action == .continueWriting {
             lines.append("Use the document summary as global context and the document tail as the continuation anchor.")
             lines.append("Do not restart from the beginning of the article.")
+            lines.append("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.")
+            lines.append("Leave a small amount of forward momentum for the next step.")
+            lines.append("Keep the continuation brief so the next move still feels natural.")
             lines.append("For continueWriting, suggestionChips must contain exactly 3 concise items.")
             lines.append("Those chips should be concrete next steps that naturally follow the current正文 and should not be generic continuation prompts.")
         }

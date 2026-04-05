@@ -130,6 +130,10 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(systemPrompt.contains("summary, nextFocus, suggestionChips"))
         XCTAssertTrue(systemPrompt.contains("Chinese writing tasks"))
         XCTAssertTrue(systemPrompt.contains("A response is incomplete until the metadata block is present."))
+        XCTAssertTrue(systemPrompt.contains("When the action is \"startDraft\", return exactly two parts in order: opening prose, then the metadata block."))
+        XCTAssertTrue(systemPrompt.contains("Do not stop after the opening prose alone."))
+        XCTAssertTrue(systemPrompt.contains("Keep the opening brief so there is room for the metadata block."))
+        XCTAssertTrue(systemPrompt.contains("Even a very short opening still needs the metadata block."))
         XCTAssertTrue(systemPrompt.contains("Every response must end with exactly one metadata block."))
         XCTAssertTrue(systemPrompt.contains("Do not stop after writing text alone."))
         XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", suggestionChips must contain exactly 3 items."))
@@ -139,6 +143,11 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(userPrompt.contains("Required output shape:"))
         XCTAssertTrue(userPrompt.contains("exactly one JSON object with summary, nextFocus, and suggestionChips"))
         XCTAssertTrue(userPrompt.contains("{\"summary\":\"...\",\"nextFocus\":\"...\",\"suggestionChips\":[\"...\",\"...\",\"...\"]}"))
+        XCTAssertTrue(userPrompt.contains("For startDraft, the response is incomplete without the metadata block."))
+        XCTAssertTrue(userPrompt.contains("Return exactly two parts in order: the opening prose, then the metadata block."))
+        XCTAssertTrue(userPrompt.contains("Do not stop after the opening prose alone."))
+        XCTAssertTrue(userPrompt.contains("Keep the opening brief so there is room for the metadata block."))
+        XCTAssertTrue(userPrompt.contains("Even a very short opening still needs the metadata block."))
         XCTAssertTrue(userPrompt.contains("For startDraft, the metadata block is required"))
         XCTAssertTrue(userPrompt.contains("exactly 3 concise suggestion chips"))
         XCTAssertFalse(userPrompt.contains("assistantMessage"))
@@ -190,11 +199,16 @@ final class WritingAITests: XCTestCase {
         let userPrompt = messages.last?.content ?? ""
 
         XCTAssertTrue(systemPrompt.contains("When the action is \"continueWriting\", suggestionChips must contain exactly 3 items."))
+        XCTAssertTrue(systemPrompt.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph."))
+        XCTAssertTrue(systemPrompt.contains("Leave a small amount of forward momentum for the next step."))
         XCTAssertTrue(userPrompt.contains("Document summary:"))
         XCTAssertTrue(userPrompt.contains("Document tail:"))
         XCTAssertTrue(userPrompt.contains("给模型看的压缩摘要要更短、更偏状态"))
         XCTAssertTrue(userPrompt.contains("尾部第二段要真正作为继续写的起点。"))
         XCTAssertTrue(userPrompt.contains("Do not restart from the beginning of the article."))
+        XCTAssertTrue(userPrompt.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph."))
+        XCTAssertTrue(userPrompt.contains("Leave a small amount of forward momentum for the next step."))
+        XCTAssertTrue(userPrompt.contains("Keep the continuation brief so the next move still feels natural."))
         XCTAssertFalse(userPrompt.contains("Project state:"))
         XCTAssertFalse(userPrompt.contains("Current goal:"))
         XCTAssertFalse(userPrompt.contains("Next focus:"))
@@ -207,7 +221,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
     }
 
-    func testRemoteClientUsesWiderMaxTokensAndProjectStateForContinueWriting() async throws {
+    func testRemoteClientUsesWiderMaxTokensAndDocumentTailForContinueWriting() async throws {
         let configuration = WritingAIConfiguration.configuration(from: [
             "VIBEWRITE_AI_DEFAULT_MODE": "real",
             "VIBEWRITE_AI_PROVIDER": "minimax",
@@ -221,11 +235,14 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.maxTokens, 1536)
-            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Project state:") ?? false)
-            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Current goal:") ?? false)
-            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Next focus:") ?? false)
-            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Style constraints:") ?? false)
+            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Project state:") ?? true)
+            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Current goal:") ?? true)
+            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Next focus:") ?? true)
+            XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Style constraints:") ?? true)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Document tail:") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Leave a small amount of forward momentum for the next step.") ?? false)
+            XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Keep the continuation brief so the next move still feels natural.") ?? false)
 
             let response = """
             event: message_start
