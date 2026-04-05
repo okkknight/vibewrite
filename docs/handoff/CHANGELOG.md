@@ -8,6 +8,9 @@
 ## 2026-04-06
 - `continueWriting` now advances only a little, avoids a fully closed ending, and relies on the persisted continuation summary plus the document tail instead of the fuller project-state block, so the continuation path stays softer and leaves room for the next turn.
 
+## 2026-04-06
+- Closing the macOS window via the title-bar close button now routes through the same dirty-check confirmation flow as Open/New, so unsaved正文 changes prompt to save before the window closes.
+
 ## 2026-04-05
 - The正文 editor bridge now keeps live user text intact when `NSTextView` is the active first responder and its visible buffer has drifted ahead of the SwiftUI binding, so selection/focus refreshes no longer wipe freshly typed text before save.
 
@@ -143,6 +146,10 @@
 ## 2026-04-04
 - The repo now ignores local Xcode artifacts, workspace user state, and `Config/VibeWrite.local.xcconfig` so those files stay out of future commits.
 - The local-only `Config/VibeWrite.local.xcconfig` still carries the real `MINIMAX_API_KEY`, which is intentionally not committed and should be treated as a machine-specific secret.
+
+# 2026-04-06
+- Independent review of `QA_REPORT_2026-04-06.md` did not fully pass: the referenced macOS UI regression test `VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` failed in my environment while waiting for the main window to appear, so the report's completed verification set is not reproducible as written.
+- The underlying dual-request implementation still looks consistent in code review, but the QA attachment should be treated as needing a rerun of the UI check before acceptance.
 
 ## 2026-04-04
 - The selection edit popover now anchors to the selected正文 region instead of staying fixed in the upper-right corner of the page. The change only touches the selection-positioning path; the edit and continue actions keep their previous behavior.

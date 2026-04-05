@@ -698,6 +698,10 @@ final class VibeWriteAppFlow: ObservableObject {
         return openDocument(at: entry.url)
     }
 
+    func handleWindowCloseRequest() -> Bool {
+        confirmDiscardCurrentChangesIfNeeded()
+    }
+
     private func recordRecentDocument(url: URL, title: String) {
         let entry = RecentDocumentEntry(
             url: url,

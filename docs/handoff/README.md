@@ -40,6 +40,7 @@ This directory is the compact handoff layer for VibeWrite.
 - External document opens now pass through a short hydration window so the freshly loaded正文 is not immediately overwritten by an empty binding sync on the first render.
 - The latest repo commit before this update is `66b43f2`, which softens `continueWriting` endings so the model advances only a little and uses the persisted continuation summary plus the document tail instead of the fuller project-state block.
 - The正文 editor bridge now preserves live user text when the NSTextView is the active first responder and its content diverges from the SwiftUI binding, so selection/focus refreshes no longer overwrite freshly typed text before save.
+- Closing the window via the macOS title-bar `×` now reuses the same dirty-check confirmation path as Open/New, so unsaved正文 changes prompt before the app closes.
 - The duplicate top-level `File` menu was traced to a standalone `CommandMenu("File")` in `VibeWriteCommands`; the current fix routes those actions through standard `CommandGroup` placement so the app keeps one top-level File menu.
 - `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
 - `scripts/package_dmg.sh` is now the simple friend-trial packaging path: it builds a Release app with `ENABLE_DEBUG_DYLIB=NO` and stages it with an `/Applications` shortcut, so the current build can be turned into a DMG without adding a full installer flow.

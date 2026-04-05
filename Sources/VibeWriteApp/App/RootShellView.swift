@@ -30,6 +30,11 @@ struct RootShellView: View {
                     appearanceMode: $appearanceMode
                 )
             }
+            .background(
+                WindowCloseObserver {
+                    flow.handleWindowCloseRequest()
+                }
+            )
             .tint(.vibeAccent)
             .preferredColorScheme(appearanceMode.colorScheme)
             .toolbarRole(.editor)
@@ -49,6 +54,47 @@ struct RootShellView: View {
                     }
                 }
             }
+        }
+    }
+}
+
+private struct WindowCloseObserver: NSViewRepresentable {
+    let shouldClose: () -> Bool
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(shouldClose: shouldClose)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        context.coordinator.attach(to: view.window)
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.shouldClose = shouldClose
+        DispatchQueue.main.async {
+            context.coordinator.attach(to: nsView.window)
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSWindowDelegate {
+        var shouldClose: () -> Bool
+        weak var window: NSWindow?
+
+        init(shouldClose: @escaping () -> Bool) {
+            self.shouldClose = shouldClose
+        }
+
+        func attach(to window: NSWindow?) {
+            guard let window else { return }
+            self.window = window
+            window.delegate = self
+        }
+
+        func windowShouldClose(_ sender: NSWindow) -> Bool {
+            shouldClose()
         }
     }
 }
