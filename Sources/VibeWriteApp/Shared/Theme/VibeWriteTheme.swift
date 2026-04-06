@@ -292,15 +292,22 @@ struct AccentPill: View {
     let title: String
     var icon: String?
     var tint: Color = .vibeAccent
+    var showsThinkingDot: Bool = false
     var accessibilityIdentifier: String? = nil
     @Environment(\.colorScheme) private var colorScheme
 
     var body: some View {
-        Label {
-            Text(title)
-        } icon: {
-            if let icon {
-                Image(systemName: icon)
+        HStack(spacing: showsThinkingDot ? 7 : 0) {
+            Label {
+                Text(title)
+            } icon: {
+                if let icon {
+                    Image(systemName: icon)
+                }
+            }
+
+            if showsThinkingDot {
+                BreathingDot(tint: tint)
             }
         }
         .font(.system(size: 12.2, weight: .semibold, design: .default))
@@ -328,6 +335,32 @@ struct AccentPill: View {
 
     private var strokeColor: Color {
         Color.vibeCapsuleStroke(.fixed, colorScheme: colorScheme)
+    }
+}
+
+private struct BreathingDot: View {
+    let tint: Color
+    @Environment(\.colorScheme) private var colorScheme
+
+    var body: some View {
+        TimelineView(.animation) { context in
+            let t = context.date.timeIntervalSinceReferenceDate
+            let pulse = 0.5 + 0.5 * sin(t * 2.1)
+            let opacity = 0.34 + 0.24 * pulse
+            let scale = 0.90 + 0.16 * pulse
+
+            Circle()
+                .fill(tint.opacity(opacity))
+                .frame(width: 7.5, height: 7.5)
+                .scaleEffect(scale)
+                .shadow(
+                    color: tint.opacity(colorScheme == .light ? 0.22 : 0.28),
+                    radius: 2.0,
+                    x: 0,
+                    y: 0.6
+                )
+                .accessibilityHidden(true)
+        }
     }
 }
 

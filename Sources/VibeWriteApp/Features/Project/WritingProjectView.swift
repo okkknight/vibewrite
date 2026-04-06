@@ -22,7 +22,6 @@ struct WritingProjectView: View {
     @State private var isLocalEditViewportLocked = false
     @State private var isDocumentEndFollowActive = false
     @State private var bodyEditorScrollView: NSScrollView?
-    @State private var bodyEditorViewportState = SelectableTextEditorViewportState()
     @State private var showComparison = false
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
@@ -45,6 +44,7 @@ struct WritingProjectView: View {
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
     }
+    private var bodyEdgeFadeHeight: CGFloat { shellLayoutMode.isCompact ? 14 : 18 }
 
     private var projectTitleBinding: Binding<String> {
         let projectID = project.id
@@ -114,7 +114,6 @@ struct WritingProjectView: View {
             isLocalEditViewportLocked = false
             isDocumentEndFollowActive = false
             bodyEditorScrollView = nil
-            bodyEditorViewportState = .init()
             showComparison = false
             showAssistantLayer = false
             showHistoryLayer = false
@@ -187,9 +186,9 @@ struct WritingProjectView: View {
                     dismissSelectionCustomInputContext()
                 })
 
-            writingBodyPane(topPadding: 16, bottomPadding: 18)
+            writingBodyPane(topPadding: 16, bottomPadding: 8)
 
-            composerSection(verticalPadding: 16)
+            composerSection(verticalPadding: 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -228,7 +227,7 @@ struct WritingProjectView: View {
                 bottomPadding: 18
             )
 
-            composerSection(verticalPadding: shellLayoutMode.isCompact ? 14 : 16)
+            composerSection(verticalPadding: 8)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: shellLayoutMode.isCompact ? .infinity : 872, alignment: .top)
@@ -363,9 +362,6 @@ struct WritingProjectView: View {
                     shouldPreserveSelectionOverlayDuringPendingLocalEdit: selectionPopoverPendingPreset != nil || isComposerLocked,
                     onScrollViewReady: { scrollView in
                         bodyEditorScrollView = scrollView
-                    },
-                    onViewportStateChanged: { viewportState in
-                        bodyEditorViewportState = viewportState
                     }
                 )
                 .id(project.id)
@@ -381,6 +377,8 @@ struct WritingProjectView: View {
                     }
                 }
 
+                bodyEdgeFadeOverlay
+
                 if let selectedText = activeSelectionPopoverText,
                    let selectionPopoverOrigin = activeSelectionPopoverOrigin {
                     SelectionPopover(
@@ -395,17 +393,14 @@ struct WritingProjectView: View {
                     .zIndex(1)
                 }
             }
-            .overlay(alignment: .bottom) {
-                if shouldShowScrollToBottomButton {
-                    scrollToBottomButton
-                        .padding(.bottom, 16)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                        .frame(maxWidth: .infinity, alignment: .center)
-                        .allowsHitTesting(true)
-                }
+            .overlay {
+                BodyEditorScrollToBottomOverlay(
+                    scrollView: bodyEditorScrollView,
+                    appearanceMode: appearanceMode,
+                    onScrollToBottom: scrollBodyEditorToBottom
+                )
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
-            .animation(.easeInOut(duration: 0.16), value: shouldShowScrollToBottomButton)
 
             if let errorMessage = flow.aiErrorMessage {
                 Text(errorMessage)
@@ -435,57 +430,23 @@ struct WritingProjectView: View {
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
 
-    private var shouldShowScrollToBottomButton: Bool {
-        bodyEditorViewportState.canScrollDown && !bodyEditorViewportState.isAtDocumentEnd
-    }
-
-    private var scrollToBottomButton: some View {
-        Button(action: scrollBodyEditorToBottom) {
-            Label("回到底端", systemImage: "arrow.down.to.line.compact")
-                .font(.system(size: 12.5, weight: .semibold, design: .default))
-                .foregroundStyle(Color.vibeCanvasInk)
-                .padding(.horizontal, 14)
-                .padding(.vertical, 10)
-                .background {
-                    RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .fill(
-                            appearanceMode == .day
-                                ? Color.vibeCanvasLift.opacity(0.84)
-                                : Color.vibeCanvasLift.opacity(0.82)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .fill(
-                                    LinearGradient(
-                                        colors: [
-                                            Color.white.opacity(0.02),
-                                            .clear
-                                        ],
-                                        startPoint: .topLeading,
-                                        endPoint: .bottomTrailing
-                                    )
-                                )
-                                .blendMode(.softLight)
-                        )
-                        .overlay(
-                            RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                .strokeBorder(Color.vibeCanvasStroke.opacity(0.28), lineWidth: 1)
-                        )
-                        .shadow(color: Color.black.opacity(appearanceMode == .day ? 0.08 : 0.14), radius: 8, x: 0, y: 3)
-                }
-        }
-        .buttonStyle(.plain)
-        .focusEffectDisabled()
-        .accessibilityIdentifier("scrollToBottomButton")
-    }
-
     private func scrollBodyEditorToBottom() {
         guard let scrollView = bodyEditorScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
 
         let endRange = NSRange(location: textView.string.utf16.count, length: 0)
+        selectedText = nil
+        selectedTextRange = WritingTextSelectionRange(location: endRange.location, length: 0)
+        isDocumentEndFollowActive = true
+        textView.setSelectedRange(endRange)
         textView.scrollRangeToVisible(endRange)
         scrollView.reflectScrolledClipView(scrollView.contentView)
+
+        DispatchQueue.main.asyncAfter(deadline: .now() + 0.12) {
+            if isDocumentEndFollowActive {
+                isDocumentEndFollowActive = false
+            }
+        }
     }
 
     private var assistantLayer: some View {
@@ -642,7 +603,7 @@ struct WritingProjectView: View {
 
     private func composerSection(verticalPadding: CGFloat) -> some View {
         writingContentColumn {
-            VStack(alignment: .leading, spacing: 6) {
+            VStack(alignment: .leading, spacing: 3) {
                 if let selectionCustomContextText {
                     selectionCustomContextCapsule(text: selectionCustomContextText)
                         .transition(.opacity.combined(with: .move(edge: .top)))
@@ -1066,13 +1027,13 @@ struct WritingProjectView: View {
 
     private func selectionCustomContextCapsule(text: String) -> some View {
         Text(text)
-            .font(.system(size: 12.2, weight: .medium, design: .default))
+            .font(.system(size: 12.0, weight: .medium, design: .default))
             .foregroundStyle(selectionCapsuleForegroundColor)
             .lineLimit(1)
             .truncationMode(.tail)
             .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 13)
+            .padding(.vertical, 9)
             .background {
                 RoundedRectangle(cornerRadius: 16, style: .continuous)
                     .fill(selectionCapsuleBackgroundColor)
@@ -1081,7 +1042,7 @@ struct WritingProjectView: View {
                             .fill(
                                 LinearGradient(
                                     colors: [
-                                        Color.white.opacity(0.018),
+                                        Color.white.opacity(0.010),
                                         .clear
                                     ],
                                     startPoint: .topLeading,
@@ -1094,26 +1055,226 @@ struct WritingProjectView: View {
                         RoundedRectangle(cornerRadius: 16, style: .continuous)
                             .strokeBorder(selectionCapsuleStrokeColor, lineWidth: 1)
                     )
-                    .shadow(color: Color.black.opacity(0.10), radius: 8, x: 0, y: 3)
+                    .shadow(color: Color.black.opacity(0.06), radius: 6, x: 0, y: 2)
             }
             .accessibilityLabel("选中内容")
             .accessibilityValue(text)
     }
 
+    private var bodyEdgeFadeOverlay: some View {
+        VStack(spacing: 0) {
+            LinearGradient(
+                colors: [
+                    Color.vibeCanvas.opacity(0.94),
+                    Color.vibeCanvas.opacity(0.46),
+                    Color.vibeCanvas.opacity(0.0)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: bodyEdgeFadeHeight)
+
+            Spacer(minLength: 0)
+
+            LinearGradient(
+                colors: [
+                    Color.vibeCanvas.opacity(0.0),
+                    Color.vibeCanvas.opacity(0.46),
+                    Color.vibeCanvas.opacity(0.94)
+                ],
+                startPoint: .top,
+                endPoint: .bottom
+            )
+            .frame(height: bodyEdgeFadeHeight)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+        .allowsHitTesting(false)
+        .accessibilityHidden(true)
+    }
+
     private var selectionCapsuleForegroundColor: Color {
-        Color.vibeCapsuleForeground(.fixed, colorScheme: appearanceMode.colorScheme)
+        let base = Color.vibeCapsuleForeground(.fixed, colorScheme: appearanceMode.colorScheme)
+        return appearanceMode == .day ? base.opacity(0.84) : base.opacity(0.90)
     }
 
     private var selectionCapsuleBackgroundColor: Color {
         appearanceMode == .day
-            ? Color.vibeCanvasLift.opacity(0.96)
-            : Color.vibeCanvasLift.opacity(0.90)
+            ? Color.vibeCanvasLift.opacity(0.88)
+            : Color.vibeCanvasLift.opacity(0.84)
     }
 
     private var selectionCapsuleStrokeColor: Color {
         appearanceMode == .day
-            ? Color.vibeCanvasStroke.opacity(0.58)
-            : Color.vibeCanvasStroke.opacity(0.46)
+            ? Color.vibeCanvasStroke.opacity(0.46)
+            : Color.vibeCanvasStroke.opacity(0.34)
+    }
+}
+
+private struct BodyEditorScrollToBottomOverlay: View {
+    let scrollView: NSScrollView?
+    let appearanceMode: VibeAppearanceMode
+    let onScrollToBottom: () -> Void
+
+    @State private var viewportState = SelectableTextEditorViewportState()
+
+    var body: some View {
+        ZStack(alignment: .bottom) {
+            if shouldShowButton {
+                Button(action: onScrollToBottom) {
+                    Image(systemName: "arrow.down.to.line.compact")
+                        .font(.system(size: 12.8, weight: .semibold, design: .default))
+                        .foregroundStyle(Color.vibeCanvasInk)
+                        .frame(width: 30, height: 30)
+                        .background {
+                            RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                .fill(
+                                    appearanceMode == .day
+                                        ? Color.vibeCanvasLift.opacity(0.84)
+                                        : Color.vibeCanvasLift.opacity(0.82)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                        .fill(
+                                            LinearGradient(
+                                                colors: [
+                                                    Color.white.opacity(0.02),
+                                                    .clear
+                                                ],
+                                                startPoint: .topLeading,
+                                                endPoint: .bottomTrailing
+                                            )
+                                        )
+                                        .blendMode(.softLight)
+                                )
+                                .overlay(
+                                    RoundedRectangle(cornerRadius: 15, style: .continuous)
+                                        .strokeBorder(Color.vibeCanvasStroke.opacity(0.28), lineWidth: 1)
+                                )
+                                .shadow(color: Color.black.opacity(appearanceMode == .day ? 0.08 : 0.14), radius: 8, x: 0, y: 3)
+                        }
+                }
+                .buttonStyle(.plain)
+                .focusEffectDisabled()
+                .accessibilityLabel("回到底端")
+                .accessibilityIdentifier("scrollToBottomButton")
+                .padding(.bottom, 8)
+                .transition(.opacity.combined(with: .move(edge: .bottom)))
+            }
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottom)
+        .allowsHitTesting(true)
+        .background {
+            ScrollViewportStateReader(scrollView: scrollView) { viewportState = $0 }
+        }
+        .animation(.easeInOut(duration: 0.16), value: shouldShowButton)
+    }
+
+    private var shouldShowButton: Bool {
+        viewportState.canScrollDown && !viewportState.isAtDocumentEnd
+    }
+}
+
+private struct ScrollViewportStateReader: NSViewRepresentable {
+    let scrollView: NSScrollView?
+    let onChange: (SelectableTextEditorViewportState) -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(onChange: onChange)
+    }
+
+    func makeNSView(context: Context) -> NSView {
+        let view = NSView(frame: .zero)
+        view.isHidden = true
+        return view
+    }
+
+    func updateNSView(_ nsView: NSView, context: Context) {
+        context.coordinator.onChange = onChange
+        context.coordinator.attach(to: scrollView)
+    }
+
+    @MainActor
+    final class Coordinator: NSObject {
+        var onChange: (SelectableTextEditorViewportState) -> Void
+        weak var scrollView: NSScrollView?
+        weak var observedContentView: NSClipView?
+        weak var observedTextView: NSTextView?
+        private var lastReportedState: SelectableTextEditorViewportState?
+
+        init(onChange: @escaping (SelectableTextEditorViewportState) -> Void) {
+            self.onChange = onChange
+        }
+
+        deinit {
+            NotificationCenter.default.removeObserver(self)
+        }
+
+        func attach(to scrollView: NSScrollView?) {
+            guard self.scrollView !== scrollView else {
+                emitCurrentState()
+                return
+            }
+
+            NotificationCenter.default.removeObserver(self)
+            self.scrollView = scrollView
+            observedContentView = nil
+            observedTextView = nil
+
+            guard let scrollView else {
+                lastReportedState = nil
+                return
+            }
+
+            let contentView = scrollView.contentView
+            let textView = scrollView.documentView as? NSTextView
+            observedContentView = contentView
+            observedTextView = textView
+
+            contentView.postsBoundsChangedNotifications = true
+            NotificationCenter.default.addObserver(
+                self,
+                selector: #selector(handleViewportDidChange(_:)),
+                name: NSView.boundsDidChangeNotification,
+                object: contentView
+            )
+
+            if let textView {
+                textView.postsFrameChangedNotifications = true
+                NotificationCenter.default.addObserver(
+                    self,
+                    selector: #selector(handleViewportDidChange(_:)),
+                    name: NSView.frameDidChangeNotification,
+                    object: textView
+                )
+            }
+
+            emitCurrentState()
+        }
+
+        @objc
+        private func handleViewportDidChange(_ notification: Notification) {
+            emitCurrentState()
+        }
+
+        private func emitCurrentState() {
+            guard let scrollView,
+                  let textView = scrollView.documentView as? NSTextView else { return }
+
+            let visibleHeight = max(scrollView.contentView.bounds.height, 1)
+            let contentHeight = max(textView.frame.height, visibleHeight)
+            let maximumScrollOffsetY = max(contentHeight - visibleHeight, 0)
+            let currentScrollOffsetY = max(scrollView.contentView.bounds.origin.y, 0)
+            let viewportState = SelectableTextEditorViewportState(
+                contentHeight: contentHeight,
+                visibleHeight: visibleHeight,
+                currentScrollOffsetY: currentScrollOffsetY,
+                maximumScrollOffsetY: maximumScrollOffsetY
+            )
+
+            guard lastReportedState != viewportState else { return }
+            lastReportedState = viewportState
+            onChange(viewportState)
+        }
     }
 }
 

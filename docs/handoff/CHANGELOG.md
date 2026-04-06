@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-06
+- The正文 surface now fades softly at the top and bottom edges instead of hard-cutting into the surrounding modules, and the bottom Composer section was tightened vertically so the writing area sits closer to it while staying horizontally centered.
+
+# 2026-04-06
+- The first Save As path for a never-before-saved正文 now backfills the project title from the filename the user chose, so the initial save panel acts as the one place where filename and title are intentionally synchronized.
+
+# 2026-04-06
 - The first-open hydration regression is fixed again at the bridge boundary: bootstrap empty `textDidChange` / `textDidEndEditing` notifications are now ignored while a loaded file is seeding the editor, so opening a file from a blank session shows the正文 on the first try instead of blanking it back out. Real manual typing and deletion still flow through the live-text commit path.
 
 # 2026-04-06

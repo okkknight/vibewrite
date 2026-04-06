@@ -46,11 +46,20 @@ struct RootShellView: View {
 
                 DispatchQueue.main.async {
                     NSApp.activate(ignoringOtherApps: true)
-                    NSApp.unhide(nil)
-
-                    for window in NSApp.windows {
+                    if let window = NSApp.windows.first(where: { $0.isMainWindow || $0.isKeyWindow }) {
+                        VibeWriteLog.launch.info(
+                            "RootShellView window probe title=\(window.title.vibewriteLogPreview(maxLength: 40), privacy: .public) number=\(window.windowNumber, privacy: .public) frame=\(String(describing: window.frame), privacy: .public) contentLayoutRect=\(String(describing: window.contentLayoutRect), privacy: .public) visible=\(window.isVisible, privacy: .public) miniaturized=\(window.isMiniaturized, privacy: .public) key=\(window.isKeyWindow, privacy: .public) main=\(window.isMainWindow, privacy: .public) autosave=\(window.frameAutosaveName, privacy: .public)"
+                        )
                         window.makeKeyAndOrderFront(nil)
                         window.orderFrontRegardless()
+                    }
+                    VibeWriteLog.launch.info(
+                        "RootShellView window probe count=\(NSApp.windows.count, privacy: .public)"
+                    )
+                    for window in NSApp.windows {
+                        VibeWriteLog.launch.info(
+                            "RootShellView window listed title=\(window.title.vibewriteLogPreview(maxLength: 40), privacy: .public) number=\(window.windowNumber, privacy: .public) frame=\(String(describing: window.frame), privacy: .public) contentLayoutRect=\(String(describing: window.contentLayoutRect), privacy: .public) visible=\(window.isVisible, privacy: .public) miniaturized=\(window.isMiniaturized, privacy: .public) key=\(window.isKeyWindow, privacy: .public) main=\(window.isMainWindow, privacy: .public) autosave=\(window.frameAutosaveName, privacy: .public)"
+                        )
                     }
                 }
             }
@@ -94,7 +103,7 @@ private struct WindowCloseObserver: NSViewRepresentable {
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {
-            shouldClose()
+            return shouldClose()
         }
     }
 }

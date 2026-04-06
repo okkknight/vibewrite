@@ -27,7 +27,8 @@ struct ProjectComposerBar: View {
                     AccentPill(
                         title: primaryActionTitle,
                         icon: actionIcon,
-                        tint: .vibeCanvasAccent
+                        tint: .vibeCanvasAccent,
+                        showsThinkingDot: isPrimaryActionInFlight
                     )
 
                     if shouldShowSuggestionLoadingPill {
@@ -46,7 +47,8 @@ struct ProjectComposerBar: View {
                     AccentPill(
                         title: primaryActionTitle,
                         icon: actionIcon,
-                        tint: .vibeCanvasAccent
+                        tint: .vibeCanvasAccent,
+                        showsThinkingDot: isPrimaryActionInFlight
                     )
 
                     Spacer(minLength: 0)
@@ -102,14 +104,24 @@ struct ProjectComposerBar: View {
                 Button(action: onSubmit) {
                     SubmitGlyph(isThinking: isPrimaryActionInFlight)
                         .background {
-                            Circle()
-                                .fill(Color.vibeCanvasLift.opacity(isRequestInFlight || isComposerLocked ? 0.72 : 0.96))
-                                .overlay(
+                            ZStack {
+                                Circle()
+                                    .fill(Color.vibeCanvasLift.opacity(submitButtonFillOpacity))
+
+                                if isPrimaryActionInFlight {
                                     Circle()
-                                        .strokeBorder(Color.vibeCanvasStroke.opacity(isRequestInFlight || isComposerLocked ? 0.35 : 0.58), lineWidth: 1)
-                                )
+                                        .fill(Color.vibeCanvasAccent.opacity(0.08))
+                                        .blendMode(.softLight)
+
+                                    Circle()
+                                        .strokeBorder(Color.vibeCanvasAccent.opacity(0.20), lineWidth: 1)
+                                } else {
+                                    Circle()
+                                        .strokeBorder(Color.vibeCanvasStroke.opacity(submitButtonStrokeOpacity), lineWidth: 1)
+                                }
+                            }
                         }
-                        .shadow(color: Color.black.opacity(0.16), radius: 8, x: 0, y: 4)
+                        .shadow(color: submitButtonShadowColor, radius: submitButtonShadowRadius, x: 0, y: submitButtonShadowYOffset)
                 }
                 .buttonStyle(.plain)
                 .disabled(isRequestInFlight || isComposerLocked)
@@ -119,7 +131,7 @@ struct ProjectComposerBar: View {
             }
             .accessibilityElement(children: .contain)
         }
-        .padding(14)
+        .padding(12)
         .accessibilityElement(children: .contain)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)
@@ -206,6 +218,51 @@ struct ProjectComposerBar: View {
         }
     }
 
+    private var submitButtonFillOpacity: Double {
+        if isRequestInFlight || isComposerLocked {
+            return 0.72
+        }
+
+        return isPrimaryActionInFlight ? 0.99 : 0.96
+    }
+
+    private var submitButtonStrokeOpacity: Double {
+        if isRequestInFlight || isComposerLocked {
+            return 0.35
+        }
+
+        return isPrimaryActionInFlight ? 0.82 : 0.58
+    }
+
+    private var submitButtonShadowColor: Color {
+        if isPrimaryActionInFlight {
+            switch appearanceMode {
+            case .day:
+                return Color.black.opacity(0.34)
+            case .night:
+                return Color.black.opacity(0.42)
+            }
+        }
+
+        return Color.black.opacity(0.16)
+    }
+
+    private var submitButtonShadowRadius: CGFloat {
+        if isPrimaryActionInFlight {
+            return 18
+        }
+
+        return 8
+    }
+
+    private var submitButtonShadowYOffset: CGFloat {
+        if isPrimaryActionInFlight {
+            return 9
+        }
+
+        return 4
+    }
+
     private var normalizedAssistantNextFocus: String? {
         let trimmed = assistantNextFocus?.trimmingCharacters(in: .whitespacesAndNewlines)
         guard let trimmed, !trimmed.isEmpty else {
@@ -290,7 +347,7 @@ private struct SubmitGlyph: View {
             } else {
                 Image(systemName: "arrow.up")
                     .font(.system(size: 13.5, weight: .semibold, design: .default))
-                    .foregroundStyle(Color.vibeCanvasInk)
+                    .foregroundStyle(Color.vibeCanvasInkMuted)
                     .frame(width: 34, height: 34)
             }
         }

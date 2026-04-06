@@ -74,6 +74,24 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeDocumentText, "typed draft")
     }
 
+    func testInitialSaveProjectUsesChosenFilenameAsTitle() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        flow.createNewProject()
+        flow.activeDocumentTextBinding.wrappedValue = "typed draft"
+
+        let saveURL = storageURL.deletingLastPathComponent().appendingPathComponent("我写的第一篇文章.md")
+        let project = flow.projectForInitialSave(at: saveURL)
+
+        XCTAssertEqual(project.title, "我写的第一篇文章")
+        XCTAssertEqual(project.documentText, "typed draft")
+        XCTAssertEqual(flow.activeProject.title, "未命名写作")
+    }
+
     func testRenameActiveProjectPreservesLiveDocumentText() {
         let flow = VibeWriteAppFlow()
         flow.createNewProject()

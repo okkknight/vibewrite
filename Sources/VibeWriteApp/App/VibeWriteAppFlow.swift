@@ -782,7 +782,9 @@ final class VibeWriteAppFlow: ObservableObject {
             return false
         }
 
-        let projectToSave = currentDocumentURL == nil ? activeEditingProject : activeEditingProject.forkedSaveAsCopy()
+        let projectToSave = currentDocumentURL == nil
+            ? projectForInitialSave(at: url)
+            : activeEditingProject.forkedSaveAsCopy()
         return saveCurrentDocument(
             to: url,
             project: projectToSave,
@@ -938,6 +940,21 @@ final class VibeWriteAppFlow: ObservableObject {
         }
 
         return cleanedTitle + ".md"
+    }
+
+    func projectForInitialSave(at url: URL) -> WritingProject {
+        var project = activeEditingProject
+        let initialSaveTitle = initialSaveTitle(for: url)
+        if project.title != initialSaveTitle {
+            project.title = initialSaveTitle
+        }
+        return project
+    }
+
+    private func initialSaveTitle(for url: URL) -> String {
+        let candidateTitle = url.deletingPathExtension().lastPathComponent
+            .trimmingCharacters(in: .whitespacesAndNewlines)
+        return candidateTitle.isEmpty ? activeEditingProject.title : candidateTitle
     }
 
     private func ensureDocumentParentDirectoryExists(for url: URL) throws {

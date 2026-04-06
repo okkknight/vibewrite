@@ -36,6 +36,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `Config/VibeWrite.local.xcconfig` is intentionally local-only and currently carries a real `MINIMAX_API_KEY`; it is ignored by git and should stay out of commits.
 - `scripts/package_dmg.sh` now builds a Release app with `ENABLE_DEBUG_DYLIB=NO` and stages it with an `/Applications` link, so we have a simple friend-test DMG path when we want to ship the current build without large-scale distribution.
 - The document storage model has been redesigned so the Markdown file carries only正文 plus a hidden identity marker, while the collaboration metadata lives in an app-side metadata store keyed by `docID`. `xattr` owns the primary identity marker, the body marker is a fallback, Save As generates a fresh `docID`, and malformed metadata always degrades to正文-only editing.
+- On the first Save As of a never-before-saved正文, the filename the user chose now backfills the project title as well, but later title/file-name edits stay independent.
 - The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
 - `.edit` now preserves already-visible assistant suggestion chips instead of replacing them. If the suggestion area was empty before the edit completed, the edit response can still populate it.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps revealing the remaining text one character at a time instead of flushing the tail in one jump.
@@ -170,6 +171,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - If you touch the file document parser or save flow, keep `xattr` as the primary identity source, fall back to the body marker only when needed, and preserve the正文-only recovery path when metadata is missing or broken.
 - If you touch collaboration state persistence, keep the recent-conversation cap at 20 rounds and keep the `localSummary` and `globalSynopsis` in sync with the latest metadata record.
 - The current save-loss tracing pass now logs the live正文 binding setter plus the editor bridge's make/update/sync decisions in one shot; the next repro should be able to follow a single input from `NSTextView` into `activeDocumentText` and then into the saved snapshot without adding more probes.
+- The正文 edge treatment is now a soft top/bottom fade in `WritingProjectView.editorBody`, and the bottom Composer spacing was tightened so the writing surface sits closer to the composer while keeping the layout centered.
 
 ## Working rules
 - Keep the handoff concise and durable.
