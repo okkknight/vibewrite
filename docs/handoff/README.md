@@ -75,6 +75,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The app-owned local store now only keeps lightweight recent-document entries; the actual writing state lives in the Markdown file, and the collaboration state lives in the app-side metadata store keyed by `docID`.
 - Debug logs were added around正文 binding writeback and `saveCurrentDocument` so the current Ctrl+S save-loss repro can be traced with real `OSLog` instead of the no-op debug trace sink.
 - The current save-loss debugging pass also logs the menu command entry points and `SelectableTextEditor.textDidChange`, which should let the next repro distinguish command dispatch from editor commit and from disk save.
+- The current save-loss tracing pass now also logs the live正文 binding setter and the editor bridge's make/update/sync decisions in one shot, so the next repro can follow a single input from `NSTextView` into `activeDocumentText` and then into the saved snapshot without adding more probes.
 - Edit streaming now starts from the selected passage instead of replaying from the top of the document, so local patch responses feel anchored to the user’s selection.
 - The page header subtitle continues to use `project.localSummary`; if the text under the title is off-topic, the issue is in the local summary source, not the subtitle component.
 - The current head keeps `continueWriting` soft, but the collaboration metadata now stores `localSummary` and `globalSynopsis` instead of the old `continuationSummary`.

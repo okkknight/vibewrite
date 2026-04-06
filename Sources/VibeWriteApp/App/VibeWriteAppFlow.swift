@@ -128,7 +128,21 @@ final class VibeWriteAppFlow: ObservableObject {
                 self?.activeDocumentText ?? ""
             },
             set: { [weak self] newText in
-                self?.activeDocumentText = newText
+                guard let self else { return }
+                let oldCount = activeDocumentText.utf16.count
+                let newCount = newText.utf16.count
+                let activeProjectIDName = activeProjectID?.uuidString ?? "nil"
+                let currentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+                VibeWriteLog.ai.info(
+                    "flow activeDocumentText binding writeback oldCount=\(oldCount, privacy: .public) newCount=\(newCount, privacy: .public) activeProjectID=\(activeProjectIDName, privacy: .public) currentURL=\(currentURLName, privacy: .public)"
+                )
+                VibeWriteLog.launch.info(
+                    "flow activeDocumentText binding writeback oldCount=\(oldCount, privacy: .public) newCount=\(newCount, privacy: .public) activeProjectID=\(activeProjectIDName, privacy: .public) currentURL=\(currentURLName, privacy: .public)"
+                )
+                VibeWriteDebugTrace.append(
+                    "flow activeDocumentText binding writeback oldCount=\(oldCount) newCount=\(newCount) activeProjectID=\(activeProjectIDName) currentURL=\(currentURLName)"
+                )
+                self.activeDocumentText = newText
             }
         )
     }
@@ -575,16 +589,59 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     private func replaceActiveProject(_ project: WritingProject) {
+        let previousProjectID = activeProjectID?.uuidString ?? "nil"
+        let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        let previousActiveCount = self.activeDocumentText.count
+        let incomingCount = project.documentText.count
+        let projectCount = projects.count
+        let hydrationProtected = documentHydrationProtectedProjectID?.uuidString ?? "nil"
+        VibeWriteLog.ai.info(
+            "flow replaceActiveProject entry incomingProjectID=\(project.id.uuidString, privacy: .public) incomingCount=\(incomingCount, privacy: .public) previousProjectID=\(previousProjectID, privacy: .public) previousActiveCount=\(previousActiveCount, privacy: .public) projectCount=\(projectCount, privacy: .public) currentURL=\(currentDocumentURLName, privacy: .public) hydrationProtected=\(hydrationProtected, privacy: .public)"
+        )
+        VibeWriteLog.launch.info(
+            "flow replaceActiveProject entry incomingProjectID=\(project.id.uuidString, privacy: .public) incomingCount=\(incomingCount, privacy: .public) previousProjectID=\(previousProjectID, privacy: .public) previousActiveCount=\(previousActiveCount, privacy: .public) projectCount=\(projectCount, privacy: .public) currentURL=\(currentDocumentURLName, privacy: .public) hydrationProtected=\(hydrationProtected, privacy: .public)"
+        )
+        VibeWriteDebugTrace.append(
+            "flow replaceActiveProject entry incomingProjectID=\(project.id.uuidString) incomingCount=\(incomingCount) previousProjectID=\(previousProjectID) previousActiveCount=\(previousActiveCount) projectCount=\(projectCount) currentURL=\(currentDocumentURLName) hydrationProtected=\(hydrationProtected)"
+        )
         if activeDocumentText != project.documentText {
+            VibeWriteLog.ai.info(
+                "flow replaceActiveProject sync live text incomingCount=\(incomingCount, privacy: .public) previousActiveCount=\(previousActiveCount, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow replaceActiveProject sync live text incomingCount=\(incomingCount, privacy: .public) previousActiveCount=\(previousActiveCount, privacy: .public)"
+            )
             activeDocumentText = project.documentText
+        } else {
+            VibeWriteLog.ai.info(
+                "flow replaceActiveProject live text already aligned count=\(incomingCount, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow replaceActiveProject live text already aligned count=\(incomingCount, privacy: .public)"
+            )
         }
 
         if let currentProject = self.project(for: project.id), currentProject == project, activeProjectID == project.id {
+            VibeWriteLog.ai.info(
+                "flow replaceActiveProject skipped project unchanged projectID=\(project.id.uuidString, privacy: .public) count=\(incomingCount, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow replaceActiveProject skipped project unchanged projectID=\(project.id.uuidString, privacy: .public) count=\(incomingCount, privacy: .public)"
+            )
             return
         }
 
         projects = [project]
         activeProjectID = project.id
+        VibeWriteLog.ai.info(
+            "flow replaceActiveProject applied projectID=\(project.id.uuidString, privacy: .public) projectCount=1 activeCount=\(self.activeDocumentText.count, privacy: .public)"
+        )
+        VibeWriteLog.launch.info(
+            "flow replaceActiveProject applied projectID=\(project.id.uuidString, privacy: .public) projectCount=1 activeCount=\(self.activeDocumentText.count, privacy: .public)"
+        )
+        VibeWriteDebugTrace.append(
+            "flow replaceActiveProject applied projectID=\(project.id.uuidString) projectCount=1 activeCount=\(self.activeDocumentText.count)"
+        )
     }
 
     @discardableResult
@@ -782,6 +839,13 @@ final class VibeWriteAppFlow: ObservableObject {
             let fallbackAutomationKey = url.deletingPathExtension().lastPathComponent
             let resolvedMarker = documentIdentityStore.readDocumentID(from: url) ?? parsedDocument.identityMarker
             let metadataRecord = resolvedMarker.flatMap { documentMetadataStore.loadRecord(documentID: $0.documentID) }
+            let resolvedMarkerID = resolvedMarker?.documentID.uuidString ?? "nil"
+            VibeWriteLog.ai.info(
+                "flow openDocument parse url=\(url.lastPathComponent, privacy: .public) rawCount=\(rawText.count, privacy: .public) bodyCount=\(parsedDocument.body.count, privacy: .public) hasIdentityMarker=\(parsedDocument.identityMarker != nil, privacy: .public) resolvedMarker=\(resolvedMarkerID, privacy: .public) metadataFound=\(metadataRecord != nil, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow openDocument parse url=\(url.lastPathComponent, privacy: .public) rawCount=\(rawText.count, privacy: .public) bodyCount=\(parsedDocument.body.count, privacy: .public) hasIdentityMarker=\(parsedDocument.identityMarker != nil, privacy: .public) resolvedMarker=\(resolvedMarkerID, privacy: .public) metadataFound=\(metadataRecord != nil, privacy: .public)"
+            )
             let project = metadataRecord?
                 .makeProject(
                     documentText: parsedDocument.body,
@@ -796,6 +860,12 @@ final class VibeWriteAppFlow: ObservableObject {
             currentDocumentURL = url
             savedDocumentContents = rawText
             activeDocumentText = project.documentText
+            VibeWriteLog.ai.info(
+                "flow openDocument staged projectID=\(project.id.uuidString, privacy: .public) title=\(project.title.vibewriteLogPreview(maxLength: 60), privacy: .public) documentCount=\(project.documentText.count, privacy: .public) currentURL=\(url.lastPathComponent, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow openDocument staged projectID=\(project.id.uuidString, privacy: .public) title=\(project.title.vibewriteLogPreview(maxLength: 60), privacy: .public) documentCount=\(project.documentText.count, privacy: .public) currentURL=\(url.lastPathComponent, privacy: .public)"
+            )
             beginDocumentHydration(for: project.id)
             openProject(project)
             DispatchQueue.main.async { [weak self, projectID = project.id] in
@@ -878,11 +948,13 @@ final class VibeWriteAppFlow: ObservableObject {
         let dirty = isCurrentDocumentDirty
         let pristineBlank = isPristineBlankSession
         let activeCount = activeDocumentText.count
+        let savedCount = savedDocumentContents?.count ?? -1
+        let fileCount = currentDocumentFileText.count
         VibeWriteLog.ai.info(
-            "flow discard prompt check currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) pristineBlank=\(pristineBlank, privacy: .public) activeCount=\(activeCount, privacy: .public)"
+            "flow discard prompt check currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) pristineBlank=\(pristineBlank, privacy: .public) activeCount=\(activeCount, privacy: .public) fileCount=\(fileCount, privacy: .public) savedCount=\(savedCount, privacy: .public)"
         )
         VibeWriteLog.launch.info(
-            "flow discard prompt check currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) pristineBlank=\(pristineBlank, privacy: .public) activeCount=\(activeCount, privacy: .public)"
+            "flow discard prompt check currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) pristineBlank=\(pristineBlank, privacy: .public) activeCount=\(activeCount, privacy: .public) fileCount=\(fileCount, privacy: .public) savedCount=\(savedCount, privacy: .public)"
         )
         if pristineBlank {
             VibeWriteDebugTrace.append("flow discard prompt skipped pristine blank session")

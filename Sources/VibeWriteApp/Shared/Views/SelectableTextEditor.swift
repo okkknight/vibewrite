@@ -57,6 +57,9 @@ struct SelectableTextEditor: NSViewRepresentable {
     }
 
     func makeNSView(context: Context) -> NSScrollView {
+        context.coordinator.logTextEvent(
+            "make nsview start initialBindingCount=\(text.utf16.count) editable=\(isEditable) autoScrollToEnd=\(shouldAutoScrollToDocumentEnd)"
+        )
         let textView = StyledTextView(frame: .zero)
         textView.delegate = context.coordinator
         textView.isRichText = false
@@ -117,6 +120,9 @@ struct SelectableTextEditor: NSViewRepresentable {
         )
         _ = context.coordinator.syncText(text, in: textView)
         context.coordinator.syncSelectionOverlayState(from: textView)
+        context.coordinator.logTextEvent(
+            "make nsview end textViewCount=\(textView.string.utf16.count) selectedCount=\(textView.selectedRange().length) editable=\(textView.isEditable)"
+        )
 
         return scrollView
     }
@@ -124,10 +130,10 @@ struct SelectableTextEditor: NSViewRepresentable {
         func updateNSView(_ scrollView: NSScrollView, context: Context) {
             guard let textView = scrollView.documentView as? NSTextView else {
                 return
-            }
+        }
 
         context.coordinator.logTextEvent(
-            "update nsview start bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) selection=\(context.coordinator.debugRange(textView.selectedRange())) editable=\(textView.isEditable)"
+            "update nsview start bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) selection=\(context.coordinator.debugRange(textView.selectedRange())) editable=\(textView.isEditable) firstResponder=\(textView.window?.firstResponder === textView)"
         )
         context.coordinator.textView = textView
         context.coordinator.setSelectionOverlayPreservationDuringPendingLocalEdit(
@@ -143,7 +149,11 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView
         )
         let didMutateText: Bool
-        if context.coordinator.shouldPreserveLiveUserText(in: textView, bindingText: text) {
+        let shouldPreserveLiveUserText = context.coordinator.shouldPreserveLiveUserText(in: textView, bindingText: text)
+        context.coordinator.logTextEvent(
+            "update nsview preserve live text decision preserve=\(shouldPreserveLiveUserText) bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) selection=\(context.coordinator.debugRange(textView.selectedRange()))"
+        )
+        if shouldPreserveLiveUserText {
             context.coordinator.syncLiveUserTextFromView(textView)
             didMutateText = false
         } else {
@@ -408,7 +418,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             }
 
             logTextEvent(
-                "sync text start currentCount=\(textView.string.utf16.count) requestedCount=\(newText.utf16.count) applyingProgrammatic=\(isApplyingProgrammaticChange) layoutSync=\(isPerformingLayoutSync)"
+                "sync text start currentCount=\(textView.string.utf16.count) requestedCount=\(newText.utf16.count) applyingProgrammatic=\(isApplyingProgrammaticChange) layoutSync=\(isPerformingLayoutSync) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
             )
             guard textView.string != newText else {
                 logTextEvent("sync text skipped identical requestedCount=\(newText.utf16.count)")
@@ -463,19 +473,28 @@ struct SelectableTextEditor: NSViewRepresentable {
             lastAppliedAccessibilityValue = newText
             pendingUserTextChange = nil
             logTextEvent(
-                "sync text applied oldCount=\(oldText.length) newCount=\(newTextString.length) didMutate=true selection=\(debugRange(textView.selectedRange()))"
+                "sync text applied oldCount=\(oldText.length) newCount=\(newTextString.length) didMutate=true selection=\(debugRange(textView.selectedRange())) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
             )
             return true
         }
 
         func shouldPreserveLiveUserText(in textView: NSTextView, bindingText: String) -> Bool {
-            guard textView.isEditable else { return false }
-            guard textView.string != bindingText else { return false }
-            guard textView.window?.firstResponder === textView else { return false }
-            guard !isApplyingProgrammaticChange else { return false }
-            guard hasUncommittedUserText(in: textView) else { return false }
+            let viewCount = textView.string.utf16.count
+            let bindingCount = bindingText.utf16.count
+            let isFirstResponder = textView.window?.firstResponder === textView
+            let hasPendingUserText = hasUncommittedUserText(in: textView)
+            let shouldPreserve =
+                textView.isEditable &&
+                textView.string != bindingText &&
+                isFirstResponder &&
+                !isApplyingProgrammaticChange &&
+                hasPendingUserText
 
-            return true
+            logTextEvent(
+                "preserve live text decision preserve=\(shouldPreserve) viewCount=\(viewCount) bindingCount=\(bindingCount) editable=\(textView.isEditable) firstResponder=\(isFirstResponder) applyingProgrammatic=\(isApplyingProgrammaticChange) hasPending=\(hasPendingUserText) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1) deferredCount=\(pendingTextBindingUpdateAfterLayoutSync?.utf16.count ?? -1)"
+            )
+
+            return shouldPreserve
         }
 
         private func hasUncommittedUserText(in textView: NSTextView) -> Bool {
@@ -485,7 +504,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         func syncLiveUserTextFromView(_ textView: NSTextView) {
             let currentText = textView.string
             logTextEvent(
-                "live user text preserved viewCount=\(currentText.utf16.count) bindingCount=\(text.utf16.count) selection=\(debugRange(textView.selectedRange()))"
+                "live user text preserved viewCount=\(currentText.utf16.count) bindingCount=\(text.utf16.count) selection=\(debugRange(textView.selectedRange())) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1) deferredCount=\(pendingTextBindingUpdateAfterLayoutSync?.utf16.count ?? -1)"
             )
             setTextIfNeeded(currentText)
             pendingUserTextChange = nil
@@ -705,6 +724,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard textView.isEditable else { return }
             guard !isApplyingProgrammaticChange else { return }
             pendingUserTextChange = textView.string
+            logTextEvent(
+                "text did change pending user text set count=\(textView.string.utf16.count) selection=\(currentSelection) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
+            )
             if isPerformingLayoutSync {
                 pendingTextBindingUpdateAfterLayoutSync = textView.string
                 let pendingCount = textView.string.utf16.count
@@ -749,6 +771,9 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             pendingUserTextChange = textView.string
             pendingTextBindingUpdateAfterLayoutSync = nil
+            logTextEvent(
+                "text did end editing pending user text set count=\(textView.string.utf16.count) selection=\(currentSelection) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
+            )
 
             let commitCount = textView.string.utf16.count
             let commitSelection = debugRange(textView.selectedRange())
@@ -764,17 +789,19 @@ struct SelectableTextEditor: NSViewRepresentable {
         }
 
         fileprivate func setTextIfNeeded(_ newText: String) {
+            let currentBindingCount = text.utf16.count
+            let requestedCount = newText.utf16.count
             guard text != newText else {
                 VibeWriteLog.ai.info(
-                    "binding text unchanged count=\(newText.utf16.count, privacy: .public)"
+                    "binding text unchanged currentBindingCount=\(currentBindingCount, privacy: .public) requestedCount=\(requestedCount, privacy: .public)"
                 )
-                logTextEvent("binding text unchanged count=\(newText.utf16.count)")
+                logTextEvent("binding text unchanged currentBindingCount=\(currentBindingCount) requestedCount=\(requestedCount)")
                 return
             }
             VibeWriteLog.ai.info(
-                "binding text updated count=\(newText.utf16.count, privacy: .public)"
+                "binding text updated currentBindingCount=\(currentBindingCount, privacy: .public) requestedCount=\(requestedCount, privacy: .public)"
             )
-            logTextEvent("binding text updated count=\(newText.utf16.count)")
+            logTextEvent("binding text updated currentBindingCount=\(currentBindingCount) requestedCount=\(requestedCount)")
             text = newText
         }
 
@@ -800,6 +827,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             setTextIfNeeded(pendingTextBindingUpdateAfterLayoutSync)
             pendingUserTextChange = nil
+            logTextEvent(
+                "text change flush cleared pending user text pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
+            )
             syncSelectionOverlayState(from: textView)
         }
 

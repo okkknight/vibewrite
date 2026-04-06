@@ -166,6 +166,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - If you touch the start-draft request assembly again, make sure the prompt is still passed to the AI request once and is not silently dropped by dedup logic.
 - If you touch the file document parser or save flow, keep `xattr` as the primary identity source, fall back to the body marker only when needed, and preserve the正文-only recovery path when metadata is missing or broken.
 - If you touch collaboration state persistence, keep the recent-conversation cap at 20 rounds and keep the `localSummary` and `globalSynopsis` in sync with the latest metadata record.
+- The current save-loss tracing pass now logs the live正文 binding setter plus the editor bridge's make/update/sync decisions in one shot; the next repro should be able to follow a single input from `NSTextView` into `activeDocumentText` and then into the saved snapshot without adding more probes.
 
 ## Working rules
 - Keep the handoff concise and durable.
