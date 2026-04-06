@@ -184,6 +184,9 @@
 - The first-open hydration regression came back through the live-text preservation guard in `SelectableTextEditor`. The guard is now narrowed so an empty focused editor no longer overwrites a freshly opened external document, while real uncommitted user text still preserves the live buffer and saves normally.
 
 # 2026-04-06
+- Added a second tracing layer for the recurring save-loss investigation: the app now logs raw local key-down events at launch and logs `windowShouldClose` results, so the next repro can tell whether `Ctrl+S` or the close path is entering the responder chain before the editor/save bridge.
+
+# 2026-04-06
 - Independent review of `QA_REPORT_2026-04-06.md` did not fully pass: the referenced macOS UI regression test `VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` failed in my environment while waiting for the main window to appear, so the report's completed verification set is not reproducible as written.
 - The underlying dual-request implementation still looks consistent in code review, but the QA attachment should be treated as needing a rerun of the UI check before acceptance.
 
