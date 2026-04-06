@@ -83,10 +83,10 @@ struct WritingAIPromptBuilder {
             - Keep the output short enough to stream quickly.
             - Do not stop after writing text alone.
             - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
-            - The metadata JSON must contain: summary, nextFocus, suggestionChips.
+            - The metadata JSON must contain: localSummary, globalSynopsis, nextFocus, suggestionChips.
             - Keep the metadata specific to the current正文 and actionable for the next step.
             - Match the metadata language to the language of the current正文 and user request.
-            - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
+            - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
             - The metadata block is not part of the正文 and must not be mixed into the prose.
             - Every response must end with exactly one metadata block.
             - When the action is "edit", rewrite only the selected passage or local region whenever practical.
@@ -114,19 +114,22 @@ struct WritingAIPromptBuilder {
         switch action {
         case .startDraft:
             actionInstructions = """
-            - Describe the current opening state.
+            - Describe the current opening state as the local summary.
+            - Describe the overall story or article state as the global synopsis.
             - Suggest the next concrete step after the opening exists.
             - Return exactly 3 concise suggestion chips.
             """
         case .continueWriting:
             actionInstructions = """
-            - Summarize the completed正文 after the continuation.
+            - Describe the completed正文 as the local summary.
+            - Describe the overall story or article state as the global synopsis.
             - Suggest the next concrete step after the continuation.
             - Return exactly 3 concise suggestion chips.
             """
         case .edit:
             actionInstructions = """
-            - Summarize the completed change.
+            - Describe the completed change as the local summary.
+            - Describe the overall story or article state as the global synopsis.
             - Suggest the next concrete step after the edit.
             - Return exactly 3 concise suggestion chips.
             """
@@ -144,7 +147,7 @@ struct WritingAIPromptBuilder {
 
             - Keep the metadata specific to the current正文 and actionable for the next step.
             - Match the metadata language to the language of the current正文 and user request.
-            - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
+            - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
             - suggestionChips must be concise, concrete, and non-generic.
 
             Provider: \(provider)
@@ -162,7 +165,7 @@ struct WritingAIPromptBuilder {
 
             - Keep the metadata specific to the current正文 and actionable for the next step.
             - Match the metadata language to the language of the current正文 and user request.
-            - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
+            - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
             - suggestionChips must be concise, concrete, and non-generic.
             - The response format is schema-enforced, so do not wrap the metadata in extra text.
 
@@ -182,8 +185,8 @@ struct WritingAIPromptBuilder {
 
         switch request.action {
         case .continueWriting:
-            lines.append("Document summary:")
-            lines.append(nonEmptyText(request.project.continuationSummary, fallback: "(empty)"))
+            lines.append("Global synopsis:")
+            lines.append(nonEmptyText(request.project.globalSynopsis, fallback: "(empty)"))
             lines.append("Document tail:")
             lines.append(documentTail(for: request.project.documentText))
 
@@ -201,7 +204,7 @@ struct WritingAIPromptBuilder {
         }
 
         if request.action == .continueWriting {
-            lines.append("Use the document summary as global context and the document tail as the continuation anchor.")
+            lines.append("Use the global synopsis as stable context and the document tail as the continuation anchor.")
             lines.append("Do not restart from the beginning of the article.")
             lines.append("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.")
             lines.append("Leave a small amount of forward momentum for the next step.")
@@ -209,7 +212,7 @@ struct WritingAIPromptBuilder {
         } else if request.action == .edit {
             lines.append("Return only the replacement text for the selected segment.")
             lines.append("Rewrite only the selected passage or local region whenever practical.")
-            lines.append("After the prose, append a blank line, then [[VIBEWRITE_METADATA]], then a single JSON object with summary, nextFocus, and suggestionChips.")
+            lines.append("After the prose, append a blank line, then [[VIBEWRITE_METADATA]], then a single JSON object with localSummary, globalSynopsis, nextFocus, and suggestionChips.")
             lines.append("Do not mix the metadata into the prose.")
             lines.append("The metadata must be concise, concrete, and in the same language as the current正文.")
         }
@@ -232,16 +235,20 @@ struct WritingAIPromptBuilder {
         case .startDraft:
             lines.append("Completed prose:")
             lines.append(documentExcerpt(for: request.project.documentText))
+            lines.append("Current global synopsis:")
+            lines.append(nonEmptyText(request.project.globalSynopsis, fallback: "(empty)"))
 
         case .continueWriting:
             lines.append("Completed prose:")
             lines.append(documentTail(for: request.project.documentText))
-            lines.append("Document summary:")
-            lines.append(nonEmptyText(request.project.continuationSummary, fallback: "(empty)"))
+            lines.append("Current global synopsis:")
+            lines.append(nonEmptyText(request.project.globalSynopsis, fallback: "(empty)"))
 
         case .edit:
             lines.append("Completed prose:")
             lines.append(documentExcerpt(for: request.project.documentText))
+            lines.append("Current global synopsis:")
+            lines.append(nonEmptyText(request.project.globalSynopsis, fallback: "(empty)"))
         }
 
         if let prompt, !prompt.isEmpty {
@@ -254,14 +261,14 @@ struct WritingAIPromptBuilder {
 
         switch metadataRoute {
         case .current:
-            lines.append("Use the `emit_metadata` tool to return summary, nextFocus, and suggestionChips.")
+            lines.append("Use the `emit_metadata` tool to return localSummary, globalSynopsis, nextFocus, and suggestionChips.")
             lines.append("Do not include prose, markdown fences, or commentary.")
         case .text01JsonSchema:
-            lines.append("Return summary, nextFocus, and suggestionChips only.")
+            lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.")
             lines.append("Do not include prose, markdown fences, or commentary.")
         }
 
-        lines.append("For Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
+        lines.append("For Chinese writing tasks, keep localSummary, globalSynopsis, nextFocus, and suggestionChips in concise Chinese.")
         lines.append("Return exactly 3 concise suggestion chips.")
 
         return lines.joined(separator: "\n")

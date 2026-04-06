@@ -30,8 +30,8 @@ struct WritingProjectSnapshot: Codable, Hashable {
     var title: String
     var prompt: String
     var mode: WritingProjectMode
-    var summary: String
-    var continuationSummary: String = ""
+    var localSummary: String
+    var globalSynopsis: String = ""
     var context: ProjectContext
     var conversation: [ConversationMessage]
     var documentText: String
@@ -42,7 +42,8 @@ struct WritingProjectSnapshot: Codable, Hashable {
 struct WritingAIResponse: Codable, Hashable {
     var assistantMessage: String
     var documentText: String
-    var summary: String
+    var localSummary: String
+    var globalSynopsis: String
     var intentSummary: String
     var styleConstraints: [String]
     var currentGoal: String
@@ -54,7 +55,8 @@ struct WritingAIResponse: Codable, Hashable {
 
     var completionMetadata: WritingAICompletionMetadata {
         WritingAICompletionMetadata(
-            summary: summary,
+            localSummary: localSummary,
+            globalSynopsis: globalSynopsis,
             nextFocus: nextFocus,
             suggestionChips: suggestionChips
         )
@@ -62,7 +64,8 @@ struct WritingAIResponse: Codable, Hashable {
 }
 
 struct WritingAICompletionMetadata: Codable, Hashable {
-    var summary: String
+    var localSummary: String
+    var globalSynopsis: String
     var nextFocus: String
     var suggestionChips: [String]
 }
@@ -190,8 +193,8 @@ extension WritingProject {
             title: title,
             prompt: prompt,
             mode: mode,
-            summary: summary,
-            continuationSummary: continuationSummary,
+            localSummary: localSummary,
+            globalSynopsis: globalSynopsis,
             context: context,
             conversation: conversation,
             documentText: documentText,
@@ -206,8 +209,8 @@ extension WritingProject {
         }
 
         self.documentText = documentText
-        summary = response.summary
-        continuationSummary = response.summary
+        localSummary = response.localSummary
+        globalSynopsis = response.globalSynopsis
         intentSummary = response.intentSummary
         styleConstraints = response.styleConstraints
         currentGoal = response.currentGoal
@@ -242,8 +245,8 @@ extension WritingProject {
     }
 
     mutating func applyWritingMetadata(_ metadata: WritingAICompletionMetadata) {
-        summary = metadata.summary
-        continuationSummary = metadata.summary
+        localSummary = metadata.localSummary
+        globalSynopsis = metadata.globalSynopsis
         nextFocus = metadata.nextFocus
         suggestionChips = metadata.suggestionChips
         refreshUpdatedAt()
@@ -263,7 +266,8 @@ extension WritingProject {
 
     func responseMetadata() -> WritingAICompletionMetadata {
         WritingAICompletionMetadata(
-            summary: responseValue(summary: summary),
+            localSummary: responseValue(localSummary: localSummary),
+            globalSynopsis: responseValue(globalSynopsis: globalSynopsis),
             nextFocus: responseValue(nextFocus: context.nextFocus),
             suggestionChips: normalizedResponseSuggestionChips(suggestionChips)
         )
@@ -280,7 +284,11 @@ extension WritingProject {
         refreshUpdatedAt()
     }
 
-    private func responseValue(summary value: String) -> String {
+    private func responseValue(localSummary value: String) -> String {
+        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
+    private func responseValue(globalSynopsis value: String) -> String {
         value.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
@@ -312,7 +320,8 @@ extension WritingAIResponse {
             title: base.title,
             prompt: base.prompt,
             mode: mode,
-            summary: summary,
+            localSummary: localSummary,
+            globalSynopsis: globalSynopsis,
             context: ProjectContext(
                 intentSummary: intentSummary,
                 styleConstraints: styleConstraints,

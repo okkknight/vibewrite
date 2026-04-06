@@ -6,6 +6,7 @@ import Darwin
 
 enum VibeWriteDocumentMetadataPolicy {
     static let schemaVersion = 2
+    static let collaborationStoreSchemaVersion = 3
     static let conversationRoundLimit = 20
     static let conversationMessageLimit = conversationRoundLimit * 2
     static let xattrKey = "com.vibewrite.document-identity"
@@ -18,8 +19,8 @@ struct VibeWriteDocumentMetadataRecord: Codable, Hashable {
     var title: String
     var prompt: String
     var mode: WritingProjectMode
-    var summary: String
-    var continuationSummary: String
+    var localSummary: String
+    var globalSynopsis: String
     var context: ProjectContext
     var conversation: [ConversationMessage]
     var revisionHistory: [WritingProjectRevision]
@@ -57,7 +58,7 @@ struct VibeWriteDocumentMetadataStore {
         do {
             let data = try Data(contentsOf: storageURL)
             let snapshot = try JSONDecoder.vibeWriteDocumentMetadataDecoder.decode(VibeWriteDocumentMetadataStoreSnapshot.self, from: data)
-            guard snapshot.schemaVersion == VibeWriteDocumentMetadataPolicy.schemaVersion else {
+            guard snapshot.schemaVersion == VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion else {
                 return nil
             }
 
@@ -68,19 +69,19 @@ struct VibeWriteDocumentMetadataStore {
     }
 
     func loadRecord(documentID: UUID) -> VibeWriteDocumentMetadataRecord? {
-        load()?.records.first(where: { $0.documentID == documentID && $0.schemaVersion == VibeWriteDocumentMetadataPolicy.schemaVersion })
+        load()?.records.first(where: { $0.documentID == documentID && $0.schemaVersion == VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion })
     }
 
     func save(project: WritingProject, documentID: UUID? = nil) {
         let record = VibeWriteDocumentMetadataRecord(
-            schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+            schemaVersion: VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion,
             documentID: documentID ?? project.id,
             automationKey: project.automationKey,
             title: project.title,
             prompt: project.prompt,
             mode: project.mode,
-            summary: project.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            continuationSummary: project.continuationSummary.trimmingCharacters(in: .whitespacesAndNewlines),
+            localSummary: project.localSummary.trimmingCharacters(in: .whitespacesAndNewlines),
+            globalSynopsis: project.globalSynopsis.trimmingCharacters(in: .whitespacesAndNewlines),
             context: project.context,
             conversation: Array(project.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit)),
             revisionHistory: project.revisionHistory,
@@ -93,7 +94,7 @@ struct VibeWriteDocumentMetadataStore {
 
     func save(record: VibeWriteDocumentMetadataRecord) {
         var snapshot = load() ?? VibeWriteDocumentMetadataStoreSnapshot(
-            schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+            schemaVersion: VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion,
             records: []
         )
 
@@ -101,7 +102,7 @@ struct VibeWriteDocumentMetadataStore {
         snapshot.records.removeAll { $0.documentID == normalizedRecord.documentID }
         snapshot.records.append(normalizedRecord)
         snapshot.records.sort { $0.updatedAt > $1.updatedAt }
-        snapshot.schemaVersion = VibeWriteDocumentMetadataPolicy.schemaVersion
+        snapshot.schemaVersion = VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion
 
         do {
             try ensureStorageDirectoryExists()
@@ -116,7 +117,7 @@ struct VibeWriteDocumentMetadataStore {
         do {
             try ensureStorageDirectoryExists()
             let emptySnapshot = VibeWriteDocumentMetadataStoreSnapshot(
-                schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+                schemaVersion: VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion,
                 records: []
             )
             let data = try JSONEncoder.vibeWriteDocumentMetadataEncoder.encode(emptySnapshot)
@@ -143,14 +144,14 @@ struct VibeWriteDocumentMetadataStore {
 
     private func normalize(_ record: VibeWriteDocumentMetadataRecord) -> VibeWriteDocumentMetadataRecord {
         VibeWriteDocumentMetadataRecord(
-            schemaVersion: VibeWriteDocumentMetadataPolicy.schemaVersion,
+            schemaVersion: VibeWriteDocumentMetadataPolicy.collaborationStoreSchemaVersion,
             documentID: record.documentID,
             automationKey: record.automationKey.trimmingCharacters(in: .whitespacesAndNewlines).ifEmpty(record.documentID.uuidString.lowercased()) ?? record.documentID.uuidString.lowercased(),
             title: record.title.trimmingCharacters(in: .whitespacesAndNewlines),
             prompt: record.prompt.trimmingCharacters(in: .whitespacesAndNewlines),
             mode: record.mode,
-            summary: record.summary.trimmingCharacters(in: .whitespacesAndNewlines),
-            continuationSummary: record.continuationSummary.trimmingCharacters(in: .whitespacesAndNewlines),
+            localSummary: record.localSummary.trimmingCharacters(in: .whitespacesAndNewlines),
+            globalSynopsis: record.globalSynopsis.trimmingCharacters(in: .whitespacesAndNewlines),
             context: record.context,
             conversation: Array(record.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit)),
             revisionHistory: record.revisionHistory,
@@ -255,10 +256,10 @@ extension VibeWriteDocumentMetadataRecord {
         let cleanedPrompt = prompt.trimmingCharacters(in: .whitespacesAndNewlines)
         let resolvedAutomationKey = automationKey.trimmingCharacters(in: .whitespacesAndNewlines).ifEmpty(fallbackAutomationKey) ?? documentID.uuidString.lowercased()
         let defaultSummary = VibeWriteMarkdownDocument.defaultSummary(prompt: cleanedPrompt, body: documentText, mode: mode)
-        let cleanedSummary = summary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedSummary = cleanedSummary.ifEmpty(defaultSummary) ?? defaultSummary
-        let cleanedContinuationSummary = continuationSummary.trimmingCharacters(in: .whitespacesAndNewlines)
-        let resolvedContinuationSummary = cleanedContinuationSummary.ifEmpty(resolvedSummary) ?? resolvedSummary
+        let cleanedLocalSummary = localSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedLocalSummary = cleanedLocalSummary.ifEmpty(defaultSummary) ?? defaultSummary
+        let cleanedGlobalSynopsis = globalSynopsis.trimmingCharacters(in: .whitespacesAndNewlines)
+        let resolvedGlobalSynopsis = cleanedGlobalSynopsis.ifEmpty(resolvedLocalSummary) ?? resolvedLocalSummary
 
         return WritingProject(
             id: documentID,
@@ -266,8 +267,8 @@ extension VibeWriteDocumentMetadataRecord {
             title: resolvedTitle,
             prompt: cleanedPrompt,
             mode: mode,
-            summary: resolvedSummary,
-            continuationSummary: resolvedContinuationSummary,
+            localSummary: resolvedLocalSummary,
+            globalSynopsis: resolvedGlobalSynopsis,
             context: context,
             conversation: Array(conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit)),
             documentText: documentText,
@@ -295,8 +296,8 @@ extension WritingProject {
             title: title,
             prompt: prompt,
             mode: mode,
-            summary: summary,
-            continuationSummary: continuationSummary,
+            localSummary: localSummary,
+            globalSynopsis: globalSynopsis,
             context: context,
             conversation: conversation,
             documentText: documentText,

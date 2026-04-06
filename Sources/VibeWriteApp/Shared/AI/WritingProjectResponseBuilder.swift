@@ -20,14 +20,16 @@ enum WritingProjectResponseBuilder {
             for: action.toMockAction,
             variant: .standard
         )
-        let resolvedSummary = normalizedMetadataValue(metadata?.summary)
+        let resolvedLocalSummary = normalizedMetadataValue(metadata?.localSummary)
+        let resolvedGlobalSynopsis = normalizedMetadataValue(metadata?.globalSynopsis)
         let resolvedNextFocus = normalizedMetadataValue(metadata?.nextFocus)
         let resolvedSuggestionChips = normalizedSuggestionChips(metadata?.suggestionChips ?? [])
 
         return WritingAIResponse(
             assistantMessage: resolvedAssistantMessage,
             documentText: resolvedDocumentText,
-            summary: resolvedSummary,
+            localSummary: resolvedLocalSummary,
+            globalSynopsis: resolvedGlobalSynopsis,
             intentSummary: intentSummary(for: request),
             styleConstraints: styleConstraints(for: request),
             currentGoal: goalText(for: action),

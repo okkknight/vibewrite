@@ -28,7 +28,7 @@ struct ProjectAISidebarView: View {
                     if shouldShowSummaryAndSuggestions {
                         AISection(title: "协作摘要") {
                             VStack(alignment: .leading, spacing: 8) {
-                                Text(project.summary)
+                                Text(project.localSummary)
                                     .font(.system(size: 13.2, weight: .semibold, design: .default))
                                     .foregroundStyle(Color.vibeCanvasInk)
                                     .fixedSize(horizontal: false, vertical: true)

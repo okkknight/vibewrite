@@ -12,7 +12,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(flow.activeProject.documentText.isEmpty)
         XCTAssertTrue(flow.activeProject.prompt.isEmpty)
         XCTAssertTrue(flow.activeProject.conversation.isEmpty)
-        XCTAssertEqual(flow.activeProject.summary, "等待起稿输入")
+        XCTAssertEqual(flow.activeProject.localSummary, "等待起稿输入")
         XCTAssertEqual(flow.activeProject.mode.stageTitle, "正文协作中")
         XCTAssertEqual(flow.activeProject.automationKey, "project.new.blank")
     }
@@ -178,7 +178,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         let undone = flow.undoLastRevision()
         XCTAssertEqual(undone?.action, .startDraft)
         XCTAssertTrue(flow.activeProject.documentText.isEmpty)
-        XCTAssertEqual(flow.activeProject.summary, revision?.before.summary)
+        XCTAssertEqual(flow.activeProject.localSummary, revision?.before.localSummary)
         XCTAssertEqual(flow.activeProject.currentGoal, revision?.before.context.currentGoal)
         XCTAssertEqual(flow.activeProject.suggestionChips, revision?.before.suggestionChips)
     }
@@ -369,7 +369,8 @@ final class VibeWriteAppFlowTests: XCTestCase {
         initialFlow.openProject(project)
 
         var updatedProject = initialFlow.activeProject
-        updatedProject.summary = "正在收紧雨夜重逢的第一段"
+        updatedProject.localSummary = "正在收紧雨夜重逢的第一段"
+        updatedProject.globalSynopsis = "正在收紧雨夜重逢的第一段"
         updatedProject.currentGoal = "确认角色关系"
         updatedProject.recentDecisions = ["先说明场景", "再处理重逢"]
         for index in 1...25 {
@@ -403,7 +404,8 @@ final class VibeWriteAppFlowTests: XCTestCase {
 
         XCTAssertEqual(reopenedFlow.activeProject.id, updatedProject.id)
         XCTAssertEqual(reopenedFlow.activeProject.title, updatedProject.title)
-        XCTAssertEqual(reopenedFlow.activeProject.summary, updatedProject.summary)
+        XCTAssertEqual(reopenedFlow.activeProject.localSummary, updatedProject.localSummary)
+        XCTAssertEqual(reopenedFlow.activeProject.globalSynopsis, updatedProject.globalSynopsis)
         XCTAssertEqual(reopenedFlow.activeProject.currentGoal, "确认角色关系")
         XCTAssertEqual(reopenedFlow.activeProject.recentDecisions, updatedProject.recentDecisions)
         XCTAssertEqual(reopenedFlow.activeProject.suggestionChips, updatedProject.suggestionChips)
@@ -515,8 +517,8 @@ final class VibeWriteAppFlowTests: XCTestCase {
             title: "XATTR 版本",
             prompt: "写一个雨夜重逢的小说场景",
             mode: .collaboration,
-            summary: "XATTR 记录的最新摘要",
-            continuationSummary: "XATTR 记录的模型摘要",
+            localSummary: "XATTR 记录的最新摘要",
+            globalSynopsis: "XATTR 记录的模型摘要",
             context: ProjectContext(
                 intentSummary: "围绕 xattr 记录恢复协作状态。",
                 styleConstraints: ["克制", "平静"],
@@ -544,7 +546,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.currentGoal, "继续推进 xattr 版本")
         XCTAssertEqual(flow.activeProject.documentText, bodyText)
         XCTAssertEqual(flow.activeProject.conversation.count, 2)
-        XCTAssertEqual(flow.activeProject.continuationSummary, "XATTR 记录的模型摘要")
+        XCTAssertEqual(flow.activeProject.globalSynopsis, "XATTR 记录的模型摘要")
     }
 
     func testMockEngineRevisesSelectedAndWholeDocumentText() {
@@ -1017,7 +1019,8 @@ private struct NonLocalWritingAIClient: WritingAIClient {
         return WritingAIResponse(
             assistantMessage: "我已经重新写了一版。",
             documentText: "完全不同的正文",
-            summary: "整篇重写",
+            localSummary: "整篇重写",
+            globalSynopsis: "整篇重写总览",
             intentSummary: snapshot.context.intentSummary,
             styleConstraints: snapshot.context.styleConstraints,
             currentGoal: snapshot.context.currentGoal,

@@ -1178,9 +1178,9 @@ private final class StyledTextView: NSTextView {
         let ignoringModifiers = debugEventString(event.charactersIgnoringModifiers)
         let modifierFlags = debugModifierFlags(event.modifierFlags)
         let firstResponderName = debugFirstResponder()
-        let textCount = string.utf16.count
+        let textCount = self.string.utf16.count
         VibeWriteLog.launch.info(
-            "styled text view keyDown keyCode=\(event.keyCode, privacy: .public) chars=\(chars, privacy: .public) ignoringModifiers=\(ignoringModifiers, privacy: .public) modifiers=\(modifierFlags, privacy: .public) firstResponder=\(firstResponderName, privacy: .public) editable=\(isEditable, privacy: .public) textCount=\(textCount, privacy: .public)"
+            "styled text view keyDown keyCode=\(event.keyCode, privacy: .public) chars=\(chars, privacy: .public) ignoringModifiers=\(ignoringModifiers, privacy: .public) modifiers=\(modifierFlags, privacy: .public) firstResponder=\(firstResponderName, privacy: .public) editable=\(self.isEditable, privacy: .public) textCount=\(textCount, privacy: .public)"
         )
         super.keyDown(with: event)
     }

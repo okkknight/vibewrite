@@ -312,7 +312,7 @@ final class VibeWriteAppFlow: ObservableObject {
                         liveProject.prompt = requestUserMessage
                     }
                 }
-                liveProject.summary = streamingSummary(for: action)
+                liveProject.localSummary = streamingSummary(for: action)
                 replaceActiveProject(liveProject, persist: false)
 
                 var streamedText = ""
@@ -395,7 +395,7 @@ final class VibeWriteAppFlow: ObservableObject {
                     liveProject.prompt = requestUserMessage
                 }
             }
-            liveProject.summary = streamingSummary(for: action)
+            liveProject.localSummary = streamingSummary(for: action)
             liveProject.nextFocus = ""
             liveProject.suggestionChips = []
             replaceActiveProject(liveProject, persist: false)
@@ -509,7 +509,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 }
                 let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
                 VibeWriteLog.ai.info(
-                    "Flow metadata response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+                    "Flow metadata response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) localSummaryCount=\(metadata.localSummary.count, privacy: .public) globalSynopsisCount=\(metadata.globalSynopsis.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
                 )
             } catch {
                 let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
@@ -914,8 +914,8 @@ final class VibeWriteAppFlow: ObservableObject {
             && project.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && project.title == emptyProjectShell.title
             && project.mode == emptyProjectShell.mode
-            && project.summary == emptyProjectShell.summary
-            && project.continuationSummary == emptyProjectShell.continuationSummary
+            && project.localSummary == emptyProjectShell.localSummary
+            && project.globalSynopsis == emptyProjectShell.globalSynopsis
             && project.context == emptyProjectShell.context
             && project.conversation.isEmpty
             && project.revisionHistory.isEmpty

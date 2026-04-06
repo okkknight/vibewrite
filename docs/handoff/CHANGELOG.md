@@ -1,6 +1,11 @@
 # Changelog
 
 ## 2026-04-06
+- Refactored the collaboration AI summary model to remove `continuationSummary` entirely and split the surviving state into `localSummary` for UI-facing subtitles and `globalSynopsis` for model-facing full-context guidance.
+- The collaboration metadata store schema moved to version 3 so it persists `localSummary` and `globalSynopsis` together with the existing collaboration state, and the markdown file recovery path now seeds both fields from the file body when metadata is missing.
+- The prose and metadata AI paths now read the new split summary fields, the metadata prompt/schema were updated to return `localSummary`, `globalSynopsis`, `nextFocus`, and `suggestionChips`, and the current test suite passed after the refactor.
+
+## 2026-04-06
 - Expanded the Ctrl+S save-loss diagnostics with `OSLog` traces at the menu-command entry points, `SelectableTextEditor.textDidChange`, and the save/discard flow, so the next repro can separate command dispatch, editor commit, and disk write.
 
 ## 2026-04-06

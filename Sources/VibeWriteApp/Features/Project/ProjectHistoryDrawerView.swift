@@ -93,7 +93,7 @@ struct ProjectHistoryDrawerView: View {
 
     private var currentVersionCard: some View {
         VStack(alignment: .leading, spacing: 7) {
-            Text(project.summary)
+            Text(project.localSummary)
                 .font(.system(size: 13.2, weight: .semibold, design: .default))
                 .foregroundStyle(Color.vibeCanvasInk)
                 .fixedSize(horizontal: false, vertical: true)

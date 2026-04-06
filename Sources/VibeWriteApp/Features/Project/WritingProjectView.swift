@@ -39,7 +39,6 @@ struct WritingProjectView: View {
     }
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
-    private var bodyEditorScrollerLaneWidth: CGFloat { 12 }
     private var projectHeaderVerticalPadding: CGFloat { shellLayoutMode.isCompact ? 7 : 8 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
@@ -179,21 +178,16 @@ struct WritingProjectView: View {
     }
 
     private var projectWorkspace: some View {
-        HStack(spacing: 0) {
+        ZStack(alignment: .topTrailing) {
             wideWorkspace
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
 
-            ZStack(alignment: .trailing) {
-                Color.clear
-
-                if let bodyEditorScrollView {
-                    ExternalVerticalScroller(scrollView: bodyEditorScrollView)
-                        .frame(width: bodyEditorScrollerLaneWidth)
-                        .frame(maxHeight: .infinity)
-                        .accessibilityHidden(true)
-                }
+            if let bodyEditorScrollView {
+                ExternalVerticalScroller(scrollView: bodyEditorScrollView)
+                    .frame(width: 12)
+                    .frame(maxHeight: .infinity)
+                    .accessibilityHidden(true)
             }
-            .frame(width: bodyEditorScrollerLaneWidth)
         }
         .accessibilityIdentifier(VibeWriteAutomationID.projectPaperShell)
     }
@@ -378,7 +372,7 @@ struct WritingProjectView: View {
             return project.mode.stageDescription
         }
 
-        let trimmedSummary = project.summary.trimmingCharacters(in: .whitespacesAndNewlines)
+        let trimmedSummary = project.localSummary.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmedSummary.isEmpty ? project.mode.stageDescription : trimmedSummary
     }
 
@@ -593,6 +587,7 @@ struct WritingProjectView: View {
     private var composerBar: some View {
         ProjectComposerBar(
             messageDraft: $messageDraft,
+            appearanceMode: appearanceMode,
             primaryActionTitle: primaryActionTitle,
             messageFieldPlaceholder: messageFieldPlaceholder,
             showsAssistantSuggestions: shouldShowAssistantSuggestions,

@@ -2,6 +2,7 @@ import SwiftUI
 
 struct ProjectComposerBar: View {
     @Binding var messageDraft: String
+    let appearanceMode: VibeAppearanceMode
     let primaryActionTitle: String
     let messageFieldPlaceholder: String
     let showsAssistantSuggestions: Bool
@@ -141,7 +142,7 @@ struct ProjectComposerBar: View {
                     RoundedRectangle(cornerRadius: 22, style: .continuous)
                         .strokeBorder(Color.vibeCanvasStroke.opacity(0.78), lineWidth: 1)
                 )
-                .shadow(color: Color.black.opacity(0.20), radius: 16, x: 0, y: 9)
+                .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
         }
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -176,6 +177,33 @@ struct ProjectComposerBar: View {
 
     private var highlightShadowRadius: CGFloat {
         isMessageFieldHighlighted && !isPrimaryActionInFlight ? 10 : 0
+    }
+
+    private var composerShadowColor: Color {
+        switch appearanceMode {
+        case .day:
+            return Color.black.opacity(0.12)
+        case .night:
+            return Color.black.opacity(0.20)
+        }
+    }
+
+    private var composerShadowRadius: CGFloat {
+        switch appearanceMode {
+        case .day:
+            return 12
+        case .night:
+            return 16
+        }
+    }
+
+    private var composerShadowYOffset: CGFloat {
+        switch appearanceMode {
+        case .day:
+            return 6
+        case .night:
+            return 9
+        }
     }
 
     private var normalizedAssistantNextFocus: String? {

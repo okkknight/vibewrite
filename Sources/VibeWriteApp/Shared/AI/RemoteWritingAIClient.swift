@@ -109,7 +109,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         let metadataTool = AnthropicToolDefinition.metadata
         let metadataModel = configuration.metadataModel
         VibeWriteLog.ai.info(
-            "Remote metadata structured request start action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(metadataModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
+            "Remote metadata structured request start action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(metadataModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) localSummaryCount=\(request.project.localSummary.count, privacy: .public) globalSynopsisCount=\(request.project.globalSynopsis.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
         )
 
         let urlRequest = try makeAnthropicRequest(
@@ -161,7 +161,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
 
         VibeWriteLog.ai.info(
-            "Remote metadata structured tool use decoded action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) toolName=\(toolUse.name, privacy: .public) summaryCount=\(toolUse.input.summary.count, privacy: .public) nextFocusCount=\(toolUse.input.nextFocus.count, privacy: .public) suggestionCount=\(toolUse.input.suggestionChips.count, privacy: .public)"
+            "Remote metadata structured tool use decoded action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) toolName=\(toolUse.name, privacy: .public) localSummaryCount=\(toolUse.input.localSummary.count, privacy: .public) globalSynopsisCount=\(toolUse.input.globalSynopsis.count, privacy: .public) nextFocusCount=\(toolUse.input.nextFocus.count, privacy: .public) suggestionCount=\(toolUse.input.suggestionChips.count, privacy: .public)"
         )
 
         return toolUse.input
@@ -173,7 +173,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
     ) async throws -> WritingAICompletionMetadata {
         let metadataModel = configuration.metadataModel
         VibeWriteLog.ai.info(
-            "Remote metadata json schema request start action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(metadataModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
+            "Remote metadata json schema request start action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(metadataModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) localSummaryCount=\(request.project.localSummary.count, privacy: .public) globalSynopsisCount=\(request.project.globalSynopsis.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
         )
 
         let promptMessages = promptBuilder.messages(
@@ -256,7 +256,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
         let metadata = try WritingAICompletionMetadataDecoder.decode(from: content)
         VibeWriteLog.ai.info(
-            "Remote metadata json schema decoded action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+            "Remote metadata json schema decoded action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) localSummaryCount=\(metadata.localSummary.count, privacy: .public) globalSynopsisCount=\(metadata.globalSynopsis.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
         )
         return metadata
     }
@@ -326,7 +326,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         do {
             completionMetadata = try WritingAICompletionMetadataDecoder.decode(from: streamedCompletion.metadataText)
             VibeWriteLog.ai.info(
-                "Remote edit metadata parsed action=\(request.action.rawValue, privacy: .public) summaryCount=\(completionMetadata?.summary.count ?? 0, privacy: .public) nextFocusCount=\(completionMetadata?.nextFocus.count ?? 0, privacy: .public) suggestionCount=\(completionMetadata?.suggestionChips.count ?? 0, privacy: .public)"
+                "Remote edit metadata parsed action=\(request.action.rawValue, privacy: .public) localSummaryCount=\(completionMetadata?.localSummary.count ?? 0, privacy: .public) globalSynopsisCount=\(completionMetadata?.globalSynopsis.count ?? 0, privacy: .public) nextFocusCount=\(completionMetadata?.nextFocus.count ?? 0, privacy: .public) suggestionCount=\(completionMetadata?.suggestionChips.count ?? 0, privacy: .public)"
             )
         } catch {
             VibeWriteLog.ai.error(
@@ -683,14 +683,18 @@ struct AnthropicToolDefinition: Encodable {
 struct AnthropicToolInputSchema: Encodable {
     let type = "object"
     let properties = Properties()
-    let required = ["summary", "nextFocus", "suggestionChips"]
+    let required = ["localSummary", "globalSynopsis", "nextFocus", "suggestionChips"]
     let additionalProperties = false
 
     init() {}
 
     struct Properties: Encodable {
-        let summary = StringProperty(
-            description: "A concise summary of the completed prose."
+        let localSummary = StringProperty(
+            description: "A concise local summary of the completed prose."
+        )
+
+        let globalSynopsis = StringProperty(
+            description: "A stable overall synopsis of the story or article so far."
         )
 
         let nextFocus = StringProperty(
@@ -855,12 +859,16 @@ struct MiniMaxTextJSONSchema: Encodable {
 struct MiniMaxTextJSONSchemaDefinition: Encodable {
     let type = "object"
     let properties = Properties()
-    let required = ["summary", "nextFocus", "suggestionChips"]
+    let required = ["localSummary", "globalSynopsis", "nextFocus", "suggestionChips"]
     let additionalProperties = false
 
     struct Properties: Encodable {
-        let summary = StringProperty(
-            description: "A concise summary of the completed prose."
+        let localSummary = StringProperty(
+            description: "A concise local summary of the completed prose."
+        )
+
+        let globalSynopsis = StringProperty(
+            description: "A stable overall synopsis of the story or article so far."
         )
 
         let nextFocus = StringProperty(

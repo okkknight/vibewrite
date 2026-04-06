@@ -77,8 +77,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
     var title: String { didSet { touch() } }
     var prompt: String { didSet { touch() } }
     var mode: WritingProjectMode { didSet { touch() } }
-    var summary: String { didSet { touch() } }
-    var continuationSummary: String { didSet { touch() } }
+    var localSummary: String { didSet { touch() } }
+    var globalSynopsis: String { didSet { touch() } }
     var context: ProjectContext { didSet { touch() } }
     var conversation: [ConversationMessage] { didSet { touch() } }
     var documentText: String { didSet { touch() } }
@@ -92,8 +92,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
         title: String,
         prompt: String,
         mode: WritingProjectMode,
-        summary: String,
-        continuationSummary: String = "",
+        localSummary: String,
+        globalSynopsis: String = "",
         context: ProjectContext,
         conversation: [ConversationMessage],
         documentText: String,
@@ -106,8 +106,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
         self.title = title
         self.prompt = prompt
         self.mode = mode
-        self.summary = summary
-        self.continuationSummary = Self.normalizedContinuationSummary(continuationSummary, fallback: summary)
+        self.localSummary = Self.normalizedLocalSummary(localSummary)
+        self.globalSynopsis = Self.normalizedGlobalSynopsis(globalSynopsis, fallback: self.localSummary)
         self.context = context
         self.conversation = conversation
         self.documentText = documentText
@@ -122,8 +122,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
         case title
         case prompt
         case mode
-        case summary
-        case continuationSummary
+        case localSummary
+        case globalSynopsis
         case context
         case conversation
         case documentText
@@ -139,8 +139,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
         title = try container.decode(String.self, forKey: .title)
         prompt = try container.decode(String.self, forKey: .prompt)
         mode = try container.decode(WritingProjectMode.self, forKey: .mode)
-        summary = try container.decode(String.self, forKey: .summary)
-        continuationSummary = try container.decode(String.self, forKey: .continuationSummary)
+        localSummary = try container.decode(String.self, forKey: .localSummary)
+        globalSynopsis = try container.decode(String.self, forKey: .globalSynopsis)
         context = try container.decode(ProjectContext.self, forKey: .context)
         conversation = try container.decode([ConversationMessage].self, forKey: .conversation)
         documentText = try container.decode(String.self, forKey: .documentText)
@@ -156,8 +156,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
         try container.encode(title, forKey: .title)
         try container.encode(prompt, forKey: .prompt)
         try container.encode(mode, forKey: .mode)
-        try container.encode(summary, forKey: .summary)
-        try container.encode(continuationSummary, forKey: .continuationSummary)
+        try container.encode(localSummary, forKey: .localSummary)
+        try container.encode(globalSynopsis, forKey: .globalSynopsis)
         try container.encode(context, forKey: .context)
         try container.encode(conversation, forKey: .conversation)
         try container.encode(documentText, forKey: .documentText)
@@ -191,8 +191,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
                 title: title,
                 prompt: cleanedPrompt,
                 mode: mode,
-                summary: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
-                continuationSummary: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
+                localSummary: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
+                globalSynopsis: cleanedPrompt.isEmpty ? "先聊清楚方向，再生成第一稿" : "先把方向聊清楚，再生成第一稿",
                 context: .discussion(prompt: cleanedPrompt),
                 conversation: conversation,
                 documentText: "",
@@ -213,8 +213,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
                 title: title,
                 prompt: cleanedPrompt,
                 mode: mode,
-                summary: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
-                continuationSummary: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
+                localSummary: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
+                globalSynopsis: cleanedPrompt.isEmpty ? "等待起稿输入" : "正在生成第一稿",
                 context: .collaboration(prompt: cleanedPrompt),
                 conversation: conversation,
                 documentText: "",
@@ -230,8 +230,8 @@ struct WritingProject: Identifiable, Hashable, Codable {
         title = snapshot.title
         prompt = snapshot.prompt
         mode = snapshot.mode
-        summary = snapshot.summary
-        continuationSummary = snapshot.continuationSummary
+        localSummary = snapshot.localSummary
+        globalSynopsis = snapshot.globalSynopsis
         context = snapshot.context
         conversation = snapshot.conversation
         documentText = snapshot.documentText
@@ -324,7 +324,12 @@ struct WritingProject: Identifiable, Hashable, Codable {
         updatedAt = .now
     }
 
-    private static func normalizedContinuationSummary(_ value: String, fallback: String) -> String {
+    private static func normalizedLocalSummary(_ value: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed
+    }
+
+    private static func normalizedGlobalSynopsis(_ value: String, fallback: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
     }
@@ -452,7 +457,8 @@ enum WorkspaceFixtures {
                 title: "成年人孤独感",
                 prompt: "写一篇关于成年人孤独感的公众号文章",
                 mode: .collaboration,
-                summary: "语气克制的长文随笔，当前在收紧开头",
+                localSummary: "语气克制的长文随笔，当前在收紧开头",
+                globalSynopsis: "语气克制的长文随笔，当前在收紧开头",
                 context: ProjectContext(
                     intentSummary: "围绕成年人孤独感，写一篇平静、克制、不说教的长文。",
                     styleConstraints: ["克制", "平静", "非鸡汤"],
@@ -474,7 +480,8 @@ enum WorkspaceFixtures {
                 title: "雨夜重逢",
                 prompt: "写一个雨夜重逢的小说场景",
                 mode: .collaboration,
-                summary: "小说场景，已写到重逢后的第一段对话",
+                localSummary: "小说场景，已写到重逢后的第一段对话",
+                globalSynopsis: "小说场景，已写到重逢后的第一段对话",
                 context: ProjectContext(
                     intentSummary: "写一段雨夜重逢的小说场景，重点是情绪和停顿感。",
                     styleConstraints: ["含蓄", "有画面感", "少解释"],
@@ -496,7 +503,8 @@ enum WorkspaceFixtures {
                 title: "克制随笔",
                 prompt: "把这段日记整理成更克制的随笔",
                 mode: .discussion,
-                summary: "先讨论语气边界，再决定起稿方向",
+                localSummary: "先讨论语气边界，再决定起稿方向",
+                globalSynopsis: "先讨论语气边界，再决定起稿方向",
                 context: ProjectContext(
                     intentSummary: "用户希望把日记整理成更克制的随笔，避免过度抒情。",
                     styleConstraints: ["克制", "自然", "避免抒情过满"],
