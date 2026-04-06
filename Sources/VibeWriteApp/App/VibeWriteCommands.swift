@@ -6,6 +6,9 @@ struct VibeWriteCommands: Commands {
     var body: some Commands {
         CommandGroup(replacing: .newItem) {
             Button("New") {
+                VibeWriteLog.ai.info(
+                    "command new triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
+                )
                 flow.createNewProject()
             }
             .keyboardShortcut("n")
@@ -13,16 +16,25 @@ struct VibeWriteCommands: Commands {
 
         CommandGroup(after: .newItem) {
             Button("Open...") {
+                VibeWriteLog.ai.info(
+                    "command open triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
+                )
                 _ = flow.openDocumentFromPanel()
             }
             .keyboardShortcut("o")
 
             Button("Save") {
+                VibeWriteLog.ai.info(
+                    "command save triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) currentURL=\(flow.currentDocumentURL?.lastPathComponent ?? "nil", privacy: .public)"
+                )
                 _ = flow.saveCurrentDocument()
             }
             .keyboardShortcut("s")
 
             Button("Save As...") {
+                VibeWriteLog.ai.info(
+                    "command saveAs triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) currentURL=\(flow.currentDocumentURL?.lastPathComponent ?? "nil", privacy: .public)"
+                )
                 _ = flow.saveCurrentDocumentAs()
             }
             .keyboardShortcut("s", modifiers: [.command, .shift])
@@ -33,6 +45,9 @@ struct VibeWriteCommands: Commands {
                 Menu("Open Recent") {
                     ForEach(flow.recentDocumentEntries) { entry in
                         Button(entry.displayName) {
+                            VibeWriteLog.ai.info(
+                                "command openRecent triggered title=\(entry.title.vibewriteLogPreview(maxLength: 60), privacy: .public) url=\(entry.url.lastPathComponent, privacy: .public)"
+                            )
                             _ = flow.openRecentDocument(entry)
                         }
                     }

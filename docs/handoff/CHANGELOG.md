@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-04-06
+- Expanded the Ctrl+S save-loss diagnostics with `OSLog` traces at the menu-command entry points, `SelectableTextEditor.textDidChange`, and the save/discard flow, so the next repro can separate command dispatch, editor commit, and disk write.
+
+## 2026-04-06
 - Added real `OSLog` traces around the正文 binding writeback path, `saveCurrentDocument`, and discard-prompt checks so the current Ctrl+S save-loss repro can be diagnosed from runtime logs instead of the no-op debug trace sink.
 
 ## 2026-04-06

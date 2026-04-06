@@ -644,30 +644,54 @@ struct SelectableTextEditor: NSViewRepresentable {
                 return
             }
 
+            let currentStringCount = textView.string.utf16.count
+            let currentSelection = debugRange(textView.selectedRange())
+            let isProgrammatic = isApplyingProgrammaticChange
+            let isLayoutSync = isPerformingLayoutSync
+            let isEditable = textView.isEditable
+            VibeWriteLog.ai.info(
+                "textDidChange entry stringCount=\(currentStringCount, privacy: .public) applyingProgrammatic=\(isProgrammatic, privacy: .public) layoutSync=\(isLayoutSync, privacy: .public) editable=\(isEditable, privacy: .public) selection=\(currentSelection, privacy: .public)"
+            )
             logTextEvent(
-                "text did change stringCount=\(textView.string.utf16.count) applyingProgrammatic=\(isApplyingProgrammaticChange) layoutSync=\(isPerformingLayoutSync) editable=\(textView.isEditable) selection=\(debugRange(textView.selectedRange()))"
+                "text did change stringCount=\(currentStringCount) applyingProgrammatic=\(isProgrammatic) layoutSync=\(isLayoutSync) editable=\(isEditable) selection=\(currentSelection)"
             )
             guard textView.isEditable else { return }
             guard !isApplyingProgrammaticChange else { return }
             pendingUserTextChange = textView.string
             if isPerformingLayoutSync {
                 pendingTextBindingUpdateAfterLayoutSync = textView.string
+                let pendingCount = textView.string.utf16.count
+                let pendingSelection = debugRange(textView.selectedRange())
+                VibeWriteLog.ai.info(
+                    "textDidChange deferred during layout pendingCount=\(pendingCount, privacy: .public) selection=\(pendingSelection, privacy: .public)"
+                )
                 logTextEvent(
-                    "text change deferred during layout pendingCount=\(textView.string.utf16.count) selection=\(debugRange(textView.selectedRange()))"
+                    "text change deferred during layout pendingCount=\(pendingCount) selection=\(pendingSelection)"
                 )
                 return
             }
 
             pendingTextBindingUpdateAfterLayoutSync = nil
+            let commitCount = textView.string.utf16.count
+            let commitSelection = debugRange(textView.selectedRange())
+            VibeWriteLog.ai.info(
+                "textDidChange immediate commit count=\(commitCount, privacy: .public) selection=\(commitSelection, privacy: .public)"
+            )
             setTextIfNeeded(textView.string)
             syncSelectionOverlayState(from: textView)
         }
 
         fileprivate func setTextIfNeeded(_ newText: String) {
             guard text != newText else {
+                VibeWriteLog.ai.info(
+                    "binding text unchanged count=\(newText.utf16.count, privacy: .public)"
+                )
                 logTextEvent("binding text unchanged count=\(newText.utf16.count)")
                 return
             }
+            VibeWriteLog.ai.info(
+                "binding text updated count=\(newText.utf16.count, privacy: .public)"
+            )
             logTextEvent("binding text updated count=\(newText.utf16.count)")
             text = newText
         }
@@ -684,8 +708,13 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let pendingTextBindingUpdateAfterLayoutSync else { return }
             self.pendingTextBindingUpdateAfterLayoutSync = nil
 
+            let pendingCount = pendingTextBindingUpdateAfterLayoutSync.utf16.count
+            let pendingSelection = debugRange(textView.selectedRange())
+            VibeWriteLog.ai.info(
+                "textDidChange flushed after layout pendingCount=\(pendingCount, privacy: .public) selection=\(pendingSelection, privacy: .public)"
+            )
             logTextEvent(
-                "text change flushed after layout pendingCount=\(pendingTextBindingUpdateAfterLayoutSync.utf16.count) selection=\(debugRange(textView.selectedRange()))"
+                "text change flushed after layout pendingCount=\(pendingCount) selection=\(pendingSelection)"
             )
             setTextIfNeeded(pendingTextBindingUpdateAfterLayoutSync)
             pendingUserTextChange = nil
