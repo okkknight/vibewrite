@@ -68,4 +68,37 @@ final class SelectableTextEditorTests: XCTestCase {
 
         XCTAssertEqual(box.value, "typed draft")
     }
+
+    func testLiveTextMutationCommitsShorterTextToBinding() {
+        final class Box {
+            var value: String
+
+            init(_ value: String) {
+                self.value = value
+            }
+        }
+
+        let box = Box("loaded body")
+        let editor = SelectableTextEditor(
+            text: Binding(
+                get: { box.value },
+                set: { box.value = $0 }
+            ),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.isEditable = true
+        textView.string = "loaded bod"
+
+        coordinator.handleLiveTextMutation(
+            from: textView,
+            source: "doCommand(deleteBackward:)"
+        )
+
+        XCTAssertEqual(box.value, "loaded bod")
+    }
 }

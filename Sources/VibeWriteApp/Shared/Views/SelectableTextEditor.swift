@@ -45,7 +45,6 @@ struct SelectableTextEditor: NSViewRepresentable {
     var isViewportLockedDuringLocalEdit: Bool = false
     var shouldPreserveSelectionOverlayDuringPendingLocalEdit: Bool = false
     var onScrollViewReady: ((NSScrollView) -> Void)? = nil
-    var onViewportStateChanged: ((SelectableTextEditorViewportState) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -142,7 +141,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         context.coordinator.setSelectionOverlayPreservationDuringPendingLocalEdit(
             shouldPreserveSelectionOverlayDuringPendingLocalEdit
         )
-        context.coordinator.viewportStateChangedHandler = onViewportStateChanged
         context.coordinator.syncTypography(
             isEditable: isEditable,
             font: textFont,
@@ -182,7 +180,6 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView,
             scrollView: scrollView
         )
-        context.coordinator.reportViewportStateIfNeeded(in: scrollView, textView: textView)
         context.coordinator.logTextEvent(
             "update nsview end bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) didMutateText=\(didMutateText) selection=\(context.coordinator.debugRange(textView.selectedRange()))"
         )
@@ -215,9 +212,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var lastAppliedLocalEditFlashID: UUID?
         private weak var localEditFlashOverlayView: LocalEditFlashOverlayView?
         private var shouldPreserveSelectionOverlayDuringPendingLocalEdit = false
-        private var lastReportedViewportState: SelectableTextEditorViewportState?
         private var lastCommittedUserText: String?
-        var viewportStateChangedHandler: ((SelectableTextEditorViewportState) -> Void)?
 
         private var isApplyingProgrammaticChange: Bool {
             programmaticChangeDepth > 0
@@ -271,31 +266,6 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let onScrollViewReady else { return }
             DispatchQueue.main.async {
                 onScrollViewReady(scrollView)
-            }
-        }
-
-        func reportViewportStateIfNeeded(
-            in scrollView: NSScrollView,
-            textView: NSTextView
-        ) {
-            guard let viewportStateChangedHandler else { return }
-            let handler = viewportStateChangedHandler
-
-            let visibleHeight = max(scrollView.contentView.bounds.height, 1)
-            let contentHeight = max(textView.frame.height, visibleHeight)
-            let maximumScrollOffsetY = max(contentHeight - visibleHeight, 0)
-            let currentScrollOffsetY = max(scrollView.contentView.bounds.origin.y, 0)
-            let viewportState = SelectableTextEditorViewportState(
-                contentHeight: contentHeight,
-                visibleHeight: visibleHeight,
-                currentScrollOffsetY: currentScrollOffsetY,
-                maximumScrollOffsetY: maximumScrollOffsetY
-            )
-
-            guard lastReportedViewportState != viewportState else { return }
-            lastReportedViewportState = viewportState
-            DispatchQueue.main.async {
-                handler(viewportState)
             }
         }
 
@@ -632,7 +602,6 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             scrollView.reflectScrolledClipView(scrollView.contentView)
             localEditFlashOverlayView?.needsDisplay = true
-            reportViewportStateIfNeeded(in: scrollView, textView: textView)
             logLayoutIfNeeded(
                 textView: textView,
                 scrollView: scrollView,
@@ -1320,11 +1289,20 @@ private final class StyledTextView: NSTextView {
 
     override func doCommand(by selector: Selector) {
         let firstResponderName = debugFirstResponder()
-        let textCount = string.utf16.count
+        let beforeText = string
+        let beforeCount = beforeText.utf16.count
         VibeWriteLog.launch.info(
-            "styled text view doCommand selector=\(NSStringFromSelector(selector), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) textCount=\(textCount, privacy: .public)"
+            "styled text view doCommand selector=\(NSStringFromSelector(selector), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) textCountBefore=\(beforeCount, privacy: .public)"
         )
         super.doCommand(by: selector)
+        let afterText = string
+        let afterCount = afterText.utf16.count
+        if afterText != beforeText {
+            VibeWriteLog.launch.info(
+                "styled text view doCommand applied mutation selector=\(NSStringFromSelector(selector), privacy: .public) textCountAfter=\(afterCount, privacy: .public)"
+            )
+            onLiveTextMutation?(self)
+        }
     }
 
     override func insertText(_ insertString: Any, replacementRange: NSRange) {

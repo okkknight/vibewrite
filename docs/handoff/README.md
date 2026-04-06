@@ -69,6 +69,7 @@ This directory is the compact handoff layer for VibeWrite.
 - Trace logs confirmed the first flash frame was arriving fully transparent; the overlay timing now keeps the initial frame visible before the fade begins.
 - The正文 editor now buffers user text changes that arrive during layout sync and flushes the pending binding update once layout settles, so save operations preserve newly typed正文 instead of falling back to an older model snapshot.
 - The正文 editor bridge now also commits `insertText` directly into the live正文 binding, so manual typing no longer depends on `textDidChange` alone before save or selection refreshes.
+- The正文 editor bridge now also commits mutating `doCommand(by:)` text actions into the live正文 binding, which keeps deletions on the same live commit path as insertions.
 - The selection-preset loading state is now represented as a real busy/disabled state in the selection chips, and the targeted UI test waits for the preset button to disable instead of probing a fragile accessibility spinner node.
 - Blank startup no longer trips the discard prompt or wipes a newly opened file: the flow now starts from the blank shell's rendered snapshot, and the title/body bindings ignore stale writebacks from an inactive project so an external document is not overwritten by an empty buffer during the first load.
 - Edit mode no longer uses the streaming preview renderer to rewrite the正文 live. The final patch is applied once at completion so local edits do not visually flicker through chunk-by-chunk replacement.
