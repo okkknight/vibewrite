@@ -10,6 +10,9 @@
 - Remote AI metadata routing is now explicit: the current Anthropic-compatible metadata path still uses the forced `emit_metadata` tool call, while a separate `MiniMax-Text-01` path uses `response_format: json_schema` for the same `summary`, `nextFocus`, and `suggestionChips` payload.
 
 ## 2026-04-06
+- The default metadata route for real AI requests now prefers `text01_json_schema`, so `startDraft` / `continueWriting` metadata normally go through the schema-enforced MiniMax text endpoint unless `MINIMAX_METADATA_ROUTE=current` is explicitly set.
+
+## 2026-04-06
 - Dock reopen now intentionally resets the in-memory writing session to a blank shell after the close confirmation succeeds, while preserving recent-document history. That keeps the app from carrying the previous `currentDocumentURL` / active project into the next Dock-opened window.
 
 ## 2026-04-06

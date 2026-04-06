@@ -177,8 +177,10 @@ struct WritingAIConfiguration {
         switch rawValue {
         case "text01_json_schema", "text01-json-schema", "text01", "json_schema":
             return .text01JsonSchema
-        default:
+        case "current":
             return .current
+        default:
+            return .text01JsonSchema
         }
     }
 }

@@ -75,8 +75,8 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(ignoredOverrideConfiguration.baseURL.absoluteString, "https://api.minimaxi.com/anthropic")
         XCTAssertEqual(ignoredOverrideConfiguration.textBaseURL.absoluteString, "https://api.minimaxi.com")
         XCTAssertEqual(ignoredOverrideConfiguration.model, "MiniMax-M2.5-highspeed")
-        XCTAssertEqual(ignoredOverrideConfiguration.metadataRoute, .current)
-        XCTAssertEqual(ignoredOverrideConfiguration.metadataModel, "MiniMax-M2.5-highspeed")
+        XCTAssertEqual(ignoredOverrideConfiguration.metadataRoute, .text01JsonSchema)
+        XCTAssertEqual(ignoredOverrideConfiguration.metadataModel, "MiniMax-Text-01")
         XCTAssertEqual(ignoredOverrideConfiguration.apiKey, "bundle-key-123")
         XCTAssertTrue(ignoredOverrideConfiguration.shouldUseRealClient)
 
@@ -187,7 +187,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(textSchemaSystemPrompt.contains("metadata-only response builder"))
         XCTAssertTrue(textSchemaSystemPrompt.contains("Return only the metadata for the completed prose"))
         XCTAssertFalse(textSchemaSystemPrompt.contains("emit_metadata"))
-        XCTAssertTrue(textSchemaUserPrompt.contains("Return summary, nextFocus, and suggestionChips only."))
+        XCTAssertTrue(textSchemaUserPrompt.contains("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only."))
         XCTAssertFalse(textSchemaUserPrompt.contains("Use the `emit_metadata` tool"))
     }
 
@@ -212,8 +212,8 @@ final class WritingAITests: XCTestCase {
             title: "续写测试",
             prompt: "写一篇关于成年人孤独感的公众号文章",
             mode: .collaboration,
-            summary: "给人看的摘要可以保留原样",
-            continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
+            localSummary: "给人看的局部摘要可以保留原样",
+            globalSynopsis: "给模型看的全局摘要要更短、更偏状态",
             context: context,
             conversation: [],
             documentText: documentText,
@@ -239,9 +239,9 @@ final class WritingAITests: XCTestCase {
         XCTAssertFalse(systemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(systemPrompt.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph."))
         XCTAssertTrue(systemPrompt.contains("Leave a small amount of forward momentum for the next step."))
-        XCTAssertTrue(userPrompt.contains("Document summary:"))
+        XCTAssertTrue(userPrompt.contains("Global synopsis:"))
         XCTAssertTrue(userPrompt.contains("Document tail:"))
-        XCTAssertTrue(userPrompt.contains("给模型看的压缩摘要要更短、更偏状态"))
+        XCTAssertTrue(userPrompt.contains("给模型看的全局摘要要更短、更偏状态"))
         XCTAssertTrue(userPrompt.contains("尾部第二段要真正作为继续写的起点。"))
         XCTAssertTrue(userPrompt.contains("Do not restart from the beginning of the article."))
         XCTAssertTrue(userPrompt.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph."))
@@ -254,7 +254,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertFalse(userPrompt.contains("Current document:"))
         XCTAssertFalse(userPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertFalse(userPrompt.contains("Required output shape:"))
-        XCTAssertFalse(userPrompt.contains("exactly one JSON object with summary, nextFocus, and suggestionChips"))
+        XCTAssertFalse(userPrompt.contains("exactly one JSON object with localSummary, globalSynopsis, nextFocus, and suggestionChips"))
         XCTAssertFalse(userPrompt.contains("Respond with only the writing text"))
 
         let metadataRequest = WritingAIRequest(
@@ -273,10 +273,10 @@ final class WritingAITests: XCTestCase {
         let metadataSystemPrompt = metadataMessages.first?.content ?? ""
         let metadataUserPrompt = metadataMessages.last?.content ?? ""
         XCTAssertTrue(metadataSystemPrompt.contains("metadata-only response builder"))
-        XCTAssertTrue(metadataSystemPrompt.contains("Summarize the completed正文 after the continuation"))
+        XCTAssertTrue(metadataSystemPrompt.contains("Describe the completed正文 as the local summary"))
         XCTAssertTrue(metadataUserPrompt.contains("Action: continueWriting metadata"))
         XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
-        XCTAssertTrue(metadataUserPrompt.contains("Document summary:"))
+        XCTAssertTrue(metadataUserPrompt.contains("Current global synopsis:"))
         XCTAssertTrue(metadataUserPrompt.contains("Use the `emit_metadata` tool"))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
     }
@@ -300,7 +300,7 @@ final class WritingAITests: XCTestCase {
             XCTAssertEqual(payload.tools?.first?.name, "emit_metadata")
             XCTAssertEqual(payload.toolChoice?.type, "tool")
             XCTAssertEqual(payload.toolChoice?.name, "emit_metadata")
-            XCTAssertEqual(payload.tools?.first?.inputSchema.required, ["summary", "nextFocus", "suggestionChips"])
+            XCTAssertEqual(payload.tools?.first?.inputSchema.required, ["localSummary", "globalSynopsis", "nextFocus", "suggestionChips"])
             XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.minItems, 3)
             XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.maxItems, 3)
             XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
@@ -314,7 +314,8 @@ final class WritingAITests: XCTestCase {
                   "id": "toolu_01",
                   "name": "emit_metadata",
                   "input": {
-                    "summary": "已生成开头",
+                    "localSummary": "已生成开头",
+                    "globalSynopsis": "已生成总览",
                     "nextFocus": "继续推进第一段",
                     "suggestionChips": ["继续写", "编辑这段", "补一段"]
                   }
@@ -334,8 +335,8 @@ final class WritingAITests: XCTestCase {
             title: "结构化建议测试",
             prompt: "写一篇关于成年人孤独感的公众号文章",
             mode: .collaboration,
-            summary: "给人看的摘要可以保留原样",
-            continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
+            localSummary: "给人看的局部摘要可以保留原样",
+            globalSynopsis: "给模型看的全局摘要要更短、更偏状态",
             context: ProjectContext(
                 intentSummary: "当前要把结尾收紧，并保持人物气口一致。",
                 styleConstraints: ["克制", "平静", "非鸡汤"],
@@ -359,7 +360,8 @@ final class WritingAITests: XCTestCase {
         let response = try await client.generateResponse(for: request)
 
         XCTAssertEqual(response.documentText, request.project.documentText)
-        XCTAssertEqual(response.summary, "已生成开头")
+        XCTAssertEqual(response.localSummary, "已生成开头")
+        XCTAssertEqual(response.globalSynopsis, "已生成总览")
         XCTAssertEqual(response.nextFocus, "继续推进第一段")
         XCTAssertEqual(response.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
@@ -417,8 +419,8 @@ final class WritingAITests: XCTestCase {
             title: "续写测试",
             prompt: "写一篇关于成年人孤独感的公众号文章",
             mode: .collaboration,
-            summary: "给人看的摘要可以保留原样",
-            continuationSummary: "给模型看的压缩摘要要更短、更偏状态",
+            localSummary: "给人看的局部摘要可以保留原样",
+            globalSynopsis: "给模型看的全局摘要要更短、更偏状态",
             context: ProjectContext(
                 intentSummary: "当前要把结尾收紧，并保持人物气口一致。",
                 styleConstraints: ["克制", "平静", "非鸡汤"],
@@ -446,7 +448,8 @@ final class WritingAITests: XCTestCase {
         }
 
         XCTAssertEqual(finalResponse?.documentText, "前文第一段。\n\n前文第二段。续写正文。")
-        XCTAssertTrue(finalResponse?.summary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.localSummary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.globalSynopsis.isEmpty ?? false)
         XCTAssertTrue(finalResponse?.nextFocus.isEmpty ?? false)
         XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
     }
@@ -508,7 +511,8 @@ final class WritingAITests: XCTestCase {
         }
 
         XCTAssertEqual(finalResponse?.documentText, "成年人真正感到孤独的时候，未必是在深夜。")
-        XCTAssertTrue(finalResponse?.summary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.localSummary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.globalSynopsis.isEmpty ?? false)
         XCTAssertTrue(finalResponse?.nextFocus.isEmpty ?? false)
         XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
     }
@@ -532,7 +536,7 @@ final class WritingAITests: XCTestCase {
             XCTAssertEqual(payload.tools?.first?.name, "emit_metadata")
             XCTAssertEqual(payload.toolChoice?.type, "tool")
             XCTAssertEqual(payload.toolChoice?.name, "emit_metadata")
-            XCTAssertEqual(payload.tools?.first?.inputSchema.required, ["summary", "nextFocus", "suggestionChips"])
+            XCTAssertEqual(payload.tools?.first?.inputSchema.required, ["localSummary", "globalSynopsis", "nextFocus", "suggestionChips"])
             XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.minItems, 3)
             XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.maxItems, 3)
             XCTAssertTrue(payload.system.contains("metadata-only response builder"))
@@ -549,7 +553,8 @@ final class WritingAITests: XCTestCase {
                   "id": "toolu_01",
                   "name": "emit_metadata",
                   "input": {
-                    "summary": "已生成开头",
+                    "localSummary": "已生成开头",
+                    "globalSynopsis": "已生成总览",
                     "nextFocus": "继续推进第一段",
                     "suggestionChips": ["继续写", "编辑这段", "补一段"]
                   }
@@ -580,7 +585,8 @@ final class WritingAITests: XCTestCase {
             }
         }
 
-        XCTAssertEqual(finalResponse?.summary, "已生成开头")
+        XCTAssertEqual(finalResponse?.localSummary, "已生成开头")
+        XCTAssertEqual(finalResponse?.globalSynopsis, "已生成总览")
         XCTAssertEqual(finalResponse?.nextFocus, "继续推进第一段")
         XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
         XCTAssertEqual(finalResponse?.documentText, request.project.documentText)
@@ -613,7 +619,7 @@ final class WritingAITests: XCTestCase {
             XCTAssertEqual(payload.responseFormat.type, "json_schema")
             XCTAssertEqual(payload.responseFormat.jsonSchema.name, "writing_ai_metadata")
             XCTAssertTrue(payload.responseFormat.jsonSchema.strict)
-            XCTAssertEqual(payload.responseFormat.jsonSchema.schema.required, ["summary", "nextFocus", "suggestionChips"])
+            XCTAssertEqual(payload.responseFormat.jsonSchema.schema.required, ["localSummary", "globalSynopsis", "nextFocus", "suggestionChips"])
             XCTAssertEqual(payload.messages.count, 2)
             XCTAssertEqual(payload.messages.first?.role, "system")
             XCTAssertEqual(payload.messages.first?.name, "MiniMax AI")
@@ -621,7 +627,7 @@ final class WritingAITests: XCTestCase {
             XCTAssertEqual(payload.messages.last?.role, "user")
             XCTAssertEqual(payload.messages.last?.name, "用户")
             XCTAssertTrue(payload.messages.last?.content.contains("Action: startDraft metadata") ?? false)
-            XCTAssertTrue(payload.messages.last?.content.contains("Return summary, nextFocus, and suggestionChips only.") ?? false)
+            XCTAssertTrue(payload.messages.last?.content.contains("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.") ?? false)
             XCTAssertFalse(payload.messages.last?.content.contains("emit_metadata") ?? true)
 
             let response = """
@@ -629,7 +635,7 @@ final class WritingAITests: XCTestCase {
               "choices": [
                 {
                   "message": {
-                    "content": "{\\"summary\\":\\"已生成开头\\",\\"nextFocus\\":\\"继续推进第一段\\",\\"suggestionChips\\":[\\"继续写\\",\\"编辑这段\\",\\"补一段\\"]}"
+                    "content": "{\\"localSummary\\":\\"已生成开头\\",\\"globalSynopsis\\":\\"已生成总览\\",\\"nextFocus\\":\\"继续推进第一段\\",\\"suggestionChips\\":[\\"继续写\\",\\"编辑这段\\",\\"补一段\\"]}"
                   }
                 }
               ],
@@ -658,7 +664,8 @@ final class WritingAITests: XCTestCase {
         let finalResponse = try await client.generateResponse(for: request)
 
         XCTAssertEqual(finalResponse.documentText, request.project.documentText)
-        XCTAssertEqual(finalResponse.summary, "已生成开头")
+        XCTAssertEqual(finalResponse.localSummary, "已生成开头")
+        XCTAssertEqual(finalResponse.globalSynopsis, "已生成总览")
         XCTAssertEqual(finalResponse.nextFocus, "继续推进第一段")
         XCTAssertEqual(finalResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
@@ -792,7 +799,8 @@ final class WritingAITests: XCTestCase {
         )
         XCTAssertEqual(finalResponse?.documentText, "成年人真正感到孤独的时候，未必是在深夜。更多时候，是在一个很普通的傍晚。")
         XCTAssertEqual(finalResponse?.mode, .collaboration)
-        XCTAssertTrue(finalResponse?.summary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.localSummary.isEmpty ?? false)
+        XCTAssertTrue(finalResponse?.globalSynopsis.isEmpty ?? false)
         XCTAssertTrue(finalResponse?.nextFocus.isEmpty ?? false)
         XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
         XCTAssertFalse(finalResponse?.assistantMessage.isEmpty ?? true)
@@ -813,7 +821,8 @@ final class WritingAITests: XCTestCase {
             metadata: nil
         )
 
-        XCTAssertEqual(response.summary, "")
+        XCTAssertEqual(response.localSummary, "")
+        XCTAssertEqual(response.globalSynopsis, "")
         XCTAssertEqual(response.nextFocus, "")
         XCTAssertEqual(response.suggestionChips, [])
     }
@@ -866,7 +875,8 @@ final class WritingAITests: XCTestCase {
         {
           "assistantMessage": "我已经起草完了。",
           "documentText": "正文",
-          "summary": "摘要",
+          "localSummary": "摘要",
+          "globalSynopsis": "全局摘要",
           "intentSummary": "意图",
           "styleConstraints": ["克制"],
           "currentGoal": "目标",
@@ -891,7 +901,8 @@ final class WritingAITests: XCTestCase {
         let response = WritingAIResponse(
             assistantMessage: "继续推进",
             documentText: "新的正文",
-            summary: "新的摘要",
+            localSummary: "新的局部摘要",
+            globalSynopsis: "新的全局摘要",
             intentSummary: "新的意图",
             styleConstraints: ["克制", "平静"],
             currentGoal: "新的目标",
@@ -918,7 +929,8 @@ final class WritingAITests: XCTestCase {
         let response = WritingAIResponse(
             assistantMessage: "继续推进",
             documentText: "新的正文",
-            summary: "新的摘要",
+            localSummary: "新的局部摘要",
+            globalSynopsis: "新的全局摘要",
             intentSummary: "新的意图",
             styleConstraints: ["克制", "平静"],
             currentGoal: "新的目标",
@@ -1199,7 +1211,8 @@ private struct AnthropicRequestEnvelope: Decodable {
         let additionalProperties: Bool
 
         struct Properties: Decodable {
-            let summary: StringProperty
+            let localSummary: StringProperty
+            let globalSynopsis: StringProperty
             let nextFocus: StringProperty
             let suggestionChips: SuggestionChipsProperty
         }
