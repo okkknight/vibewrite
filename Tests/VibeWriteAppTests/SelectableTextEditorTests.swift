@@ -37,6 +37,41 @@ final class SelectableTextEditorTests: XCTestCase {
         XCTAssertTrue(coordinator.shouldPreserveLiveUserText(in: textView, bindingText: "loaded body"))
     }
 
+    func testBootstrapEmptyDelegateMutationDoesNotClearLoadedBinding() {
+        final class Box {
+            var value: String
+
+            init(_ value: String) {
+                self.value = value
+            }
+        }
+
+        let box = Box("loaded body")
+        let editor = SelectableTextEditor(
+            text: Binding(
+                get: { box.value },
+                set: { box.value = $0 }
+            ),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.isEditable = true
+        textView.string = ""
+
+        coordinator.textDidChange(
+            Notification(name: NSText.didChangeNotification, object: textView)
+        )
+        coordinator.textDidEndEditing(
+            Notification(name: NSText.didEndEditingNotification, object: textView)
+        )
+
+        XCTAssertEqual(box.value, "loaded body")
+    }
+
     func testTextDidEndEditingCommitsLiveTextToBinding() {
         final class Box {
             var value: String
@@ -100,5 +135,38 @@ final class SelectableTextEditorTests: XCTestCase {
         )
 
         XCTAssertEqual(box.value, "loaded bod")
+    }
+
+    func testLiveTextMutationCommitsDeletionToEmptyBinding() {
+        final class Box {
+            var value: String
+
+            init(_ value: String) {
+                self.value = value
+            }
+        }
+
+        let box = Box("loaded body")
+        let editor = SelectableTextEditor(
+            text: Binding(
+                get: { box.value },
+                set: { box.value = $0 }
+            ),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let textView = NSTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.isEditable = true
+        textView.string = ""
+
+        coordinator.handleLiveTextMutation(
+            from: textView,
+            source: "doCommand(deleteBackward:)"
+        )
+
+        XCTAssertEqual(box.value, "")
     }
 }

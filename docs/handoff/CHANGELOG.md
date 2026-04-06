@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-06
+- The first-open hydration regression is fixed again at the bridge boundary: bootstrap empty `textDidChange` / `textDidEndEditing` notifications are now ignored while a loaded file is seeding the editor, so opening a file from a blank session shows the正文 on the first try instead of blanking it back out. Real manual typing and deletion still flow through the live-text commit path.
+
+# 2026-04-06
 - The正文 bridge delete regression was fixed by committing mutating `doCommand(by:)` paths into the live正文 binding as well, so deletions no longer fall back to a stale snapshot and reappear on save.
 
 # 2026-04-06

@@ -857,6 +857,12 @@ final class VibeWriteAppFlow: ObservableObject {
                     fallbackTitle: fallbackTitle,
                     fallbackAutomationKey: fallbackAutomationKey
                 )
+            VibeWriteLog.ai.info(
+                "flow openDocument project resolved url=\(url.lastPathComponent, privacy: .public) projectID=\(project.id.uuidString, privacy: .public) projectCount=\(project.documentText.count, privacy: .public) activeCountBefore=\(self.activeDocumentText.count, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow openDocument project resolved url=\(url.lastPathComponent, privacy: .public) projectID=\(project.id.uuidString, privacy: .public) projectCount=\(project.documentText.count, privacy: .public) activeCountBefore=\(self.activeDocumentText.count, privacy: .public)"
+            )
             currentDocumentURL = url
             savedDocumentContents = rawText
             activeDocumentText = project.documentText

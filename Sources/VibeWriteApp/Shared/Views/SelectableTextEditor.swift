@@ -121,6 +121,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView
         )
         _ = context.coordinator.syncText(text, in: textView)
+        context.coordinator.logTextEvent(
+            "make nsview seeded bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count)"
+        )
         context.coordinator.syncSelectionOverlayState(from: textView)
         context.coordinator.logTextEvent(
             "make nsview end textViewCount=\(textView.string.utf16.count) selectedCount=\(textView.selectedRange().length) editable=\(textView.isEditable)"
@@ -160,6 +163,9 @@ struct SelectableTextEditor: NSViewRepresentable {
         } else {
             didMutateText = context.coordinator.syncText(text, in: textView)
         }
+        context.coordinator.logTextEvent(
+            "update nsview resolved bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) didMutateText=\(didMutateText)"
+        )
         context.coordinator.syncAccessibilityValue(in: textView)
         context.coordinator.syncLayout(
             in: textView,
@@ -683,6 +689,11 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let textView = notification.object as? NSTextView else {
                 return
             }
+
+            if shouldIgnoreBootstrapEmptyDelegateMutation(from: textView, source: "textDidChange") {
+                return
+            }
+
             handleLiveTextMutation(from: textView, source: "textDidChange")
         }
 
@@ -704,6 +715,10 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             guard textView.isEditable else { return }
             guard !isApplyingProgrammaticChange else { return }
+
+            if shouldIgnoreBootstrapEmptyDelegateMutation(from: textView, source: "textDidEndEditing") {
+                return
+            }
 
             handleLiveTextMutation(from: textView, source: "textDidEndEditing")
             pendingUserTextChange = nil
@@ -779,6 +794,37 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             setTextIfNeeded(currentText)
             syncSelectionOverlayState(from: textView)
+        }
+
+        private func shouldIgnoreBootstrapEmptyDelegateMutation(
+            from textView: NSTextView,
+            source: String
+        ) -> Bool {
+            guard source == "textDidChange" || source == "textDidEndEditing" else {
+                return false
+            }
+
+            guard textView.string.isEmpty else {
+                return false
+            }
+
+            guard text.utf16.count > 0 else {
+                return false
+            }
+
+            guard pendingUserTextChange == nil else {
+                return false
+            }
+
+            guard pendingTextBindingUpdateAfterLayoutSync == nil else {
+                return false
+            }
+
+            guard lastCommittedUserText == nil else {
+                return false
+            }
+
+            return true
         }
 
         private func flushDeferredSelectionOverlaySyncIfNeeded(for textView: NSTextView) {
