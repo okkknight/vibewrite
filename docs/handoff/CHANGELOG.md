@@ -165,6 +165,12 @@
 ## 2026-04-04
 - The正文 editor now shares the same outer content column as the bottom composer but no longer applies its own centered readable-width calculation. It uses a fixed internal text inset and a right-side scroll gutter instead, which keeps the editor and composer aligned on both left and right edges without clipping正文.
 - Remote AI metadata now has an explicit Chinese-language constraint for Chinese writing tasks, so `summary`, `nextFocus`, and `suggestionChips` are expected to stay in Chinese instead of drifting into English.
+# 2026-04-06
+- The正文 editor now binds directly to `activeDocumentText` as live session text, while `WritingProject` stays the persisted metadata/snapshot shell. The old project-body writeback bridge has been removed, save now serializes the live session snapshot directly, and project-level updates that intentionally change正文 reconcile through the session layer instead of a last-second window flush.
+- Blank startup still bypasses the discard prompt, but only when the live正文 and project metadata are both truly pristine.
+- Verified with `swift test --filter VibeWriteAppFlowTests` and `swift test --filter SelectableTextEditorTests`, plus `swift build`.
+
+## 2026-04-04
 - Continue-writing streaming now reveals from the end of the current正文 instead of starting from character 0, so the streamed preview stays anchored to the latest paragraph.
 
 ## 2026-04-04

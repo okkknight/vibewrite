@@ -30,6 +30,20 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(flow.recentProjects.isEmpty)
     }
 
+    func testActiveDocumentTextIsTrackedSeparatelyFromProjectSnapshot() {
+        let flow = VibeWriteAppFlow()
+        flow.createNewProject()
+
+        XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+        XCTAssertTrue(flow.activeDocumentText.isEmpty)
+
+        flow.activeDocumentTextBinding.wrappedValue = "typed draft"
+
+        XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+        XCTAssertEqual(flow.activeDocumentText, "typed draft")
+        XCTAssertEqual(flow.activeEditingProject.documentText, "typed draft")
+    }
+
     func testBlankStartupStartsCleanBeforeEditing() throws {
         let flow = VibeWriteAppFlow()
 
@@ -39,6 +53,37 @@ final class VibeWriteAppFlowTests: XCTestCase {
 
         XCTAssertFalse(flow.isCurrentDocumentDirty)
         XCTAssertEqual(flow.activeProject.documentText, "")
+    }
+
+    func testSaveCurrentDocumentUsesLiveDocumentTextSnapshot() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        flow.createNewProject()
+        flow.activeDocumentTextBinding.wrappedValue = "typed draft"
+
+        let documentURL = storageURL.deletingLastPathComponent().appendingPathComponent("draft.md")
+        XCTAssertTrue(flow.saveCurrentDocument(to: documentURL))
+
+        let rawText = try String(contentsOf: documentURL, encoding: .utf8)
+        XCTAssertTrue(rawText.contains("typed draft"))
+        XCTAssertEqual(flow.activeProject.documentText, "typed draft")
+        XCTAssertEqual(flow.activeDocumentText, "typed draft")
+    }
+
+    func testRenameActiveProjectPreservesLiveDocumentText() {
+        let flow = VibeWriteAppFlow()
+        flow.createNewProject()
+        flow.activeDocumentTextBinding.wrappedValue = "typed draft"
+
+        flow.renameActiveProject(to: "新的标题")
+
+        XCTAssertEqual(flow.activeProject.title, "新的标题")
+        XCTAssertEqual(flow.activeDocumentText, "typed draft")
+        XCTAssertEqual(flow.activeEditingProject.documentText, "typed draft")
     }
 
     func testBlankStartupWindowCloseBypassesDiscardPrompt() {
@@ -608,7 +653,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
 
         XCTAssertEqual(flow.activeProject.documentText, before.documentText)
         XCTAssertEqual(flow.activeProject.conversation.count, before.conversation.count)
-        XCTAssertEqual(flow.activeProject.updatedAt, before.updatedAt)
+        XCTAssertEqual(Int(flow.activeProject.updatedAt.timeIntervalSince1970), Int(before.updatedAt.timeIntervalSince1970))
         XCTAssertNil(flow.activeEditLock)
     }
 

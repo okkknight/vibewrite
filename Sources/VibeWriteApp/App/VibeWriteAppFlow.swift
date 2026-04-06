@@ -14,6 +14,7 @@ final class VibeWriteAppFlow: ObservableObject {
     @Published private(set) var aiErrorMessage: String?
     @Published private(set) var currentDocumentURL: URL?
     @Published private(set) var recentDocumentEntries: [RecentDocumentEntry]
+    @Published private(set) var activeDocumentText: String
 
     private let recentDocumentStore: RecentDocumentStore
     private let documentMetadataStore: VibeWriteDocumentMetadataStore
@@ -55,6 +56,7 @@ final class VibeWriteAppFlow: ObservableObject {
         self.emptyProjectShell = WritingProject.entryShell(mode: .collaboration)
         self.recentDocumentEntries = resolvedStore.load()
         self.savedDocumentContents = VibeWriteMarkdownDocument(project: self.emptyProjectShell).renderedText()
+        self.activeDocumentText = self.emptyProjectShell.documentText
 
         if forceBlankStartup || shouldResetStorage {
             self.projects = []
@@ -63,6 +65,7 @@ final class VibeWriteAppFlow: ObservableObject {
             documentMetadataStore.clear()
             self.recentDocumentEntries = []
             self.savedDocumentContents = VibeWriteMarkdownDocument(project: self.emptyProjectShell).renderedText()
+            self.activeDocumentText = self.emptyProjectShell.documentText
             self.currentDocumentURL = nil
         } else {
             self.projects = []
@@ -77,7 +80,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     var currentDocumentFileText: String {
-        VibeWriteMarkdownDocument(project: activeProject).renderedText()
+        VibeWriteMarkdownDocument(project: activeEditingProject).renderedText()
     }
 
     var isCurrentDocumentDirty: Bool {
@@ -94,6 +97,12 @@ final class VibeWriteAppFlow: ObservableObject {
         }
 
         return currentDocumentFileText != savedDocumentContents
+    }
+
+    var activeEditingProject: WritingProject {
+        var project = activeProject
+        project.documentText = activeDocumentText
+        return project
     }
 
     var activeProject: WritingProject {
@@ -113,22 +122,19 @@ final class VibeWriteAppFlow: ObservableObject {
         }
     }
 
-    var activeProjectBinding: Binding<WritingProject> {
+    var activeDocumentTextBinding: Binding<String> {
         Binding(
             get: { [weak self] in
-                guard let self else {
-                    return WritingProject.entryShell(mode: .collaboration)
-                }
-                return self.activeProject
+                self?.activeDocumentText ?? ""
             },
-            set: { [weak self] updatedProject in
-                self?.replaceActiveProject(updatedProject, persist: false)
+            set: { [weak self] newText in
+                self?.activeDocumentText = newText
             }
         )
     }
 
     func openProject(_ project: WritingProject) {
-        replaceActiveProject(project, persist: false)
+        replaceActiveProject(project)
     }
 
     func beginDocumentHydration(for projectID: UUID) {
@@ -158,6 +164,7 @@ final class VibeWriteAppFlow: ObservableObject {
         )
         currentDocumentURL = nil
         savedDocumentContents = VibeWriteMarkdownDocument(project: project).renderedText()
+        activeDocumentText = project.documentText
         openProject(project)
     }
 
@@ -173,6 +180,7 @@ final class VibeWriteAppFlow: ObservableObject {
         )
         currentDocumentURL = nil
         savedDocumentContents = VibeWriteMarkdownDocument(project: project).renderedText()
+        activeDocumentText = project.documentText
         openProject(project)
         guard mode == .collaboration else { return }
 
@@ -191,7 +199,7 @@ final class VibeWriteAppFlow: ObservableObject {
         let trimmed = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !trimmed.isEmpty else { return }
 
-        var updatedProject = activeProject
+        var updatedProject = activeEditingProject
         updatedProject.title = trimmed
         activeProject = updatedProject
         if let currentDocumentURL {
@@ -220,6 +228,7 @@ final class VibeWriteAppFlow: ObservableObject {
         activeProjectID = nil
         currentDocumentURL = nil
         savedDocumentContents = nil
+        activeDocumentText = emptyProjectShell.documentText
         activeEditLock = nil
         aiErrorMessage = nil
         isAIRequestInFlight = false
@@ -229,7 +238,7 @@ final class VibeWriteAppFlow: ObservableObject {
 
     @discardableResult
     func undoLastRevision() -> WritingProjectRevision? {
-        var project = activeProject
+        var project = activeEditingProject
         guard let revision = project.undoLastRevision() else {
             return nil
         }
@@ -248,14 +257,14 @@ final class VibeWriteAppFlow: ObservableObject {
             throw WritingAIClientError.requestFailed("已有请求正在进行，请稍后再试。")
         }
 
-        let project = activeProject
+        let project = activeEditingProject
         isAIRequestInFlight = true
         isProseRequestInFlight = true
         isMetadataRequestInFlight = false
         activeEditLock = WritingEditLock(
             action: action,
             lockedSelectionText: selectionRange.flatMap { $0.substring(in: project.documentText)?.trimmingCharacters(in: .whitespacesAndNewlines) } ?? selectionText,
-            lockedDocumentText: activeProject.documentText
+            lockedDocumentText: project.documentText
         )
         aiErrorMessage = nil
         defer {
@@ -313,7 +322,7 @@ final class VibeWriteAppFlow: ObservableObject {
                     }
                 }
                 liveProject.localSummary = streamingSummary(for: action)
-                replaceActiveProject(liveProject, persist: false)
+                replaceActiveProject(liveProject)
 
                 var streamedText = ""
                 let previewRenderer: WritingStreamingPreviewRenderer? = nil
@@ -364,7 +373,7 @@ final class VibeWriteAppFlow: ObservableObject {
                     before: beforeSnapshot,
                     after: liveProject.aiSnapshot
                 )
-                replaceActiveProject(liveProject, persist: false)
+                replaceActiveProject(liveProject)
                 if let currentDocumentURL {
                     _ = saveCurrentDocument(to: currentDocumentURL)
                 }
@@ -372,7 +381,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 VibeWriteLog.ai.error(
                     "Flow AI request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                 )
-                replaceActiveProject(project, persist: false)
+                replaceActiveProject(project)
                 aiErrorMessage = error.localizedDescription
                 throw error
             }
@@ -398,7 +407,7 @@ final class VibeWriteAppFlow: ObservableObject {
             liveProject.localSummary = streamingSummary(for: action)
             liveProject.nextFocus = ""
             liveProject.suggestionChips = []
-            replaceActiveProject(liveProject, persist: false)
+            replaceActiveProject(liveProject)
 
             let proseRequest = WritingAIRequest(
                 action: action,
@@ -413,7 +422,7 @@ final class VibeWriteAppFlow: ObservableObject {
             let proseNetworkStartedAt = Date()
             let previewRenderer = WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
                 liveProject.documentText = renderedText
-                self.replaceActiveProject(liveProject, persist: false)
+                self.replaceActiveProject(liveProject)
             }
             var finalResponse: WritingAIResponse?
             VibeWriteLog.ai.info(
@@ -463,7 +472,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 before: beforeSnapshot,
                 after: liveProject.aiSnapshot
             )
-            replaceActiveProject(liveProject, persist: false)
+            replaceActiveProject(liveProject)
             if let currentDocumentURL {
                 _ = saveCurrentDocument(to: currentDocumentURL)
             }
@@ -503,7 +512,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 let metadataResponse = try await metadataTask.value
                 let metadata = metadataResponse.completionMetadata
                 liveProject.applyWritingMetadata(metadata)
-                replaceActiveProject(liveProject, persist: false)
+                replaceActiveProject(liveProject)
                 if let currentDocumentURL {
                     _ = saveCurrentDocument(to: currentDocumentURL)
                 }
@@ -522,7 +531,7 @@ final class VibeWriteAppFlow: ObservableObject {
             VibeWriteLog.ai.error(
                 "Flow AI request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
-            replaceActiveProject(project, persist: false)
+            replaceActiveProject(project)
             aiErrorMessage = error.localizedDescription
             throw error
         }
@@ -549,7 +558,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     private func setActiveProject(_ project: WritingProject) {
-        replaceActiveProject(project, persist: false)
+        replaceActiveProject(project)
     }
 
     private func resetCurrentSessionForDockReopen() {
@@ -565,46 +574,17 @@ final class VibeWriteAppFlow: ObservableObject {
         isMetadataRequestInFlight = false
     }
 
-    private func replaceActiveProject(_ project: WritingProject, persist: Bool) {
+    private func replaceActiveProject(_ project: WritingProject) {
+        if activeDocumentText != project.documentText {
+            activeDocumentText = project.documentText
+        }
+
         if let currentProject = self.project(for: project.id), currentProject == project, activeProjectID == project.id {
             return
         }
 
         projects = [project]
         activeProjectID = project.id
-    }
-
-    private func commitLiveEditorStateBeforeSaving(reason: String) {
-        let currentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
-        guard let window = NSApp.keyWindow ?? NSApp.mainWindow else {
-            VibeWriteLog.ai.info(
-                "flow commit editor skipped reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) window=nil"
-            )
-            VibeWriteLog.launch.info(
-                "flow commit editor skipped reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) window=nil"
-            )
-            return
-        }
-
-        let firstResponderName = window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
-        if let textView = window.firstResponder as? NSTextView {
-            let textCount = textView.string.utf16.count
-            VibeWriteLog.ai.info(
-                "flow commit editor flush first responder reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) textCount=\(textCount, privacy: .public) firstResponder=\(firstResponderName, privacy: .public)"
-            )
-            VibeWriteLog.launch.info(
-                "flow commit editor flush first responder reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) textCount=\(textCount, privacy: .public) firstResponder=\(firstResponderName, privacy: .public)"
-            )
-            textView.delegate?.textDidEndEditing?(Notification(name: NSText.didEndEditingNotification, object: textView))
-        }
-        window.endEditing(for: nil)
-        let resignedFirstResponder = window.makeFirstResponder(nil)
-        VibeWriteLog.ai.info(
-            "flow commit editor before save reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) windowTitle=\(window.title.vibewriteLogPreview(maxLength: 40), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) endedEditing=true resignedFirstResponder=\(resignedFirstResponder, privacy: .public)"
-        )
-        VibeWriteLog.launch.info(
-            "flow commit editor before save reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) windowTitle=\(window.title.vibewriteLogPreview(maxLength: 40), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) endedEditing=true resignedFirstResponder=\(resignedFirstResponder, privacy: .public)"
-        )
     }
 
     @discardableResult
@@ -637,7 +617,7 @@ final class VibeWriteAppFlow: ObservableObject {
             }
             documentMetadataStore.save(project: project)
             if updateActiveProject {
-                replaceActiveProject(project, persist: false)
+                replaceActiveProject(project)
             }
             currentDocumentURL = url
             savedDocumentContents = renderedText
@@ -706,10 +686,9 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocument() -> Bool {
-        commitLiveEditorStateBeforeSaving(reason: "saveCurrentDocument")
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
-        let activeCount = activeProject.documentText.count
+        let activeCount = activeDocumentText.count
         VibeWriteLog.ai.info(
             "flow saveCurrentDocument entry currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
         )
@@ -724,10 +703,9 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocumentAs() -> Bool {
-        commitLiveEditorStateBeforeSaving(reason: "saveCurrentDocumentAs")
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
-        let activeCount = activeProject.documentText.count
+        let activeCount = activeDocumentText.count
         VibeWriteLog.ai.info(
             "flow saveCurrentDocumentAs entry currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
         )
@@ -747,32 +725,31 @@ final class VibeWriteAppFlow: ObservableObject {
             return false
         }
 
-        let projectToSave = currentDocumentURL == nil ? activeProject : activeProject.forkedSaveAsCopy()
+        let projectToSave = currentDocumentURL == nil ? activeEditingProject : activeEditingProject.forkedSaveAsCopy()
         return saveCurrentDocument(
             to: url,
             project: projectToSave,
-            updateActiveProject: currentDocumentURL != nil
+            updateActiveProject: true
         )
     }
 
     func saveCurrentDocument(to url: URL) -> Bool {
-        commitLiveEditorStateBeforeSaving(reason: "saveCurrentDocument(to:)")
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
-        let activeCount = activeProject.documentText.count
+        let activeCount = activeDocumentText.count
         VibeWriteLog.ai.info(
             "flow saveCurrentDocument to-url entry targetURL=\(url.lastPathComponent, privacy: .public) currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
         )
         VibeWriteLog.launch.info(
             "flow saveCurrentDocument to-url entry targetURL=\(url.lastPathComponent, privacy: .public) currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
         )
-        return saveCurrentDocument(to: url, project: activeProject, updateActiveProject: false)
+        return saveCurrentDocument(to: url, project: activeEditingProject, updateActiveProject: true)
     }
 
     func openDocumentFromPanel() -> Bool {
         let currentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
-        let activeCount = activeProject.documentText.count
+        let activeCount = activeDocumentText.count
         VibeWriteLog.ai.info(
             "flow openDocumentFromPanel entry currentURL=\(currentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
         )
@@ -818,19 +795,20 @@ final class VibeWriteAppFlow: ObservableObject {
                 )
             currentDocumentURL = url
             savedDocumentContents = rawText
+            activeDocumentText = project.documentText
             beginDocumentHydration(for: project.id)
             openProject(project)
             DispatchQueue.main.async { [weak self, projectID = project.id] in
                 self?.endDocumentHydration(for: projectID)
             }
             let savedCount = self.savedDocumentContents?.count ?? -1
-            let activeCount = self.activeProject.documentText.count
+            let activeCount = self.activeDocumentText.count
             VibeWriteLog.ai.info(
                 "flow openDocument applied url=\(url.lastPathComponent, privacy: .public) projectID=\(project.id.uuidString, privacy: .public) savedCount=\(savedCount, privacy: .public) activeCount=\(activeCount, privacy: .public)"
             )
             let currentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
             VibeWriteDebugTrace.append(
-                "flow openDocument applied url=\(url.lastPathComponent) projectID=\(project.id.uuidString) currentURL=\(currentURLName) savedCount=\(savedDocumentContents?.count ?? -1) activeCount=\(activeProject.documentText.count)"
+                "flow openDocument applied url=\(url.lastPathComponent) projectID=\(project.id.uuidString) currentURL=\(currentURLName) savedCount=\(savedDocumentContents?.count ?? -1) activeCount=\(activeDocumentText.count)"
             )
             recordRecentDocument(url: url, title: project.title)
             return true
@@ -871,7 +849,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     private func saveFileNameSuggestion() -> String {
-        let cleanedTitle = activeProject.title
+        let cleanedTitle = activeEditingProject.title
             .trimmingCharacters(in: .whitespacesAndNewlines)
             .replacingOccurrences(of: "/", with: "-")
 
@@ -899,7 +877,7 @@ final class VibeWriteAppFlow: ObservableObject {
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
         let pristineBlank = isPristineBlankSession
-        let activeCount = activeProject.documentText.count
+        let activeCount = activeDocumentText.count
         VibeWriteLog.ai.info(
             "flow discard prompt check currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) pristineBlank=\(pristineBlank, privacy: .public) activeCount=\(activeCount, privacy: .public)"
         )
@@ -945,7 +923,7 @@ final class VibeWriteAppFlow: ObservableObject {
     private var isPristineBlankSession: Bool {
         guard currentDocumentURL == nil else { return false }
 
-        let project = activeProject
+        let project = activeEditingProject
         return project.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && project.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
             && project.title == emptyProjectShell.title

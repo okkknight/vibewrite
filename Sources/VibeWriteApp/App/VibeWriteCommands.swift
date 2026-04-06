@@ -7,7 +7,7 @@ struct VibeWriteCommands: Commands {
         CommandGroup(replacing: .newItem) {
             Button("New") {
                 VibeWriteLog.ai.info(
-                    "command new triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
+                    "command new triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
                 )
                 flow.createNewProject()
             }
@@ -17,7 +17,7 @@ struct VibeWriteCommands: Commands {
         CommandGroup(after: .newItem) {
             Button("Open...") {
                 VibeWriteLog.ai.info(
-                    "command open triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
+                    "command open triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
                 )
                 _ = flow.openDocumentFromPanel()
             }
@@ -25,7 +25,7 @@ struct VibeWriteCommands: Commands {
 
             Button("Save") {
                 VibeWriteLog.ai.info(
-                    "command save triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) currentURL=\(flow.currentDocumentURL?.lastPathComponent ?? "nil", privacy: .public)"
+                    "command save triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) currentURL=\(flow.currentDocumentURL?.lastPathComponent ?? "nil", privacy: .public)"
                 )
                 _ = flow.saveCurrentDocument()
             }
@@ -33,7 +33,7 @@ struct VibeWriteCommands: Commands {
 
             Button("Save As...") {
                 VibeWriteLog.ai.info(
-                    "command saveAs triggered activeCount=\(flow.activeProject.documentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) currentURL=\(flow.currentDocumentURL?.lastPathComponent ?? "nil", privacy: .public)"
+                    "command saveAs triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) currentURL=\(flow.currentDocumentURL?.lastPathComponent ?? "nil", privacy: .public)"
                 )
                 _ = flow.saveCurrentDocumentAs()
             }

@@ -22,13 +22,14 @@ struct WritingProjectView: View {
     @State private var isLocalEditViewportLocked = false
     @State private var isDocumentEndFollowActive = false
     @State private var bodyEditorScrollView: NSScrollView?
+    @State private var bodyEditorViewportState = SelectableTextEditorViewportState()
     @State private var showComparison = false
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
     @State private var isComposerLocked = false
     @FocusState private var messageFieldFocused: Bool
 
-    private var project: WritingProject { flow.activeProject }
+    private var project: WritingProject { flow.activeEditingProject }
     private var currentRevision: WritingProjectRevision? { project.revisionHistory.last }
     private var assistantDrawerWidth: CGFloat { shellLayoutMode.isCompact ? 300 : 280 }
     private var historyDrawerWidth: CGFloat { shellLayoutMode.isCompact ? 372 : 344 }
@@ -74,44 +75,8 @@ struct WritingProjectView: View {
                 VibeWriteLog.launch.info(
                     "project title binding accepted projectID=\(projectID.uuidString, privacy: .public) newTitleCount=\(newTitle.count, privacy: .public)"
                 )
-                var updatedProject = flow.activeProject
+                var updatedProject = flow.activeEditingProject
                 updatedProject.title = newTitle
-                flow.openProject(updatedProject)
-            }
-        )
-    }
-
-    private var projectDocumentTextBinding: Binding<String> {
-        let projectID = project.id
-        return Binding(
-            get: { project.documentText },
-            set: { newText in
-                let activeProjectID = flow.activeProject.id.uuidString
-                let isHydrationProtected = flow.isDocumentHydrationProtected(for: projectID)
-                VibeWriteDebugTrace.append(
-                    "project body binding writeback projectID=\(projectID.uuidString) activeProjectID=\(activeProjectID) textCount=\(newText.count)"
-                )
-                VibeWriteLog.launch.info(
-                    "project body binding writeback projectID=\(projectID.uuidString, privacy: .public) activeProjectID=\(activeProjectID, privacy: .public) textCount=\(newText.count, privacy: .public) hydrationProtected=\(isHydrationProtected, privacy: .public)"
-                )
-                guard flow.activeProject.id == projectID else { return }
-                guard !isHydrationProtected else {
-                    VibeWriteDebugTrace.append(
-                        "project body binding suppressed during document hydration projectID=\(projectID.uuidString) textCount=\(newText.count)"
-                    )
-                    VibeWriteLog.launch.info(
-                        "project body binding suppressed during document hydration projectID=\(projectID.uuidString, privacy: .public) textCount=\(newText.count, privacy: .public)"
-                    )
-                    return
-                }
-                VibeWriteDebugTrace.append(
-                    "project body binding accepted projectID=\(projectID.uuidString) newTextCount=\(newText.count)"
-                )
-                VibeWriteLog.launch.info(
-                    "project body binding accepted projectID=\(projectID.uuidString, privacy: .public) newTextCount=\(newText.count, privacy: .public)"
-                )
-                var updatedProject = flow.activeProject
-                updatedProject.documentText = newText
                 flow.openProject(updatedProject)
             }
         )
@@ -149,6 +114,7 @@ struct WritingProjectView: View {
             isLocalEditViewportLocked = false
             isDocumentEndFollowActive = false
             bodyEditorScrollView = nil
+            bodyEditorViewportState = .init()
             showComparison = false
             showAssistantLayer = false
             showHistoryLayer = false
@@ -380,7 +346,7 @@ struct WritingProjectView: View {
         VStack(alignment: .leading, spacing: 18) {
             ZStack(alignment: .topLeading) {
                 SelectableTextEditor(
-                    text: projectDocumentTextBinding,
+                    text: flow.activeDocumentTextBinding,
                     selectedText: $selectedText,
                     selectedTextRange: $selectedTextRange,
                     selectionPopoverOrigin: $selectionPopoverOrigin,
@@ -397,6 +363,9 @@ struct WritingProjectView: View {
                     shouldPreserveSelectionOverlayDuringPendingLocalEdit: selectionPopoverPendingPreset != nil || isComposerLocked,
                     onScrollViewReady: { scrollView in
                         bodyEditorScrollView = scrollView
+                    },
+                    onViewportStateChanged: { viewportState in
+                        bodyEditorViewportState = viewportState
                     }
                 )
                 .id(project.id)
@@ -426,7 +395,17 @@ struct WritingProjectView: View {
                     .zIndex(1)
                 }
             }
+            .overlay(alignment: .bottom) {
+                if shouldShowScrollToBottomButton {
+                    scrollToBottomButton
+                        .padding(.bottom, 16)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                        .frame(maxWidth: .infinity, alignment: .center)
+                        .allowsHitTesting(true)
+                }
+            }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+            .animation(.easeInOut(duration: 0.16), value: shouldShowScrollToBottomButton)
 
             if let errorMessage = flow.aiErrorMessage {
                 Text(errorMessage)
@@ -454,6 +433,59 @@ struct WritingProjectView: View {
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+    }
+
+    private var shouldShowScrollToBottomButton: Bool {
+        bodyEditorViewportState.canScrollDown && !bodyEditorViewportState.isAtDocumentEnd
+    }
+
+    private var scrollToBottomButton: some View {
+        Button(action: scrollBodyEditorToBottom) {
+            Label("回到底端", systemImage: "arrow.down.to.line.compact")
+                .font(.system(size: 12.5, weight: .semibold, design: .default))
+                .foregroundStyle(Color.vibeCanvasInk)
+                .padding(.horizontal, 14)
+                .padding(.vertical, 10)
+                .background {
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .fill(
+                            appearanceMode == .day
+                                ? Color.vibeCanvasLift.opacity(0.84)
+                                : Color.vibeCanvasLift.opacity(0.82)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .fill(
+                                    LinearGradient(
+                                        colors: [
+                                            Color.white.opacity(0.02),
+                                            .clear
+                                        ],
+                                        startPoint: .topLeading,
+                                        endPoint: .bottomTrailing
+                                    )
+                                )
+                                .blendMode(.softLight)
+                        )
+                        .overlay(
+                            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                                .strokeBorder(Color.vibeCanvasStroke.opacity(0.28), lineWidth: 1)
+                        )
+                        .shadow(color: Color.black.opacity(appearanceMode == .day ? 0.08 : 0.14), radius: 8, x: 0, y: 3)
+                }
+        }
+        .buttonStyle(.plain)
+        .focusEffectDisabled()
+        .accessibilityIdentifier("scrollToBottomButton")
+    }
+
+    private func scrollBodyEditorToBottom() {
+        guard let scrollView = bodyEditorScrollView,
+              let textView = scrollView.documentView as? NSTextView else { return }
+
+        let endRange = NSRange(location: textView.string.utf16.count, length: 0)
+        textView.scrollRangeToVisible(endRange)
+        scrollView.reflectScrolledClipView(scrollView.contentView)
     }
 
     private var assistantLayer: some View {
@@ -840,7 +872,7 @@ struct WritingProjectView: View {
         let shouldUpdateHistoryDrawer = shouldShowHistorySidebar && showHistoryLayer != keepHistoryDrawerOpen
         let shouldClearDraft = clearDraftOnSuccess && !messageDraft.isEmpty
         let shouldReleaseFocus = clearDraftOnSuccess && messageFieldFocused
-        let latestRevision = flow.activeProject.revisionHistory.last
+        let latestRevision = project.revisionHistory.last
         let shouldFlashLocalEdit = action == .edit && latestRevision?.patch.replacementHighlightRange != nil
         let shouldDelayPresetLoadingReset = action == .edit && selectionPopoverPendingPreset != nil
         let presetLoadingStartedAt = selectionPresetLoadingStartedAt
@@ -850,7 +882,7 @@ struct WritingProjectView: View {
         let flashRangePreview = latestRevision?.patch.replacementHighlightRange?.nsRange.debugDescription ?? "nil"
         let shouldPinCaretToDocumentEnd = action == .startDraft || action == .continueWriting
         let documentEndSelection = WritingTextSelectionRange(
-            location: flow.activeProject.documentText.utf16.count,
+            location: project.documentText.utf16.count,
             length: 0
         )
 
