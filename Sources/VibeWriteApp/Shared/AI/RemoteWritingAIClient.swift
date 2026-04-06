@@ -146,7 +146,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             let rawText = String(data: data, encoding: .utf8) ?? ""
             let rawCount = rawText.count
             VibeWriteLog.ai.error(
-                "Remote metadata structured decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                "Remote metadata structured decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawBody=\(rawText, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response was not valid JSON.")
         }
@@ -155,7 +155,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             let rawText = String(data: data, encoding: .utf8) ?? ""
             let rawCount = rawText.count
             VibeWriteLog.ai.error(
-                "Remote metadata structured tool use missing action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
+                "Remote metadata structured tool use missing action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawBody=\(rawText, privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response did not include the expected tool call.")
         }
@@ -216,7 +216,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             let rawText = String(data: data, encoding: .utf8) ?? ""
             let rawCount = rawText.count
             VibeWriteLog.ai.error(
-                "Remote metadata json schema request failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) status=\(httpResponse.statusCode, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
+                "Remote metadata json schema request failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) status=\(httpResponse.statusCode, privacy: .public) rawCount=\(rawCount, privacy: .public) rawBody=\(rawText, privacy: .public)"
             )
             if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
                 throw mappedError
@@ -232,7 +232,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             let rawCount = rawText.count
             let probe = try? JSONDecoder().decode(MiniMaxTextChatCompletionResponseProbe.self, from: data)
             VibeWriteLog.ai.error(
-                "Remote metadata json schema decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) probe=\(probe?.debugSummary ?? "unavailable", privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                "Remote metadata json schema decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawBody=\(rawText, privacy: .public) probe=\(probe?.debugSummary ?? "unavailable", privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response was not valid JSON.")
         }
@@ -254,7 +254,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
         guard let content = decodedResponse.firstMessageContent else {
             VibeWriteLog.ai.error(
-                "Remote metadata json schema missing content action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) choicesCount=\(decodedResponse.choices.count, privacy: .public) baseRespStatusCode=\(decodedResponse.baseResp?.statusCode ?? -1, privacy: .public) baseRespStatusMessage=\(decodedResponse.baseResp?.statusMessage ?? "", privacy: .public)"
+                "Remote metadata json schema missing content action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) choicesCount=\(decodedResponse.choices.count, privacy: .public) baseRespStatusCode=\(decodedResponse.baseResp?.statusCode ?? -1, privacy: .public) baseRespStatusMessage=\(decodedResponse.baseResp?.statusMessage ?? "", privacy: .public) rawBody=\(String(data: data, encoding: .utf8) ?? "", privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response did not include content.")
         }

@@ -4,6 +4,7 @@
 - Refactored the collaboration AI summary model to remove `continuationSummary` entirely and split the surviving state into `localSummary` for UI-facing subtitles and `globalSynopsis` for model-facing full-context guidance.
 - The collaboration metadata store schema moved to version 3 so it persists `localSummary` and `globalSynopsis` together with the existing collaboration state, and the markdown file recovery path now seeds both fields from the file body when metadata is missing.
 - The prose and metadata AI paths now read the new split summary fields, the metadata prompt/schema were updated to return `localSummary`, `globalSynopsis`, `nextFocus`, and `suggestionChips`, and the current test suite passed after the refactor.
+- The正文 editor now shows a floating bottom-center `回到底端` button only when there is more content hidden below the viewport; tapping it jumps straight back to the document end without changing the layout.
 
 ## 2026-04-06
 - Expanded the Ctrl+S save-loss diagnostics with `OSLog` traces at the menu-command entry points, `SelectableTextEditor.textDidChange`, and the save/discard flow, so the next repro can separate command dispatch, editor commit, and disk write.
@@ -16,6 +17,7 @@
 
 ## 2026-04-06
 - The MiniMax text-schema metadata path now logs a relaxed probe when strict JSON decoding fails, and it also logs parsed `choicesCount`, `baseResp` status, and first-content diagnostics when decoding succeeds. That makes `choices:null` responses visible in the runtime logs instead of collapsing them into a generic decode failure.
+- The same text-schema path now logs the full raw response body on decode failure, tool-call miss, and missing-content failures, so we can inspect the exact model / endpoint payload instead of only a truncated preview.
 
 ## 2026-04-06
 - The default metadata route for real AI requests now prefers `text01_json_schema`, so `startDraft` / `continueWriting` metadata normally go through the schema-enforced MiniMax text endpoint unless `MINIMAX_METADATA_ROUTE=current` is explicitly set.
