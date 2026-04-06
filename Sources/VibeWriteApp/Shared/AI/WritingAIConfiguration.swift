@@ -6,11 +6,18 @@ struct WritingAIConfiguration {
         case stub
     }
 
+    enum MetadataRoute: String, Codable, Hashable {
+        case current
+        case text01JsonSchema = "text01_json_schema"
+    }
+
     let mode: Mode
     let provider: String
     let baseURL: URL
+    let textBaseURL: URL
     let apiKey: String?
     let model: String
+    let metadataRoute: MetadataRoute
 
     static func current(
         bundle: Bundle = .main,
@@ -50,12 +57,22 @@ struct WritingAIConfiguration {
             environment: environment
         )
             ?? "https://api.minimaxi.com/anthropic"
+        let textBaseURLValue = resolvedString(
+            for: "MINIMAX_TEXT_BASE_URL",
+            in: info,
+            environment: environment
+        ) ?? "https://api.minimaxi.com"
         let model = resolvedString(
             for: "MINIMAX_MODEL",
             in: info,
             environment: environment
         )
             ?? "MiniMax-M2.5-highspeed"
+        let metadataRoute = resolvedMetadataRoute(
+            for: "MINIMAX_METADATA_ROUTE",
+            in: info,
+            environment: environment
+        )
         let apiKey = resolvedString(
             for: "MINIMAX_API_KEY",
             in: info,
@@ -66,13 +83,33 @@ struct WritingAIConfiguration {
             mode: Mode(rawValue: modeValue.lowercased()) ?? .real,
             provider: provider,
             baseURL: URL(string: baseURLValue) ?? URL(string: "https://api.minimaxi.com/anthropic")!,
+            textBaseURL: URL(string: textBaseURLValue) ?? URL(string: "https://api.minimaxi.com")!,
             apiKey: apiKey,
-            model: model
+            model: model,
+            metadataRoute: metadataRoute
         )
     }
 
     var shouldUseRealClient: Bool {
         mode == .real && !(apiKey?.isEmpty ?? true)
+    }
+
+    var metadataModel: String {
+        switch metadataRoute {
+        case .current:
+            return model
+        case .text01JsonSchema:
+            return "MiniMax-Text-01"
+        }
+    }
+
+    var metadataRequestBaseURL: URL {
+        switch metadataRoute {
+        case .current:
+            return baseURL
+        case .text01JsonSchema:
+            return textBaseURL
+        }
     }
 
     private static func resolvedString(
@@ -130,13 +167,27 @@ struct WritingAIConfiguration {
 
         return nil
     }
+
+    private static func resolvedMetadataRoute(
+        for key: String,
+        in info: [String: Any],
+        environment: [String: String]
+    ) -> MetadataRoute {
+        let rawValue = resolvedString(for: key, in: info, environment: environment)?.lowercased()
+        switch rawValue {
+        case "text01_json_schema", "text01-json-schema", "text01", "json_schema":
+            return .text01JsonSchema
+        default:
+            return .current
+        }
+    }
 }
 
 enum WritingAIClientFactory {
     static func makeDefaultClient(configuration: WritingAIConfiguration = .current()) -> any WritingAIClient {
         let hasAPIKey = !(configuration.apiKey?.isEmpty ?? true)
         VibeWriteLog.ai.info(
-            "Resolved AI configuration mode=\(configuration.mode.rawValue, privacy: .public) provider=\(configuration.provider, privacy: .public) baseURL=\(configuration.baseURL.absoluteString, privacy: .public) model=\(configuration.model, privacy: .public) apiKeyPresent=\(hasAPIKey, privacy: .public)"
+            "Resolved AI configuration mode=\(configuration.mode.rawValue, privacy: .public) provider=\(configuration.provider, privacy: .public) baseURL=\(configuration.baseURL.absoluteString, privacy: .public) textBaseURL=\(configuration.textBaseURL.absoluteString, privacy: .public) model=\(configuration.model, privacy: .public) metadataRoute=\(configuration.metadataRoute.rawValue, privacy: .public) metadataModel=\(configuration.metadataModel, privacy: .public) apiKeyPresent=\(hasAPIKey, privacy: .public)"
         )
 
         if configuration.shouldUseRealClient {

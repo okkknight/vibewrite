@@ -1,7 +1,12 @@
 import Foundation
 
 struct WritingAIPromptBuilder {
-    func messages(for request: WritingAIRequest, provider: String, model: String) -> [WritingAIChatMessage] {
+    func messages(
+        for request: WritingAIRequest,
+        provider: String,
+        model: String,
+        metadataRoute: WritingAIConfiguration.MetadataRoute = .current
+    ) -> [WritingAIChatMessage] {
         switch request.kind {
         case .prose:
             let sanitizedRequest = sanitizedRequest(for: request)
@@ -20,11 +25,16 @@ struct WritingAIPromptBuilder {
             return [
                 WritingAIChatMessage(
                     role: .system,
-                    content: metadataSystemPrompt(provider: provider, model: model, action: request.action)
+                    content: metadataSystemPrompt(
+                        provider: provider,
+                        model: model,
+                        action: request.action,
+                        metadataRoute: metadataRoute
+                    )
                 ),
                 WritingAIChatMessage(
                     role: .user,
-                    content: metadataUserPrompt(for: request)
+                    content: metadataUserPrompt(for: request, metadataRoute: metadataRoute)
                 )
             ]
         }
@@ -94,7 +104,12 @@ struct WritingAIPromptBuilder {
         }
     }
 
-    private func metadataSystemPrompt(provider: String, model: String, action: WritingAIAction) -> String {
+    private func metadataSystemPrompt(
+        provider: String,
+        model: String,
+        action: WritingAIAction,
+        metadataRoute: WritingAIConfiguration.MetadataRoute
+    ) -> String {
         let actionInstructions: String
         switch action {
         case .startDraft:
@@ -117,22 +132,44 @@ struct WritingAIPromptBuilder {
             """
         }
 
-        return """
-        You are VibeWrite metadata-only response builder.
-        Use the provided `emit_metadata` tool to return the metadata for the completed prose.
-        Do not output prose, markdown fences, or commentary.
-        Do not answer in plain text.
+        switch metadataRoute {
+        case .current:
+            return """
+            You are VibeWrite metadata-only response builder.
+            Use the provided `emit_metadata` tool to return the metadata for the completed prose.
+            Do not output prose, markdown fences, or commentary.
+            Do not answer in plain text.
 
-        \(actionInstructions)
+            \(actionInstructions)
 
-        - Keep the metadata specific to the current正文 and actionable for the next step.
-        - Match the metadata language to the language of the current正文 and user request.
-        - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
-        - suggestionChips must be concise, concrete, and non-generic.
+            - Keep the metadata specific to the current正文 and actionable for the next step.
+            - Match the metadata language to the language of the current正文 and user request.
+            - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
+            - suggestionChips must be concise, concrete, and non-generic.
 
-        Provider: \(provider)
-        Model: \(model)
-        """
+            Provider: \(provider)
+            Model: \(model)
+            """
+
+        case .text01JsonSchema:
+            return """
+            You are VibeWrite metadata-only response builder.
+            Return only the metadata for the completed prose.
+            Do not output prose, markdown fences, tool calls, or commentary.
+            Do not answer in plain text.
+
+            \(actionInstructions)
+
+            - Keep the metadata specific to the current正文 and actionable for the next step.
+            - Match the metadata language to the language of the current正文 and user request.
+            - For Chinese writing tasks, summary, nextFocus, and suggestionChips must be concise Chinese.
+            - suggestionChips must be concise, concrete, and non-generic.
+            - The response format is schema-enforced, so do not wrap the metadata in extra text.
+
+            Provider: \(provider)
+            Model: \(model)
+            """
+        }
     }
 
     private func proseUserPrompt(for request: WritingAIRequest) -> String {
@@ -180,7 +217,10 @@ struct WritingAIPromptBuilder {
         return lines.joined(separator: "\n")
     }
 
-    private func metadataUserPrompt(for request: WritingAIRequest) -> String {
+    private func metadataUserPrompt(
+        for request: WritingAIRequest,
+        metadataRoute: WritingAIConfiguration.MetadataRoute
+    ) -> String {
         let prompt = request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines)
         let selection = request.selectionText?.trimmingCharacters(in: .whitespacesAndNewlines)
 
@@ -212,8 +252,15 @@ struct WritingAIPromptBuilder {
             lines.append("Selection: \(selection)")
         }
 
-        lines.append("Use the `emit_metadata` tool to return summary, nextFocus, and suggestionChips.")
-        lines.append("Do not include prose, markdown fences, or commentary.")
+        switch metadataRoute {
+        case .current:
+            lines.append("Use the `emit_metadata` tool to return summary, nextFocus, and suggestionChips.")
+            lines.append("Do not include prose, markdown fences, or commentary.")
+        case .text01JsonSchema:
+            lines.append("Return summary, nextFocus, and suggestionChips only.")
+            lines.append("Do not include prose, markdown fences, or commentary.")
+        }
+
         lines.append("For Chinese writing tasks, keep summary, nextFocus, and suggestionChips in concise Chinese.")
         lines.append("Return exactly 3 concise suggestion chips.")
 

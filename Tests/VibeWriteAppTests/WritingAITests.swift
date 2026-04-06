@@ -9,28 +9,36 @@ final class WritingAITests: XCTestCase {
             "VIBEWRITE_AI_PROVIDER": "minimax",
             "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
             "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_TEXT_BASE_URL": "https://api.minimaxi.com",
+            "MINIMAX_METADATA_ROUTE": "text01_json_schema",
             "MINIMAX_API_KEY": "bundle-key-123"
         ])
 
         XCTAssertEqual(configuration.mode, .real)
         XCTAssertEqual(configuration.provider, "minimax")
         XCTAssertEqual(configuration.baseURL.absoluteString, "https://api.minimaxi.com/anthropic")
+        XCTAssertEqual(configuration.textBaseURL.absoluteString, "https://api.minimaxi.com")
         XCTAssertEqual(configuration.model, "MiniMax-M2.5-highspeed")
+        XCTAssertEqual(configuration.metadataRoute, .text01JsonSchema)
+        XCTAssertEqual(configuration.metadataModel, "MiniMax-Text-01")
         XCTAssertEqual(configuration.apiKey, "bundle-key-123")
         XCTAssertTrue(configuration.shouldUseRealClient)
 
         let overriddenConfiguration = WritingAIConfiguration.configuration(
             from: [
                 "VIBEWRITE_AI_DEFAULT_MODE": "real",
+                "MINIMAX_METADATA_ROUTE": "current",
                 "MINIMAX_API_KEY": "bundle-key-123"
             ],
             environment: [
                 "VIBEWRITE_AI_MODE": "stub",
+                "MINIMAX_METADATA_ROUTE": "text01_json_schema",
                 "MINIMAX_API_KEY": "env-key-456"
             ]
         )
 
         XCTAssertEqual(overriddenConfiguration.mode, .stub)
+        XCTAssertEqual(overriddenConfiguration.metadataRoute, .text01JsonSchema)
         XCTAssertEqual(overriddenConfiguration.apiKey, "env-key-456")
 
         let cleanLaunchConfiguration = WritingAIConfiguration.configuration(
@@ -39,6 +47,7 @@ final class WritingAITests: XCTestCase {
                 "VIBEWRITE_AI_PROVIDER": "minimax",
                 "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
                 "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+                "MINIMAX_TEXT_BASE_URL": "https://api.minimaxi.com",
                 "MINIMAX_API_KEY": "bundle-key-123"
             ],
             environment: [
@@ -56,6 +65,7 @@ final class WritingAITests: XCTestCase {
                 "VIBEWRITE_AI_PROVIDER": "minimax",
                 "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
                 "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+                "MINIMAX_TEXT_BASE_URL": "https://api.minimaxi.com",
                 "MINIMAX_API_KEY": "bundle-key-123"
             ],
             environment: [:]
@@ -63,7 +73,10 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(ignoredOverrideConfiguration.mode, .real)
         XCTAssertEqual(ignoredOverrideConfiguration.provider, "minimax")
         XCTAssertEqual(ignoredOverrideConfiguration.baseURL.absoluteString, "https://api.minimaxi.com/anthropic")
+        XCTAssertEqual(ignoredOverrideConfiguration.textBaseURL.absoluteString, "https://api.minimaxi.com")
         XCTAssertEqual(ignoredOverrideConfiguration.model, "MiniMax-M2.5-highspeed")
+        XCTAssertEqual(ignoredOverrideConfiguration.metadataRoute, .current)
+        XCTAssertEqual(ignoredOverrideConfiguration.metadataModel, "MiniMax-M2.5-highspeed")
         XCTAssertEqual(ignoredOverrideConfiguration.apiKey, "bundle-key-123")
         XCTAssertTrue(ignoredOverrideConfiguration.shouldUseRealClient)
 
@@ -120,7 +133,7 @@ final class WritingAITests: XCTestCase {
         let messages = WritingAIPromptBuilder().messages(
             for: request,
             provider: "minimax",
-            model: "MiniMax-M2.7"
+            model: "MiniMax-M2.5-highspeed"
         )
 
         let systemPrompt = messages.first?.content ?? ""
@@ -149,7 +162,8 @@ final class WritingAITests: XCTestCase {
         let metadataMessages = WritingAIPromptBuilder().messages(
             for: metadataRequest,
             provider: "minimax",
-            model: "MiniMax-M2.7"
+            model: "MiniMax-M2.5-highspeed",
+            metadataRoute: .current
         )
 
         let metadataSystemPrompt = metadataMessages.first?.content ?? ""
@@ -161,6 +175,20 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
         XCTAssertTrue(metadataUserPrompt.contains("Use the `emit_metadata` tool"))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
+
+        let textSchemaMetadataMessages = WritingAIPromptBuilder().messages(
+            for: metadataRequest,
+            provider: "minimax",
+            model: "MiniMax-Text-01",
+            metadataRoute: .text01JsonSchema
+        )
+        let textSchemaSystemPrompt = textSchemaMetadataMessages.first?.content ?? ""
+        let textSchemaUserPrompt = textSchemaMetadataMessages.last?.content ?? ""
+        XCTAssertTrue(textSchemaSystemPrompt.contains("metadata-only response builder"))
+        XCTAssertTrue(textSchemaSystemPrompt.contains("Return only the metadata for the completed prose"))
+        XCTAssertFalse(textSchemaSystemPrompt.contains("emit_metadata"))
+        XCTAssertTrue(textSchemaUserPrompt.contains("Return summary, nextFocus, and suggestionChips only."))
+        XCTAssertFalse(textSchemaUserPrompt.contains("Use the `emit_metadata` tool"))
     }
 
     func testContinueWritingPromptRequestsConcreteSuggestionChips() {
@@ -201,7 +229,7 @@ final class WritingAITests: XCTestCase {
         let messages = WritingAIPromptBuilder().messages(
             for: request,
             provider: "minimax",
-            model: "MiniMax-M2.7"
+            model: "MiniMax-M2.5-highspeed"
         )
 
         let systemPrompt = messages.first?.content ?? ""
@@ -239,7 +267,8 @@ final class WritingAITests: XCTestCase {
         let metadataMessages = WritingAIPromptBuilder().messages(
             for: metadataRequest,
             provider: "minimax",
-            model: "MiniMax-M2.7"
+            model: "MiniMax-M2.5-highspeed",
+            metadataRoute: .current
         )
         let metadataSystemPrompt = metadataMessages.first?.content ?? ""
         let metadataUserPrompt = metadataMessages.last?.content ?? ""
@@ -258,6 +287,7 @@ final class WritingAITests: XCTestCase {
             "VIBEWRITE_AI_PROVIDER": "minimax",
             "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
             "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_METADATA_ROUTE": "current",
             "MINIMAX_API_KEY": "bundle-key-123"
         ])
 
@@ -266,6 +296,7 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertFalse(payload.stream)
+            XCTAssertEqual(payload.model, "MiniMax-M2.5-highspeed")
             XCTAssertEqual(payload.tools?.first?.name, "emit_metadata")
             XCTAssertEqual(payload.toolChoice?.type, "tool")
             XCTAssertEqual(payload.toolChoice?.name, "emit_metadata")
@@ -339,6 +370,7 @@ final class WritingAITests: XCTestCase {
             "VIBEWRITE_AI_PROVIDER": "minimax",
             "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
             "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_METADATA_ROUTE": "current",
             "MINIMAX_API_KEY": "bundle-key-123"
         ])
 
@@ -347,6 +379,7 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.maxTokens, 1536)
+            XCTAssertEqual(payload.model, "MiniMax-M2.5-highspeed")
             XCTAssertTrue(payload.system.contains("Output only prose text for the requested action"))
             XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Project state:") ?? true)
             XCTAssertFalse(payload.messages.first?.content.first?.text.contains("Current goal:") ?? true)
@@ -424,6 +457,7 @@ final class WritingAITests: XCTestCase {
             "VIBEWRITE_AI_PROVIDER": "minimax",
             "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
             "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_METADATA_ROUTE": "current",
             "MINIMAX_API_KEY": "bundle-key-123"
         ])
 
@@ -432,6 +466,7 @@ final class WritingAITests: XCTestCase {
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
             XCTAssertEqual(payload.maxTokens, 2048)
+            XCTAssertEqual(payload.model, "MiniMax-M2.5-highspeed")
             XCTAssertTrue(payload.system.contains("Output only prose text for the requested action"))
             XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Action: startDraft") ?? false)
@@ -478,12 +513,13 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(finalResponse?.suggestionChips.isEmpty ?? false)
     }
 
-    func testRemoteClientMetadataRequestParsesStructuredMetadata() async throws {
+    func testRemoteClientMetadataCurrentRouteUsesStructuredToolOutput() async throws {
         let configuration = WritingAIConfiguration.configuration(from: [
             "VIBEWRITE_AI_DEFAULT_MODE": "real",
             "VIBEWRITE_AI_PROVIDER": "minimax",
             "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
             "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_METADATA_ROUTE": "current",
             "MINIMAX_API_KEY": "bundle-key-123"
         ])
 
@@ -491,28 +527,39 @@ final class WritingAITests: XCTestCase {
             let body = try XCTUnwrap(self.requestBodyData(from: request))
             let payload = try JSONDecoder().decode(AnthropicRequestEnvelope.self, from: body)
 
-            XCTAssertEqual(payload.maxTokens, 512)
+            XCTAssertFalse(payload.stream)
+            XCTAssertEqual(payload.model, "MiniMax-M2.5-highspeed")
+            XCTAssertEqual(payload.tools?.first?.name, "emit_metadata")
+            XCTAssertEqual(payload.toolChoice?.type, "tool")
+            XCTAssertEqual(payload.toolChoice?.name, "emit_metadata")
+            XCTAssertEqual(payload.tools?.first?.inputSchema.required, ["summary", "nextFocus", "suggestionChips"])
+            XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.minItems, 3)
+            XCTAssertEqual(payload.tools?.first?.inputSchema.properties.suggestionChips.maxItems, 3)
             XCTAssertTrue(payload.system.contains("metadata-only response builder"))
             XCTAssertFalse(payload.system.contains("[[VIBEWRITE_METADATA]]"))
+            XCTAssertTrue(payload.system.contains("emit_metadata"))
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Action: startDraft metadata") ?? false)
             XCTAssertTrue(payload.messages.first?.content.first?.text.contains("Completed prose:") ?? false)
 
             let response = """
-            event: message_start
-            data: {"type":"message_start"}
-
-            event: content_block_delta
-            data: {"type":"content_block_delta","index":0,"delta":{"type":"text_delta","text":"{\\\"summary\\\":\\\"已生成开头\\\",\\\"nextFocus\\\":\\\"继续推进第一段\\\",\\\"suggestionChips\\\":[\\\"继续写\\\",\\\"编辑这段\\\",\\\"补一段\\\"]}"}}
-
-            event: message_stop
-            data: {"type":"message_stop"}
+            {
+              "content": [
+                {
+                  "type": "tool_use",
+                  "id": "toolu_01",
+                  "name": "emit_metadata",
+                  "input": {
+                    "summary": "已生成开头",
+                    "nextFocus": "继续推进第一段",
+                    "suggestionChips": ["继续写", "编辑这段", "补一段"]
+                  }
+                }
+              ]
+            }
             """
 
             return (
-                self.makeHTTPResponse(
-                    statusCode: 200,
-                    headerFields: ["Content-Type": "text/event-stream"]
-                ),
+                self.makeHTTPResponse(statusCode: 200, headerFields: ["Content-Type": "application/json"]),
                 response.data(using: .utf8)!
             )
         }
@@ -537,6 +584,83 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(finalResponse?.nextFocus, "继续推进第一段")
         XCTAssertEqual(finalResponse?.suggestionChips, ["继续写", "编辑这段", "补一段"])
         XCTAssertEqual(finalResponse?.documentText, request.project.documentText)
+    }
+
+    func testRemoteClientMetadataTextRouteUsesJsonSchemaOutput() async throws {
+        let configuration = WritingAIConfiguration.configuration(from: [
+            "VIBEWRITE_AI_DEFAULT_MODE": "real",
+            "VIBEWRITE_AI_PROVIDER": "minimax",
+            "MINIMAX_BASE_URL": "https://api.minimaxi.com/anthropic",
+            "MINIMAX_TEXT_BASE_URL": "https://api.minimaxi.com",
+            "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
+            "MINIMAX_METADATA_ROUTE": "text01_json_schema",
+            "MINIMAX_API_KEY": "bundle-key-123"
+        ])
+
+        let session = makeAnthropicMockSession { request in
+            let body = try XCTUnwrap(self.requestBodyData(from: request))
+            let payload = try JSONDecoder().decode(MiniMaxTextRequestEnvelope.self, from: body)
+
+            XCTAssertEqual(request.url?.absoluteString, "https://api.minimaxi.com/v1/text/chatcompletion_v2")
+            XCTAssertEqual(request.httpMethod, "POST")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Authorization"), "Bearer bundle-key-123")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Content-Type"), "application/json")
+            XCTAssertEqual(request.value(forHTTPHeaderField: "Accept"), "application/json")
+            XCTAssertEqual(payload.model, "MiniMax-Text-01")
+            XCTAssertFalse(payload.stream)
+            XCTAssertEqual(payload.maxCompletionTokens, 512)
+            XCTAssertEqual(payload.temperature, 0.1, accuracy: 0.0001)
+            XCTAssertEqual(payload.responseFormat.type, "json_schema")
+            XCTAssertEqual(payload.responseFormat.jsonSchema.name, "writing_ai_metadata")
+            XCTAssertTrue(payload.responseFormat.jsonSchema.strict)
+            XCTAssertEqual(payload.responseFormat.jsonSchema.schema.required, ["summary", "nextFocus", "suggestionChips"])
+            XCTAssertEqual(payload.messages.count, 2)
+            XCTAssertEqual(payload.messages.first?.role, "system")
+            XCTAssertEqual(payload.messages.first?.name, "MiniMax AI")
+            XCTAssertTrue(payload.messages.first?.content.contains("metadata-only response builder") ?? false)
+            XCTAssertEqual(payload.messages.last?.role, "user")
+            XCTAssertEqual(payload.messages.last?.name, "用户")
+            XCTAssertTrue(payload.messages.last?.content.contains("Action: startDraft metadata") ?? false)
+            XCTAssertTrue(payload.messages.last?.content.contains("Return summary, nextFocus, and suggestionChips only.") ?? false)
+            XCTAssertFalse(payload.messages.last?.content.contains("emit_metadata") ?? true)
+
+            let response = """
+            {
+              "choices": [
+                {
+                  "message": {
+                    "content": "{\\"summary\\":\\"已生成开头\\",\\"nextFocus\\":\\"继续推进第一段\\",\\"suggestionChips\\":[\\"继续写\\",\\"编辑这段\\",\\"补一段\\"]}"
+                  }
+                }
+              ],
+              "base_resp": {
+                "status_code": 0,
+                "status_msg": ""
+              }
+            }
+            """
+
+            return (
+                self.makeHTTPResponse(statusCode: 200, headerFields: ["Content-Type": "application/json"]),
+                response.data(using: .utf8)!
+            )
+        }
+
+        let client = RemoteWritingAIClient(configuration: configuration, session: session)
+        let request = WritingAIRequest(
+            action: .startDraft,
+            project: WorkspaceFixtures.bootstrapProjects(now: Date()).first!.aiSnapshot,
+            userMessage: "写一篇关于成年人孤独感的公众号文章",
+            selectionText: nil,
+            kind: .metadata
+        )
+
+        let finalResponse = try await client.generateResponse(for: request)
+
+        XCTAssertEqual(finalResponse.documentText, request.project.documentText)
+        XCTAssertEqual(finalResponse.summary, "已生成开头")
+        XCTAssertEqual(finalResponse.nextFocus, "继续推进第一段")
+        XCTAssertEqual(finalResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
     }
 
     func testStreamingPreviewRendererStartsContinuationFromRevealOffset() async {
@@ -832,7 +956,7 @@ final class WritingAITests: XCTestCase {
         let messages = WritingAIPromptBuilder().messages(
             for: request,
             provider: "minimax",
-            model: "MiniMax-M2.7"
+            model: "MiniMax-M2.5-highspeed"
         )
 
         let userPrompt = messages.last?.content ?? ""
@@ -847,7 +971,7 @@ final class WritingAITests: XCTestCase {
             "VIBEWRITE_AI_DEFAULT_MODE": "real",
             "VIBEWRITE_AI_PROVIDER": "minimax",
             "MINIMAX_BASE_URL": "https://example.com",
-            "MINIMAX_MODEL": "MiniMax-M2.7",
+            "MINIMAX_MODEL": "MiniMax-M2.5-highspeed",
             "MINIMAX_API_KEY": "bundle-key-123"
         ])
 
@@ -944,6 +1068,51 @@ final class WritingAITests: XCTestCase {
         }
 
         return data
+    }
+}
+
+private struct MiniMaxTextRequestEnvelope: Decodable {
+    let model: String
+    let messages: [Message]
+    let temperature: Double
+    let maxCompletionTokens: Int
+    let stream: Bool
+    let responseFormat: ResponseFormat
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case temperature
+        case maxCompletionTokens = "max_completion_tokens"
+        case stream
+        case responseFormat = "response_format"
+    }
+
+    struct Message: Decodable {
+        let role: String
+        let name: String?
+        let content: String
+    }
+
+    struct ResponseFormat: Decodable {
+        let type: String
+        let jsonSchema: JSONSchema
+
+        enum CodingKeys: String, CodingKey {
+            case type
+            case jsonSchema = "json_schema"
+        }
+    }
+
+    struct JSONSchema: Decodable {
+        let name: String
+        let strict: Bool
+        let schema: Schema
+    }
+
+    struct Schema: Decodable {
+        let type: String
+        let required: [String]
     }
 }
 

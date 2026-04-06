@@ -32,6 +32,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
         switch request.kind {
         case .prose:
+            let proseModel = configuration.model
             if request.action == .edit {
                 try await streamLegacyEditRequest(
                     for: request,
@@ -42,7 +43,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             }
 
             VibeWriteLog.ai.info(
-                "Remote prose request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) selectionCount=\(request.selectionText?.count ?? 0, privacy: .public)"
+                "Remote prose request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(proseModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) selectionCount=\(request.selectionText?.count ?? 0, privacy: .public)"
             )
 
             let finalBodyText = try await collectProseText(
@@ -68,17 +69,9 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             continuation.finish()
 
         case .metadata:
-            VibeWriteLog.ai.info(
-                "Remote metadata structured request start action=\(request.action.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(self.configuration.model, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
-            )
-
-            let metadata = try await requestStructuredMetadata(
+            let metadata = try await requestMetadata(
                 for: request,
                 apiKey: apiKey
-            )
-
-            VibeWriteLog.ai.info(
-                "Remote metadata structured request finished action=\(request.action.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
             )
             let finalResponse = WritingProjectResponseBuilder.response(
                 for: request,
@@ -90,14 +83,40 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
     }
 
-    private func requestStructuredMetadata(
+    private func requestMetadata(
+        for request: WritingAIRequest,
+        apiKey: String
+    ) async throws -> WritingAICompletionMetadata {
+        switch configuration.metadataRoute {
+        case .current:
+            return try await requestAnthropicStructuredMetadata(
+                for: request,
+                apiKey: apiKey
+            )
+
+        case .text01JsonSchema:
+            return try await requestTextSchemaMetadata(
+                for: request,
+                apiKey: apiKey
+            )
+        }
+    }
+
+    private func requestAnthropicStructuredMetadata(
         for request: WritingAIRequest,
         apiKey: String
     ) async throws -> WritingAICompletionMetadata {
         let metadataTool = AnthropicToolDefinition.metadata
-        let urlRequest = try makeRequest(
+        let metadataModel = configuration.metadataModel
+        VibeWriteLog.ai.info(
+            "Remote metadata structured request start action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(metadataModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
+        )
+
+        let urlRequest = try makeAnthropicRequest(
             for: request,
             apiKey: apiKey,
+            baseURL: configuration.metadataRequestBaseURL,
+            model: metadataModel,
             stream: false,
             tools: [metadataTool],
             toolChoice: .tool(name: metadataTool.name)
@@ -127,7 +146,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             let rawText = String(data: data, encoding: .utf8) ?? ""
             let rawCount = rawText.count
             VibeWriteLog.ai.error(
-                "Remote metadata structured decode failed action=\(request.action.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                "Remote metadata structured decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response was not valid JSON.")
         }
@@ -136,16 +155,110 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             let rawText = String(data: data, encoding: .utf8) ?? ""
             let rawCount = rawText.count
             VibeWriteLog.ai.error(
-                "Remote metadata structured tool use missing action=\(request.action.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
+                "Remote metadata structured tool use missing action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response did not include the expected tool call.")
         }
 
         VibeWriteLog.ai.info(
-            "Remote metadata structured tool use decoded action=\(request.action.rawValue, privacy: .public) toolName=\(toolUse.name, privacy: .public) summaryCount=\(toolUse.input.summary.count, privacy: .public) nextFocusCount=\(toolUse.input.nextFocus.count, privacy: .public) suggestionCount=\(toolUse.input.suggestionChips.count, privacy: .public)"
+            "Remote metadata structured tool use decoded action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) toolName=\(toolUse.name, privacy: .public) summaryCount=\(toolUse.input.summary.count, privacy: .public) nextFocusCount=\(toolUse.input.nextFocus.count, privacy: .public) suggestionCount=\(toolUse.input.suggestionChips.count, privacy: .public)"
         )
 
         return toolUse.input
+    }
+
+    private func requestTextSchemaMetadata(
+        for request: WritingAIRequest,
+        apiKey: String
+    ) async throws -> WritingAICompletionMetadata {
+        let metadataModel = configuration.metadataModel
+        VibeWriteLog.ai.info(
+            "Remote metadata json schema request start action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) provider=\(self.configuration.provider, privacy: .public) model=\(metadataModel, privacy: .public) docCount=\(request.project.documentText.count, privacy: .public) summaryCount=\(request.project.summary.count, privacy: .public) suggestionCount=\(request.project.suggestionChips.count, privacy: .public)"
+        )
+
+        let promptMessages = promptBuilder.messages(
+            for: request,
+            provider: configuration.provider,
+            model: metadataModel,
+            metadataRoute: configuration.metadataRoute
+        )
+
+        let messages = promptMessages.map { message in
+            MiniMaxTextMessage(
+                role: message.role.textRole,
+                name: message.role.textName,
+                content: message.content
+            )
+        }
+
+        let requestBody = MiniMaxTextCompletionRequest(
+            model: metadataModel,
+            messages: messages,
+            temperature: 0.1,
+            maxCompletionTokens: maxTokens(for: request),
+            stream: false,
+            responseFormat: .jsonSchema()
+        )
+
+        var urlRequest = URLRequest(url: configuration.metadataRequestBaseURL.appendingPathComponent("v1/text/chatcompletion_v2"))
+        urlRequest.httpMethod = "POST"
+        urlRequest.setValue("Bearer \(apiKey)", forHTTPHeaderField: "Authorization")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        urlRequest.setValue("application/json", forHTTPHeaderField: "Accept")
+        urlRequest.httpBody = try JSONEncoder.vibeWriteAIRequestEncoder.encode(requestBody)
+
+        let (data, response) = try await session.data(for: urlRequest)
+        guard let httpResponse = response as? HTTPURLResponse else {
+            throw WritingAIClientError.requestFailed("AI request did not return an HTTP response.")
+        }
+
+        guard (200...299).contains(httpResponse.statusCode) else {
+            let rawText = String(data: data, encoding: .utf8) ?? ""
+            let rawCount = rawText.count
+            VibeWriteLog.ai.error(
+                "Remote metadata json schema request failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) status=\(httpResponse.statusCode, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public)"
+            )
+            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: nil) {
+                throw mappedError
+            }
+            throw WritingAIClientError.requestFailed("AI request failed with HTTP \(httpResponse.statusCode).")
+        }
+
+        let decodedResponse: MiniMaxTextChatCompletionResponse
+        do {
+            decodedResponse = try JSONDecoder().decode(MiniMaxTextChatCompletionResponse.self, from: data)
+        } catch {
+            let rawText = String(data: data, encoding: .utf8) ?? ""
+            let rawCount = rawText.count
+            VibeWriteLog.ai.error(
+                "Remote metadata json schema decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
+            throw WritingAIClientError.invalidResponse("AI metadata response was not valid JSON.")
+        }
+
+        if let baseResp = decodedResponse.baseResp, baseResp.statusCode != 0 {
+            let message = baseResp.statusMessage
+            VibeWriteLog.ai.error(
+                "Remote metadata json schema returned error action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) statusCode=\(baseResp.statusCode, privacy: .public) statusMessage=\(message ?? "", privacy: .public)"
+            )
+            if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: message) {
+                throw mappedError
+            }
+            throw WritingAIClientError.requestFailed(message ?? "AI request failed with HTTP \(httpResponse.statusCode).")
+        }
+
+        guard let content = decodedResponse.firstMessageContent else {
+            VibeWriteLog.ai.error(
+                "Remote metadata json schema missing content action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public)"
+            )
+            throw WritingAIClientError.invalidResponse("AI metadata response did not include content.")
+        }
+
+        let metadata = try WritingAICompletionMetadataDecoder.decode(from: content)
+        VibeWriteLog.ai.info(
+            "Remote metadata json schema decoded action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) summaryCount=\(metadata.summary.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+        )
+        return metadata
     }
 
     private func streamLegacyEditRequest(
@@ -347,9 +460,11 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         apiKey: String,
         stream: Bool
     ) async throws -> URLSession.AsyncBytes {
-        let urlRequest = try makeRequest(
+        let urlRequest = try makeAnthropicRequest(
             for: request,
             apiKey: apiKey,
+            baseURL: configuration.baseURL,
+            model: configuration.model,
             stream: stream
         )
 
@@ -372,9 +487,11 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         return bytes
     }
 
-    private func makeRequest(
+    private func makeAnthropicRequest(
         for request: WritingAIRequest,
         apiKey: String,
+        baseURL: URL,
+        model: String,
         stream: Bool,
         tools: [AnthropicToolDefinition]? = nil,
         toolChoice: AnthropicToolChoice? = nil
@@ -382,7 +499,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         let promptMessages = promptBuilder.messages(
             for: request,
             provider: configuration.provider,
-            model: configuration.model
+            model: model
         )
 
         let systemPrompt = promptMessages.first(where: { $0.role == .system })?.content ?? ""
@@ -396,7 +513,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             }
 
         let body = AnthropicCompatibleRequest(
-            model: configuration.model,
+            model: model,
             system: systemPrompt,
             messages: userMessages,
             temperature: request.kind == .metadata ? 0.1 : 0.2,
@@ -406,7 +523,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
             toolChoice: toolChoice
         )
 
-        var urlRequest = URLRequest(url: configuration.baseURL.appendingPathComponent("v1/messages"))
+        var urlRequest = URLRequest(url: baseURL.appendingPathComponent("v1/messages"))
         urlRequest.httpMethod = "POST"
         urlRequest.setValue(apiKey, forHTTPHeaderField: "x-api-key")
         urlRequest.setValue("2023-06-01", forHTTPHeaderField: "anthropic-version")
@@ -691,6 +808,120 @@ private struct AnthropicErrorEnvelope: Decodable {
     }
 }
 
+struct MiniMaxTextCompletionRequest: Encodable {
+    let model: String
+    let messages: [MiniMaxTextMessage]
+    let temperature: Double
+    let maxCompletionTokens: Int
+    let stream: Bool
+    let responseFormat: MiniMaxTextResponseFormat
+
+    enum CodingKeys: String, CodingKey {
+        case model
+        case messages
+        case temperature
+        case maxCompletionTokens = "max_completion_tokens"
+        case stream
+        case responseFormat = "response_format"
+    }
+}
+
+struct MiniMaxTextMessage: Encodable {
+    let role: String
+    let name: String?
+    let content: String
+}
+
+struct MiniMaxTextResponseFormat: Encodable {
+    let type = "json_schema"
+    let jsonSchema = MiniMaxTextJSONSchema()
+
+    static func jsonSchema() -> MiniMaxTextResponseFormat {
+        MiniMaxTextResponseFormat()
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case type
+        case jsonSchema = "json_schema"
+    }
+}
+
+struct MiniMaxTextJSONSchema: Encodable {
+    let name = "writing_ai_metadata"
+    let strict = true
+    let schema = MiniMaxTextJSONSchemaDefinition()
+}
+
+struct MiniMaxTextJSONSchemaDefinition: Encodable {
+    let type = "object"
+    let properties = Properties()
+    let required = ["summary", "nextFocus", "suggestionChips"]
+    let additionalProperties = false
+
+    struct Properties: Encodable {
+        let summary = StringProperty(
+            description: "A concise summary of the completed prose."
+        )
+
+        let nextFocus = StringProperty(
+            description: "The next concrete step after the current prose."
+        )
+
+        let suggestionChips = SuggestionChipsProperty(
+            description: "Exactly three concise suggestion chips for the next step."
+        )
+    }
+
+    struct StringProperty: Encodable {
+        let type = "string"
+        let description: String
+    }
+
+    struct SuggestionChipsProperty: Encodable {
+        let type = "array"
+        let description: String
+        let items = Item()
+        let minItems = 3
+        let maxItems = 3
+
+        struct Item: Encodable {
+            let type = "string"
+        }
+    }
+}
+
+struct MiniMaxTextChatCompletionResponse: Decodable {
+    let choices: [Choice]
+    let baseResp: BaseResp?
+
+    var firstMessageContent: String? {
+        choices.first?.message.content
+    }
+
+    struct Choice: Decodable {
+        let message: Message
+    }
+
+    struct Message: Decodable {
+        let content: String
+    }
+
+    struct BaseResp: Decodable {
+        let statusCode: Int
+        let statusMessage: String?
+
+        enum CodingKeys: String, CodingKey {
+            case statusCode = "status_code"
+            case statusMessage = "status_msg"
+        }
+    }
+
+    enum CodingKeys: String, CodingKey {
+        case choices
+        case baseResp = "base_resp"
+    }
+}
+
 struct AnthropicMessage: Encodable {
     let role: Role
     let content: [ContentBlock]
@@ -739,6 +970,28 @@ private extension WritingAIChatMessage.Role {
             return .user
         case .assistant:
             return .assistant
+        }
+    }
+
+    var textRole: String {
+        switch self {
+        case .system:
+            return "system"
+        case .user:
+            return "user"
+        case .assistant:
+            return "assistant"
+        }
+    }
+
+    var textName: String? {
+        switch self {
+        case .system:
+            return "MiniMax AI"
+        case .user:
+            return "用户"
+        case .assistant:
+            return "MiniMax AI"
         }
     }
 }
