@@ -1173,6 +1173,62 @@ private final class LocalEditFlashOverlayView: NSView {
 }
 
 private final class StyledTextView: NSTextView {
+    override func keyDown(with event: NSEvent) {
+        let chars = debugEventString(event.characters)
+        let ignoringModifiers = debugEventString(event.charactersIgnoringModifiers)
+        let modifierFlags = debugModifierFlags(event.modifierFlags)
+        let firstResponderName = debugFirstResponder()
+        let textCount = string.utf16.count
+        VibeWriteLog.launch.info(
+            "styled text view keyDown keyCode=\(event.keyCode, privacy: .public) chars=\(chars, privacy: .public) ignoringModifiers=\(ignoringModifiers, privacy: .public) modifiers=\(modifierFlags, privacy: .public) firstResponder=\(firstResponderName, privacy: .public) editable=\(isEditable, privacy: .public) textCount=\(textCount, privacy: .public)"
+        )
+        super.keyDown(with: event)
+    }
+
+    override func performKeyEquivalent(with event: NSEvent) -> Bool {
+        let chars = debugEventString(event.characters)
+        let ignoringModifiers = debugEventString(event.charactersIgnoringModifiers)
+        let modifierFlags = debugModifierFlags(event.modifierFlags)
+        let firstResponderName = debugFirstResponder()
+        let handled = super.performKeyEquivalent(with: event)
+        VibeWriteLog.launch.info(
+            "styled text view performKeyEquivalent keyCode=\(event.keyCode, privacy: .public) chars=\(chars, privacy: .public) ignoringModifiers=\(ignoringModifiers, privacy: .public) modifiers=\(modifierFlags, privacy: .public) handled=\(handled, privacy: .public) firstResponder=\(firstResponderName, privacy: .public)"
+        )
+        return handled
+    }
+
+    override func doCommand(by selector: Selector) {
+        let firstResponderName = debugFirstResponder()
+        let textCount = string.utf16.count
+        VibeWriteLog.launch.info(
+            "styled text view doCommand selector=\(NSStringFromSelector(selector), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) textCount=\(textCount, privacy: .public)"
+        )
+        super.doCommand(by: selector)
+    }
+
+    override func insertText(_ insertString: Any, replacementRange: NSRange) {
+        let textPreview: String
+        if let string = insertString as? String {
+            textPreview = string.vibewriteLogPreview(maxLength: 32)
+        } else if let attributed = insertString as? NSAttributedString {
+            textPreview = attributed.string.vibewriteLogPreview(maxLength: 32)
+        } else {
+            textPreview = String(describing: type(of: insertString))
+        }
+        let firstResponderName = debugFirstResponder()
+        let beforeCount = string.utf16.count
+
+        VibeWriteLog.launch.info(
+            "styled text view insertText replacementRange=\(NSStringFromRange(replacementRange), privacy: .public) text=\(textPreview, privacy: .public) firstResponder=\(firstResponderName, privacy: .public) textCountBefore=\(beforeCount, privacy: .public)"
+        )
+        super.insertText(insertString, replacementRange: replacementRange)
+        let afterCount = string.utf16.count
+        let selection = NSStringFromRange(selectedRange())
+        VibeWriteLog.launch.info(
+            "styled text view insertText applied textCountAfter=\(afterCount, privacy: .public) selection=\(selection, privacy: .public)"
+        )
+    }
+
     override func setFrameSize(_ newSize: NSSize) {
         let clampedSize = NSSize(
             width: max(newSize.width, 1),
@@ -1212,6 +1268,24 @@ private final class StyledTextView: NSTextView {
         if let scrollView = enclosingScrollView {
             scrollView.reflectScrolledClipView(scrollView.contentView)
         }
+    }
+
+    private func debugEventString(_ string: String?) -> String {
+        string?.vibewriteLogPreview(maxLength: 12) ?? "nil"
+    }
+
+    private func debugModifierFlags(_ flags: NSEvent.ModifierFlags) -> String {
+        let resolved = flags.intersection(.deviceIndependentFlagsMask)
+        return String(describing: resolved)
+    }
+
+    private func debugFirstResponder() -> String {
+        guard let window else { return "nil" }
+        if window.firstResponder === self {
+            return "self"
+        }
+        guard let firstResponder = window.firstResponder else { return "nil" }
+        return String(describing: type(of: firstResponder))
     }
 }
 
