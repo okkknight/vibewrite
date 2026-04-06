@@ -230,16 +230,21 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
         } catch {
             let rawText = String(data: data, encoding: .utf8) ?? ""
             let rawCount = rawText.count
+            let probe = try? JSONDecoder().decode(MiniMaxTextChatCompletionResponseProbe.self, from: data)
             VibeWriteLog.ai.error(
-                "Remote metadata json schema decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                "Remote metadata json schema decode failed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) rawCount=\(rawCount, privacy: .public) rawPreview=\(rawText.vibewriteLogPreview(maxLength: 160), privacy: .public) probe=\(probe?.debugSummary ?? "unavailable", privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response was not valid JSON.")
         }
 
+        VibeWriteLog.ai.info(
+            "Remote metadata json schema parsed action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) choicesCount=\(decodedResponse.choices.count, privacy: .public) firstContentCount=\(decodedResponse.firstMessageContent?.count ?? 0, privacy: .public) baseRespStatusCode=\(decodedResponse.baseResp?.statusCode ?? -1, privacy: .public) baseRespStatusMessage=\(decodedResponse.baseResp?.statusMessage ?? "", privacy: .public)"
+        )
+
         if let baseResp = decodedResponse.baseResp, baseResp.statusCode != 0 {
             let message = baseResp.statusMessage
             VibeWriteLog.ai.error(
-                "Remote metadata json schema returned error action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) statusCode=\(baseResp.statusCode, privacy: .public) statusMessage=\(message ?? "", privacy: .public)"
+                "Remote metadata json schema returned error action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) choicesCount=\(decodedResponse.choices.count, privacy: .public) statusCode=\(baseResp.statusCode, privacy: .public) statusMessage=\(message ?? "", privacy: .public)"
             )
             if let mappedError = mapConfigurationError(statusCode: httpResponse.statusCode, message: message) {
                 throw mappedError
@@ -249,7 +254,7 @@ final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
 
         guard let content = decodedResponse.firstMessageContent else {
             VibeWriteLog.ai.error(
-                "Remote metadata json schema missing content action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public)"
+                "Remote metadata json schema missing content action=\(request.action.rawValue, privacy: .public) route=\(self.configuration.metadataRoute.rawValue, privacy: .public) choicesCount=\(decodedResponse.choices.count, privacy: .public) baseRespStatusCode=\(decodedResponse.baseResp?.statusCode ?? -1, privacy: .public) baseRespStatusMessage=\(decodedResponse.baseResp?.statusMessage ?? "", privacy: .public)"
             )
             throw WritingAIClientError.invalidResponse("AI metadata response did not include content.")
         }
@@ -928,6 +933,19 @@ struct MiniMaxTextChatCompletionResponse: Decodable {
         case choices
         case baseResp = "base_resp"
     }
+}
+
+private struct MiniMaxTextChatCompletionResponseProbe: Decodable {
+    private let choices: [Choice]?
+    let baseResp: MiniMaxTextChatCompletionResponse.BaseResp?
+    let object: String?
+    let model: String?
+
+    var debugSummary: String {
+        "choicesCount=\(choices?.count ?? -1) baseRespStatusCode=\(baseResp?.statusCode ?? -1) baseRespStatusMessage=\(baseResp?.statusMessage ?? "") object=\(object ?? "") model=\(model ?? "")"
+    }
+
+    private struct Choice: Decodable {}
 }
 
 struct AnthropicMessage: Encodable {

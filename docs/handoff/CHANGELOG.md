@@ -15,6 +15,9 @@
 - Remote AI metadata routing is now explicit: the current Anthropic-compatible metadata path still uses the forced `emit_metadata` tool call, while a separate `MiniMax-Text-01` path uses `response_format: json_schema` for the same `summary`, `nextFocus`, and `suggestionChips` payload.
 
 ## 2026-04-06
+- The MiniMax text-schema metadata path now logs a relaxed probe when strict JSON decoding fails, and it also logs parsed `choicesCount`, `baseResp` status, and first-content diagnostics when decoding succeeds. That makes `choices:null` responses visible in the runtime logs instead of collapsing them into a generic decode failure.
+
+## 2026-04-06
 - The default metadata route for real AI requests now prefers `text01_json_schema`, so `startDraft` / `continueWriting` metadata normally go through the schema-enforced MiniMax text endpoint unless `MINIMAX_METADATA_ROUTE=current` is explicitly set.
 
 ## 2026-04-06
