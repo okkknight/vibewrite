@@ -69,6 +69,7 @@ final class VibeWriteAppFlow: ObservableObject {
             self.activeProjectID = nil
             self.currentDocumentURL = nil
         }
+
     }
 
     var recentProjects: [WritingProject] {
@@ -739,7 +740,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func handleWindowCloseRequest() -> Bool {
-        confirmDiscardCurrentChangesIfNeeded()
+        return confirmDiscardCurrentChangesIfNeeded()
     }
 
     private func recordRecentDocument(url: URL, title: String) {
@@ -781,6 +782,11 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     private func confirmDiscardCurrentChangesIfNeeded() -> Bool {
+        if isPristineBlankSession {
+            VibeWriteDebugTrace.append("flow discard prompt skipped pristine blank session")
+            return true
+        }
+
         guard isCurrentDocumentDirty else {
             return true
         }
@@ -800,5 +806,21 @@ final class VibeWriteAppFlow: ObservableObject {
         default:
             return false
         }
+    }
+
+    private var isPristineBlankSession: Bool {
+        guard currentDocumentURL == nil else { return false }
+
+        let project = activeProject
+        return project.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && project.prompt.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+            && project.title == emptyProjectShell.title
+            && project.mode == emptyProjectShell.mode
+            && project.summary == emptyProjectShell.summary
+            && project.continuationSummary == emptyProjectShell.continuationSummary
+            && project.context == emptyProjectShell.context
+            && project.conversation.isEmpty
+            && project.revisionHistory.isEmpty
+            && project.suggestionChips == emptyProjectShell.suggestionChips
     }
 }

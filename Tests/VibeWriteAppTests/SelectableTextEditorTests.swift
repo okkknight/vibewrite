@@ -4,7 +4,7 @@ import XCTest
 
 @MainActor
 final class SelectableTextEditorTests: XCTestCase {
-    func testLiveUserTextPreservationRequiresUncommittedText() {
+    func testLiveUserTextPreservationRequiresPendingUserTextChange() {
         let editor = SelectableTextEditor(
             text: .constant("loaded body"),
             selectedText: .constant(nil),
@@ -28,13 +28,11 @@ final class SelectableTextEditorTests: XCTestCase {
 
         XCTAssertFalse(coordinator.shouldPreserveLiveUserText(in: textView, bindingText: "loaded body"))
 
-        textView.setMarkedText(
-            NSAttributedString(string: "typed draft"),
-            selectedRange: NSRange(location: 11, length: 0),
-            replacementRange: NSRange(location: NSNotFound, length: 0)
+        textView.string = "typed draft"
+        coordinator.textDidChange(
+            Notification(name: NSText.didChangeNotification, object: textView)
         )
 
-        XCTAssertTrue(textView.hasMarkedText())
         XCTAssertTrue(coordinator.shouldPreserveLiveUserText(in: textView, bindingText: "loaded body"))
     }
 }

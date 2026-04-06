@@ -176,6 +176,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var lastLoggedLayoutSignature: String?
         private var isPerformingLayoutSync = false
         private var pendingTextBindingUpdateAfterLayoutSync: String?
+        private var pendingUserTextChange: String?
         private var selectionOverlayUpdateGeneration = 0
         private var needsSelectionOverlaySyncAfterLayout = false
         private var lockedViewportOrigin: CGPoint?
@@ -365,6 +366,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             guard textView.string != newText else {
                 logTextEvent("sync text skipped identical requestedCount=\(newText.utf16.count)")
+                if pendingUserTextChange == newText {
+                    pendingUserTextChange = nil
+                }
                 lastAppliedAccessibilityValue = newText
                 return false
             }
@@ -411,6 +415,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             ensureReadableTextAttributes(in: textView)
             textView.setAccessibilityValue(newText as NSString)
             lastAppliedAccessibilityValue = newText
+            pendingUserTextChange = nil
             logTextEvent(
                 "sync text applied oldCount=\(oldText.length) newCount=\(newTextString.length) didMutate=true selection=\(debugRange(textView.selectedRange()))"
             )
@@ -428,7 +433,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         }
 
         private func hasUncommittedUserText(in textView: NSTextView) -> Bool {
-            pendingTextBindingUpdateAfterLayoutSync != nil || textView.hasMarkedText()
+            pendingUserTextChange != nil || pendingTextBindingUpdateAfterLayoutSync != nil
         }
 
         func syncLiveUserTextFromView(_ textView: NSTextView) {
@@ -437,6 +442,7 @@ struct SelectableTextEditor: NSViewRepresentable {
                 "live user text preserved viewCount=\(currentText.utf16.count) bindingCount=\(text.utf16.count) selection=\(debugRange(textView.selectedRange()))"
             )
             setTextIfNeeded(currentText)
+            pendingUserTextChange = nil
         }
 
         func syncSelectionOverlayState(from textView: NSTextView) {
@@ -643,6 +649,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             guard textView.isEditable else { return }
             guard !isApplyingProgrammaticChange else { return }
+            pendingUserTextChange = textView.string
             if isPerformingLayoutSync {
                 pendingTextBindingUpdateAfterLayoutSync = textView.string
                 logTextEvent(
@@ -681,6 +688,7 @@ struct SelectableTextEditor: NSViewRepresentable {
                 "text change flushed after layout pendingCount=\(pendingTextBindingUpdateAfterLayoutSync.utf16.count) selection=\(debugRange(textView.selectedRange()))"
             )
             setTextIfNeeded(pendingTextBindingUpdateAfterLayoutSync)
+            pendingUserTextChange = nil
             syncSelectionOverlayState(from: textView)
         }
 

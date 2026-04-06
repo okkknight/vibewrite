@@ -1,6 +1,10 @@
 # Changelog
 
 ## 2026-04-06
+- The正文 editor bridge now tracks a real pending user-text change before preserving live text, instead of depending on marked-text state, so ordinary typing still wins over stale binding sync while blank focused editors stay out of the first-open hydration path.
+- Pristine blank startup sessions now bypass the discard prompt on window close, so the app does not ask to save when no real正文 or collaboration edits have happened yet.
+
+## 2026-04-06
 - Remote AI metadata now uses a structured Anthropic tool call: the metadata request forces `emit_metadata` and decodes the tool arguments directly, which removes the old text JSON parse failure mode for `summary`, `nextFocus`, and `suggestionChips`.
 
 ## 2026-04-06

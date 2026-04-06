@@ -41,6 +41,16 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.documentText, "")
     }
 
+    func testBlankStartupWindowCloseBypassesDiscardPrompt() {
+        let flow = VibeWriteAppFlow()
+
+        XCTAssertTrue(flow.handleWindowCloseRequest())
+
+        flow.createNewProject()
+
+        XCTAssertTrue(flow.handleWindowCloseRequest())
+    }
+
     func testDocumentHydrationProtectionIsScopedToTheOpenedProject() {
         let flow = VibeWriteAppFlow()
         let project = WritingProject.entryShell(
