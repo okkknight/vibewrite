@@ -50,6 +50,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The local-edit flash was refined again: it now uses a rounded overlay highlight instead of a flat text background, the yellow tint is lighter, the flash pops in immediately and fades out gradually, and the viewport stays anchored after the flash instead of snapping the cursor to the document end.
 - Trace debugging found that the flash was initially rendering fully transparent on its first draw, so the overlay timing was adjusted to keep the first frame visible before fading instead of starting at alpha 0.
 - The正文 editor now buffers real user text changes that happen during layout sync instead of dropping them, then flushes the pending text binding update after layout settles so `Cmd+S` saves the latest visible正文 instead of an older snapshot.
+- The正文 editor bridge now also commits `insertText` directly into the live正文 binding, so manual typing does not depend on `textDidChange` alone before save or selection refreshes. That closes the last remaining save-loss gap where input could sit in `NSTextView` but never reach `activeDocumentText`.
 - The selection-preset loading state is now represented as a real busy/disabled state in the selection chips, and the targeted UI test waits for the preset button to disable instead of probing a fragile accessibility spinner node.
 - Blank startup now stays clean until the user actually edits: the flow seeds the saved content snapshot with the blank collaboration shell, and the project view's title/body bindings ignore stale writebacks from an inactive project so opening an external file is no longer immediately overwritten by an empty buffer.
 - Edit responses no longer stream-replace the正文 while the model is still generating. The live preview renderer is bypassed for `.edit`, so local patch edits apply once at completion instead of causing jumpy chunk-by-chunk replacement.
@@ -144,6 +145,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
 - `swift test --filter VibeWriteAppFlowTests/testSavingAndReopeningDocumentRestoresMetadataStoreState`
 - `swift test --filter SelectableTextEditorTests/testLiveUserTextPreservationRequiresUncommittedText`
+- `swift test --filter SelectableTextEditorTests`
 - `swift test --filter VibeWriteAppFlowTests/testContinueWritingStreamsIncrementallyBeforeCompletion`
 - `swift test --filter VibeWriteAppFlowTests/testOpenDocumentFallsBackToBodyOnlyWhenMetadataStoreIsMalformed`
 - `swift test --filter VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`

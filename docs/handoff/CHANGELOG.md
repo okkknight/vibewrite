@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-06
+- The正文 save-loss regression was pinned down to the AppKit bridge's input commit path: manual typing now commits from `insertText` directly into the live正文 binding, so input cannot sit only in `NSTextView` and then disappear when save or selection refreshes trigger a SwiftUI sync.
+
+# 2026-04-06
 - Tightened the metadata prompt so `suggestionChips` are treated as the highest-priority output and `globalSynopsis` stays short and stable, reducing the chance that the broader synopsis crowds out the next-step chips.
 
 # 2026-04-06

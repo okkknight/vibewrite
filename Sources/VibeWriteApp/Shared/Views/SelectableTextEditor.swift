@@ -61,6 +61,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             "make nsview start initialBindingCount=\(text.utf16.count) editable=\(isEditable) autoScrollToEnd=\(shouldAutoScrollToDocumentEnd)"
         )
         let textView = StyledTextView(frame: .zero)
+        textView.onLiveTextMutation = { [weak coordinator = context.coordinator] textView in
+            coordinator?.handleLiveTextMutation(from: textView, source: "insertText")
+        }
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
@@ -213,6 +216,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         private weak var localEditFlashOverlayView: LocalEditFlashOverlayView?
         private var shouldPreserveSelectionOverlayDuringPendingLocalEdit = false
         private var lastReportedViewportState: SelectableTextEditorViewportState?
+        private var lastCommittedUserText: String?
         var viewportStateChangedHandler: ((SelectableTextEditorViewportState) -> Void)?
 
         private var isApplyingProgrammaticChange: Bool {
@@ -425,6 +429,7 @@ struct SelectableTextEditor: NSViewRepresentable {
                 if pendingUserTextChange == newText {
                     pendingUserTextChange = nil
                 }
+                lastCommittedUserText = newText
                 lastAppliedAccessibilityValue = newText
                 return false
             }
@@ -709,45 +714,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let textView = notification.object as? NSTextView else {
                 return
             }
-
-            let currentStringCount = textView.string.utf16.count
-            let currentSelection = debugRange(textView.selectedRange())
-            let isProgrammatic = isApplyingProgrammaticChange
-            let isLayoutSync = isPerformingLayoutSync
-            let isEditable = textView.isEditable
-            VibeWriteLog.ai.info(
-                "textDidChange entry stringCount=\(currentStringCount, privacy: .public) applyingProgrammatic=\(isProgrammatic, privacy: .public) layoutSync=\(isLayoutSync, privacy: .public) editable=\(isEditable, privacy: .public) selection=\(currentSelection, privacy: .public)"
-            )
-            logTextEvent(
-                "text did change stringCount=\(currentStringCount) applyingProgrammatic=\(isProgrammatic) layoutSync=\(isLayoutSync) editable=\(isEditable) selection=\(currentSelection)"
-            )
-            guard textView.isEditable else { return }
-            guard !isApplyingProgrammaticChange else { return }
-            pendingUserTextChange = textView.string
-            logTextEvent(
-                "text did change pending user text set count=\(textView.string.utf16.count) selection=\(currentSelection) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
-            )
-            if isPerformingLayoutSync {
-                pendingTextBindingUpdateAfterLayoutSync = textView.string
-                let pendingCount = textView.string.utf16.count
-                let pendingSelection = debugRange(textView.selectedRange())
-                VibeWriteLog.ai.info(
-                    "textDidChange deferred during layout pendingCount=\(pendingCount, privacy: .public) selection=\(pendingSelection, privacy: .public)"
-                )
-                logTextEvent(
-                    "text change deferred during layout pendingCount=\(pendingCount) selection=\(pendingSelection)"
-                )
-                return
-            }
-
-            pendingTextBindingUpdateAfterLayoutSync = nil
-            let commitCount = textView.string.utf16.count
-            let commitSelection = debugRange(textView.selectedRange())
-            VibeWriteLog.ai.info(
-                "textDidChange immediate commit count=\(commitCount, privacy: .public) selection=\(commitSelection, privacy: .public)"
-            )
-            setTextIfNeeded(textView.string)
-            syncSelectionOverlayState(from: textView)
+            handleLiveTextMutation(from: textView, source: "textDidChange")
         }
 
         func textDidEndEditing(_ notification: Notification) {
@@ -769,22 +736,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard textView.isEditable else { return }
             guard !isApplyingProgrammaticChange else { return }
 
-            pendingUserTextChange = textView.string
-            pendingTextBindingUpdateAfterLayoutSync = nil
-            logTextEvent(
-                "text did end editing pending user text set count=\(textView.string.utf16.count) selection=\(currentSelection) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
-            )
-
-            let commitCount = textView.string.utf16.count
-            let commitSelection = debugRange(textView.selectedRange())
-            VibeWriteLog.ai.info(
-                "textDidEndEditing immediate commit count=\(commitCount, privacy: .public) selection=\(commitSelection, privacy: .public)"
-            )
-            logTextEvent(
-                "text did end editing immediate commit count=\(commitCount) selection=\(commitSelection)"
-            )
-            setTextIfNeeded(textView.string)
-            syncSelectionOverlayState(from: textView)
+            handleLiveTextMutation(from: textView, source: "textDidEndEditing")
             pendingUserTextChange = nil
         }
 
@@ -796,6 +748,7 @@ struct SelectableTextEditor: NSViewRepresentable {
                     "binding text unchanged currentBindingCount=\(currentBindingCount, privacy: .public) requestedCount=\(requestedCount, privacy: .public)"
                 )
                 logTextEvent("binding text unchanged currentBindingCount=\(currentBindingCount) requestedCount=\(requestedCount)")
+                lastCommittedUserText = newText
                 return
             }
             VibeWriteLog.ai.info(
@@ -803,6 +756,60 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             logTextEvent("binding text updated currentBindingCount=\(currentBindingCount) requestedCount=\(requestedCount)")
             text = newText
+            lastCommittedUserText = newText
+        }
+
+        func handleLiveTextMutation(from textView: NSTextView, source: String) {
+            let currentText = textView.string
+            if lastCommittedUserText == currentText {
+                logTextEvent(
+                    "live text mutation skipped duplicate source=\(source) count=\(currentText.utf16.count) selection=\(debugRange(textView.selectedRange()))"
+                )
+                return
+            }
+
+            let currentStringCount = currentText.utf16.count
+            let currentSelection = debugRange(textView.selectedRange())
+            let isProgrammatic = isApplyingProgrammaticChange
+            let isLayoutSync = isPerformingLayoutSync
+            let isEditable = textView.isEditable
+            VibeWriteLog.ai.info(
+                "textDidChange entry source=\(source, privacy: .public) stringCount=\(currentStringCount, privacy: .public) applyingProgrammatic=\(isProgrammatic, privacy: .public) layoutSync=\(isLayoutSync, privacy: .public) editable=\(isEditable, privacy: .public) selection=\(currentSelection, privacy: .public)"
+            )
+            logTextEvent(
+                "text did change source=\(source) stringCount=\(currentStringCount) applyingProgrammatic=\(isProgrammatic) layoutSync=\(isLayoutSync) editable=\(isEditable) selection=\(currentSelection)"
+            )
+            guard textView.isEditable else { return }
+            guard !isApplyingProgrammaticChange else { return }
+
+            pendingUserTextChange = currentText
+            logTextEvent(
+                "text did change pending user text set source=\(source) count=\(currentStringCount) selection=\(currentSelection) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
+            )
+
+            if isPerformingLayoutSync {
+                pendingTextBindingUpdateAfterLayoutSync = currentText
+                let pendingCount = currentText.utf16.count
+                let pendingSelection = currentSelection
+                VibeWriteLog.ai.info(
+                    "textDidChange deferred during layout source=\(source, privacy: .public) pendingCount=\(pendingCount, privacy: .public) selection=\(pendingSelection, privacy: .public)"
+                )
+                logTextEvent(
+                    "text change deferred during layout source=\(source) pendingCount=\(pendingCount) selection=\(pendingSelection)"
+                )
+                return
+            }
+
+            pendingTextBindingUpdateAfterLayoutSync = nil
+            let commitSelection = currentSelection
+            VibeWriteLog.ai.info(
+                "textDidChange immediate commit source=\(source, privacy: .public) count=\(currentStringCount, privacy: .public) selection=\(commitSelection, privacy: .public)"
+            )
+            logTextEvent(
+                "text did change immediate commit source=\(source) count=\(currentStringCount) selection=\(commitSelection)"
+            )
+            setTextIfNeeded(currentText)
+            syncSelectionOverlayState(from: textView)
         }
 
         private func flushDeferredSelectionOverlaySyncIfNeeded(for textView: NSTextView) {
@@ -1285,6 +1292,8 @@ private final class LocalEditFlashOverlayView: NSView {
 }
 
 private final class StyledTextView: NSTextView {
+    var onLiveTextMutation: ((NSTextView) -> Void)?
+
     override func keyDown(with event: NSEvent) {
         let chars = debugEventString(event.characters)
         let ignoringModifiers = debugEventString(event.charactersIgnoringModifiers)
@@ -1339,6 +1348,7 @@ private final class StyledTextView: NSTextView {
         VibeWriteLog.launch.info(
             "styled text view insertText applied textCountAfter=\(afterCount, privacy: .public) selection=\(selection, privacy: .public)"
         )
+        onLiveTextMutation?(self)
     }
 
     override func setFrameSize(_ newSize: NSSize) {
