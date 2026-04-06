@@ -131,7 +131,10 @@ struct ProjectComposerBar: View {
             }
             .accessibilityElement(children: .contain)
         }
-        .padding(12)
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .padding(.top, 8)
+        .padding(.bottom, 10)
         .accessibilityElement(children: .contain)
         .background {
             RoundedRectangle(cornerRadius: 22, style: .continuous)

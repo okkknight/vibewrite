@@ -186,9 +186,9 @@ struct WritingProjectView: View {
                     dismissSelectionCustomInputContext()
                 })
 
-            writingBodyPane(topPadding: 16, bottomPadding: 8)
+            writingBodyPane(topPadding: 16, bottomPadding: 0)
 
-            composerSection(verticalPadding: 8)
+            composerSection(verticalPadding: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -227,7 +227,7 @@ struct WritingProjectView: View {
                 bottomPadding: 18
             )
 
-            composerSection(verticalPadding: 8)
+            composerSection(verticalPadding: 0)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: shellLayoutMode.isCompact ? .infinity : 872, alignment: .top)
@@ -377,7 +377,7 @@ struct WritingProjectView: View {
                     }
                 }
 
-                bodyEdgeFadeOverlay
+                bodyTopFadeOverlay
 
                 if let selectedText = activeSelectionPopoverText,
                    let selectionPopoverOrigin = activeSelectionPopoverOrigin {
@@ -614,6 +614,7 @@ struct WritingProjectView: View {
             }
             .animation(.easeInOut(duration: 0.16), value: selectionCustomContextText)
         }
+        .padding(.bottom, 16)
     }
 
     private func writingContentColumn<Content: View>(
@@ -1061,7 +1062,7 @@ struct WritingProjectView: View {
             .accessibilityValue(text)
     }
 
-    private var bodyEdgeFadeOverlay: some View {
+    private var bodyTopFadeOverlay: some View {
         VStack(spacing: 0) {
             LinearGradient(
                 colors: [
@@ -1075,17 +1076,6 @@ struct WritingProjectView: View {
             .frame(height: bodyEdgeFadeHeight)
 
             Spacer(minLength: 0)
-
-            LinearGradient(
-                colors: [
-                    Color.vibeCanvas.opacity(0.0),
-                    Color.vibeCanvas.opacity(0.46),
-                    Color.vibeCanvas.opacity(0.94)
-                ],
-                startPoint: .top,
-                endPoint: .bottom
-            )
-            .frame(height: bodyEdgeFadeHeight)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .allowsHitTesting(false)

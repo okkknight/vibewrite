@@ -1,6 +1,14 @@
 # Changelog
 
 # 2026-04-06
+- Removed the remaining gap between正文 and Composer in the wide layout so the composer board now sits flush against the正文 with no extra spacer.
+- Kept the body-to-composer seam flush, but gave the composer card more breathing room on its lower interior edge so the bottom feels less cramped.
+- Added a bottom margin under the wide composer card so it no longer sits flush against the window edge while keeping the top seam with正文 unchanged.
+
+# 2026-04-06
+- Removed the正文 bottom fade and tightened the Composer section so it sits flush against the正文 above it, while leaving the top fade intact.
+
+# 2026-04-06
 - Reduced the app's default launch window size to 1024x700 so the initial window opens a bit more compactly.
 
 # 2026-04-06

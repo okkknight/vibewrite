@@ -11,6 +11,9 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - The app's default launch window size is now 1024x700.
+- The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.
+- The wide Composer now keeps extra internal breathing room at its lower edge while preserving the zero-gap body-to-composer seam above it.
+- The wide Composer card now also keeps an external bottom margin, so the card floats above the window edge instead of sitting flush against it.
 - V2 docs under `docs/V2/` are the source of truth.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` remains the persisted metadata/snapshot shell. `WritingProjectView` no longer writes正文 back through `projectDocumentTextBinding`; title and metadata updates still go through the project snapshot.
 - Saving now serializes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 state the editor is showing instead of depending on a last-second window flush.
