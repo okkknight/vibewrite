@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-06
+- Reduced the app's default launch window size to 1024x700 so the initial window opens a bit more compactly.
+
+# 2026-04-06
 - The正文 surface now fades softly at the top and bottom edges instead of hard-cutting into the surrounding modules, and the bottom Composer section was tightened vertically so the writing area sits closer to it while staying horizontally centered.
 
 # 2026-04-06

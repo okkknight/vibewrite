@@ -37,7 +37,7 @@ struct VibeWriteApp: App {
                 flow: flow
             )
         }
-        .defaultSize(width: 1320, height: 860)
+        .defaultSize(width: 1024, height: 700)
         .commands {
             VibeWriteCommands(flow: flow)
         }

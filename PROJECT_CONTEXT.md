@@ -10,6 +10,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - not a multi-document content library
 
 ## Current state
+- The app's default launch window size is now 1024x700.
 - V2 docs under `docs/V2/` are the source of truth.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` remains the persisted metadata/snapshot shell. `WritingProjectView` no longer writes正文 back through `projectDocumentTextBinding`; title and metadata updates still go through the project snapshot.
 - Saving now serializes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 state the editor is showing instead of depending on a last-second window flush.
