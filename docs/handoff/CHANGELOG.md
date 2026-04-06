@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-04-06
+- Dock reopen now intentionally resets the in-memory writing session to a blank shell after the close confirmation succeeds, while preserving recent-document history. That keeps the app from carrying the previous `currentDocumentURL` / active project into the next Dock-opened window.
+
+## 2026-04-06
 - The正文 editor bridge now tracks a real pending user-text change before preserving live text, instead of depending on marked-text state, so ordinary typing still wins over stale binding sync while blank focused editors stay out of the first-open hydration path.
 - Pristine blank startup sessions now bypass the discard prompt on window close, so the app does not ask to save when no real正文 or collaboration edits have happened yet.
 

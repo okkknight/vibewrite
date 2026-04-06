@@ -552,6 +552,19 @@ final class VibeWriteAppFlow: ObservableObject {
         replaceActiveProject(project, persist: false)
     }
 
+    private func resetCurrentSessionForDockReopen() {
+        projects = []
+        activeProjectID = nil
+        currentDocumentURL = nil
+        savedDocumentContents = VibeWriteMarkdownDocument(project: emptyProjectShell).renderedText()
+        documentHydrationProtectedProjectID = nil
+        activeEditLock = nil
+        aiErrorMessage = nil
+        isAIRequestInFlight = false
+        isProseRequestInFlight = false
+        isMetadataRequestInFlight = false
+    }
+
     private func replaceActiveProject(_ project: WritingProject, persist: Bool) {
         if let currentProject = self.project(for: project.id), currentProject == project, activeProjectID == project.id {
             return
@@ -740,7 +753,12 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func handleWindowCloseRequest() -> Bool {
-        return confirmDiscardCurrentChangesIfNeeded()
+        guard confirmDiscardCurrentChangesIfNeeded() else {
+            return false
+        }
+
+        resetCurrentSessionForDockReopen()
+        return true
     }
 
     private func recordRecentDocument(url: URL, title: String) {

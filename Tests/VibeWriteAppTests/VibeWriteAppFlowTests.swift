@@ -51,6 +51,36 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(flow.handleWindowCloseRequest())
     }
 
+    func testWindowCloseResetsCurrentSessionButPreservesRecentHistory() throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL)
+        let project = WritingProject.entryShell(
+            prompt: "写一个雨夜重逢的小说场景",
+            mode: .collaboration,
+            automationKey: "project.close.reset"
+        )
+        flow.openProject(project)
+
+        let documentURL = storageURL.deletingPathExtension().appendingPathExtension("md")
+        XCTAssertTrue(flow.saveCurrentDocument(to: documentURL))
+        XCTAssertFalse(flow.recentDocumentEntries.isEmpty)
+
+        XCTAssertTrue(flow.handleWindowCloseRequest())
+
+        XCTAssertNil(flow.currentDocumentURL)
+        XCTAssertNil(flow.activeProjectID)
+        XCTAssertTrue(flow.projects.isEmpty)
+        XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+        XCTAssertTrue(flow.activeProject.prompt.isEmpty)
+        XCTAssertFalse(flow.recentDocumentEntries.isEmpty)
+        XCTAssertTrue(flow.recentDocumentEntries.contains(where: { $0.url == documentURL }))
+        XCTAssertFalse(flow.isCurrentDocumentDirty)
+    }
+
     func testDocumentHydrationProtectionIsScopedToTheOpenedProject() {
         let flow = VibeWriteAppFlow()
         let project = WritingProject.entryShell(
