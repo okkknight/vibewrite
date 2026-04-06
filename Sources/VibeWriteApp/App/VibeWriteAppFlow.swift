@@ -583,6 +583,9 @@ final class VibeWriteAppFlow: ObservableObject {
         let document = VibeWriteMarkdownDocument(project: project)
         let renderedText = document.renderedText()
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        VibeWriteLog.launch.info(
+            "flow saveCurrentDocument start projectID=\(project.id.uuidString, privacy: .public) title=\(project.title.vibewriteLogPreview(maxLength: 60), privacy: .public) documentCount=\(project.documentText.count, privacy: .public) renderedCount=\(renderedText.count, privacy: .public) updateActiveProject=\(updateActiveProject, privacy: .public) currentURL=\(currentDocumentURLName, privacy: .public)"
+        )
         VibeWriteDebugTrace.append(
             "flow saveCurrentDocument start projectID=\(project.id.uuidString) title=\(project.title) documentCount=\(project.documentText.count) renderedCount=\(renderedText.count) updateActiveProject=\(updateActiveProject) currentURL=\(currentDocumentURLName)"
         )
@@ -599,12 +602,19 @@ final class VibeWriteAppFlow: ObservableObject {
             }
             currentDocumentURL = url
             savedDocumentContents = renderedText
+            let savedCount = renderedText.count
+            VibeWriteLog.launch.info(
+                "flow saveCurrentDocument applied projectID=\(project.id.uuidString, privacy: .public) savedCount=\(savedCount, privacy: .public) currentURL=\(url.lastPathComponent, privacy: .public)"
+            )
             VibeWriteDebugTrace.append(
                 "flow saveCurrentDocument applied projectID=\(project.id.uuidString) savedCount=\(savedDocumentContents?.count ?? -1) currentURL=\(url.lastPathComponent)"
             )
             recordRecentDocument(url: url, title: project.title)
             return true
         } catch {
+            VibeWriteLog.launch.error(
+                "flow saveCurrentDocument failed projectID=\(project.id.uuidString, privacy: .public) title=\(project.title.vibewriteLogPreview(maxLength: 60), privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+            )
             aiErrorMessage = error.localizedDescription
             return false
         }
@@ -651,6 +661,12 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocument() -> Bool {
+        let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        let dirty = isCurrentDocumentDirty
+        let activeCount = activeProject.documentText.count
+        VibeWriteLog.launch.info(
+            "flow saveCurrentDocument entry currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
+        )
         if let currentDocumentURL {
             return saveCurrentDocument(to: currentDocumentURL)
         }
@@ -659,6 +675,12 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocumentAs() -> Bool {
+        let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        let dirty = isCurrentDocumentDirty
+        let activeCount = activeProject.documentText.count
+        VibeWriteLog.launch.info(
+            "flow saveCurrentDocumentAs entry currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
+        )
         let panel = NSSavePanel()
         panel.canCreateDirectories = true
         panel.nameFieldStringValue = saveFileNameSuggestion()
@@ -681,7 +703,13 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocument(to url: URL) -> Bool {
-        saveCurrentDocument(to: url, project: activeProject, updateActiveProject: false)
+        let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        let dirty = isCurrentDocumentDirty
+        let activeCount = activeProject.documentText.count
+        VibeWriteLog.launch.info(
+            "flow saveCurrentDocument to-url entry targetURL=\(url.lastPathComponent, privacy: .public) currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) activeCount=\(activeCount, privacy: .public)"
+        )
+        return saveCurrentDocument(to: url, project: activeProject, updateActiveProject: false)
     }
 
     func openDocumentFromPanel() -> Bool {
@@ -800,12 +828,21 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     private func confirmDiscardCurrentChangesIfNeeded() -> Bool {
-        if isPristineBlankSession {
+        let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        let dirty = isCurrentDocumentDirty
+        let pristineBlank = isPristineBlankSession
+        let activeCount = activeProject.documentText.count
+        VibeWriteLog.launch.info(
+            "flow discard prompt check currentURL=\(currentDocumentURLName, privacy: .public) dirty=\(dirty, privacy: .public) pristineBlank=\(pristineBlank, privacy: .public) activeCount=\(activeCount, privacy: .public)"
+        )
+        if pristineBlank {
             VibeWriteDebugTrace.append("flow discard prompt skipped pristine blank session")
+            VibeWriteLog.launch.info("flow discard prompt skipped pristine blank session")
             return true
         }
 
-        guard isCurrentDocumentDirty else {
+        guard dirty else {
+            VibeWriteLog.launch.info("flow discard prompt bypassed clean session")
             return true
         }
 
@@ -818,10 +855,13 @@ final class VibeWriteAppFlow: ObservableObject {
 
         switch alert.runModal() {
         case .alertFirstButtonReturn:
+            VibeWriteLog.launch.info("flow discard prompt chose save")
             return saveCurrentDocument()
         case .alertSecondButtonReturn:
+            VibeWriteLog.launch.info("flow discard prompt chose dont-save")
             return true
         default:
+            VibeWriteLog.launch.info("flow discard prompt cancelled")
             return false
         }
     }

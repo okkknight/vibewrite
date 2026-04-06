@@ -52,18 +52,28 @@ struct WritingProjectView: View {
             get: { project.title },
             set: { newTitle in
                 let activeProjectID = flow.activeProject.id.uuidString
+                let isHydrationProtected = flow.isDocumentHydrationProtected(for: projectID)
                 VibeWriteDebugTrace.append(
                     "project title binding writeback projectID=\(projectID.uuidString) activeProjectID=\(activeProjectID) titleCount=\(newTitle.count)"
                 )
+                VibeWriteLog.launch.info(
+                    "project title binding writeback projectID=\(projectID.uuidString, privacy: .public) activeProjectID=\(activeProjectID, privacy: .public) titleCount=\(newTitle.count, privacy: .public) hydrationProtected=\(isHydrationProtected, privacy: .public)"
+                )
                 guard flow.activeProject.id == projectID else { return }
-                guard !flow.isDocumentHydrationProtected(for: projectID) else {
+                guard !isHydrationProtected else {
                     VibeWriteDebugTrace.append(
                         "project title binding suppressed during document hydration projectID=\(projectID.uuidString) titleCount=\(newTitle.count)"
+                    )
+                    VibeWriteLog.launch.info(
+                        "project title binding suppressed during document hydration projectID=\(projectID.uuidString, privacy: .public) titleCount=\(newTitle.count, privacy: .public)"
                     )
                     return
                 }
                 VibeWriteDebugTrace.append(
                     "project title binding accepted projectID=\(projectID.uuidString) newTitleCount=\(newTitle.count)"
+                )
+                VibeWriteLog.launch.info(
+                    "project title binding accepted projectID=\(projectID.uuidString, privacy: .public) newTitleCount=\(newTitle.count, privacy: .public)"
                 )
                 var updatedProject = flow.activeProject
                 updatedProject.title = newTitle
@@ -78,18 +88,28 @@ struct WritingProjectView: View {
             get: { project.documentText },
             set: { newText in
                 let activeProjectID = flow.activeProject.id.uuidString
+                let isHydrationProtected = flow.isDocumentHydrationProtected(for: projectID)
                 VibeWriteDebugTrace.append(
                     "project body binding writeback projectID=\(projectID.uuidString) activeProjectID=\(activeProjectID) textCount=\(newText.count)"
                 )
+                VibeWriteLog.launch.info(
+                    "project body binding writeback projectID=\(projectID.uuidString, privacy: .public) activeProjectID=\(activeProjectID, privacy: .public) textCount=\(newText.count, privacy: .public) hydrationProtected=\(isHydrationProtected, privacy: .public)"
+                )
                 guard flow.activeProject.id == projectID else { return }
-                guard !flow.isDocumentHydrationProtected(for: projectID) else {
+                guard !isHydrationProtected else {
                     VibeWriteDebugTrace.append(
                         "project body binding suppressed during document hydration projectID=\(projectID.uuidString) textCount=\(newText.count)"
+                    )
+                    VibeWriteLog.launch.info(
+                        "project body binding suppressed during document hydration projectID=\(projectID.uuidString, privacy: .public) textCount=\(newText.count, privacy: .public)"
                     )
                     return
                 }
                 VibeWriteDebugTrace.append(
                     "project body binding accepted projectID=\(projectID.uuidString) newTextCount=\(newText.count)"
+                )
+                VibeWriteLog.launch.info(
+                    "project body binding accepted projectID=\(projectID.uuidString, privacy: .public) newTextCount=\(newText.count, privacy: .public)"
                 )
                 var updatedProject = flow.activeProject
                 updatedProject.documentText = newText

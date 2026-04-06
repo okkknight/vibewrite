@@ -1264,7 +1264,7 @@ final class ExternalVerticalScrollerView: NSView {
         let maxOffset = max(documentHeight - visibleHeight, 1)
         let offsetY = min(max(scrollView.contentView.bounds.origin.y, 0), maxOffset)
         let progress = offsetY / maxOffset
-        let thumbY = track.minY + (travel * (1 - progress))
+        let thumbY = track.minY + (travel * progress)
         let thumbRect = CGRect(
             x: bounds.midX - (knobWidth / 2),
             y: thumbY,
@@ -1482,7 +1482,7 @@ final class ExternalVerticalScrollerView: NSView {
         let thumbHeight = metrics.thumbRect.height
         let travel = max(track.height - thumbHeight, 1)
         let desiredThumbMinY = min(max(location.y - dragAnchorOffsetY, track.minY), track.minY + travel)
-        let progress = 1 - ((desiredThumbMinY - track.minY) / travel)
+        let progress = (desiredThumbMinY - track.minY) / travel
         let targetOffset = metrics.maxOffset * progress
         scroll(to: targetOffset, maxOffset: metrics.maxOffset)
     }

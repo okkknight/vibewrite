@@ -1,6 +1,9 @@
 # Changelog
 
 ## 2026-04-06
+- Added real `OSLog` traces around the正文 binding writeback path, `saveCurrentDocument`, and discard-prompt checks so the current Ctrl+S save-loss repro can be diagnosed from runtime logs instead of the no-op debug trace sink.
+
+## 2026-04-06
 - Remote AI metadata routing is now explicit: the current Anthropic-compatible metadata path still uses the forced `emit_metadata` tool call, while a separate `MiniMax-Text-01` path uses `response_format: json_schema` for the same `summary`, `nextFocus`, and `suggestionChips` payload.
 
 ## 2026-04-06

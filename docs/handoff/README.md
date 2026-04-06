@@ -69,6 +69,7 @@ This directory is the compact handoff layer for VibeWrite.
 - Edit mode no longer uses the streaming preview renderer to rewrite the正文 live. The final patch is applied once at completion so local edits do not visually flicker through chunk-by-chunk replacement.
 - The app now saves and opens user work as Markdown files with正文 plus a hidden marker. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad or missing collaboration metadata never blocks正文 editing.
 - The app-owned local store now only keeps lightweight recent-document entries; the actual writing state lives in the Markdown file, and the collaboration state lives in the app-side metadata store keyed by `docID`.
+- Debug logs were added around正文 binding writeback and `saveCurrentDocument` so the current Ctrl+S save-loss repro can be traced with real `OSLog` instead of the no-op debug trace sink.
 - Edit streaming now starts from the selected passage instead of replaying from the top of the document, so local patch responses feel anchored to the user’s selection.
 - The page header subtitle continues to use `project.summary`; if the text under the title is off-topic, the issue is in the summary source, not the subtitle component.
 - The current head is `66b43f2`, so `continueWriting` is now intentionally a little softer and less conclusive than before.
