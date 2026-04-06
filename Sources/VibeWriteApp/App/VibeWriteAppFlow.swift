@@ -574,6 +574,29 @@ final class VibeWriteAppFlow: ObservableObject {
         activeProjectID = project.id
     }
 
+    private func commitLiveEditorStateBeforeSaving(reason: String) {
+        let currentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
+        guard let window = NSApp.keyWindow ?? NSApp.mainWindow else {
+            VibeWriteLog.ai.info(
+                "flow commit editor skipped reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) window=nil"
+            )
+            VibeWriteLog.launch.info(
+                "flow commit editor skipped reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) window=nil"
+            )
+            return
+        }
+
+        let firstResponderName = window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        window.endEditing(for: nil)
+        let resignedFirstResponder = window.makeFirstResponder(nil)
+        VibeWriteLog.ai.info(
+            "flow commit editor before save reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) windowTitle=\(window.title.vibewriteLogPreview(maxLength: 40), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) endedEditing=true resignedFirstResponder=\(resignedFirstResponder, privacy: .public)"
+        )
+        VibeWriteLog.launch.info(
+            "flow commit editor before save reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) windowTitle=\(window.title.vibewriteLogPreview(maxLength: 40), privacy: .public) firstResponder=\(firstResponderName, privacy: .public) endedEditing=true resignedFirstResponder=\(resignedFirstResponder, privacy: .public)"
+        )
+    }
+
     @discardableResult
     private func saveCurrentDocument(
         to url: URL,
@@ -673,6 +696,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocument() -> Bool {
+        commitLiveEditorStateBeforeSaving(reason: "saveCurrentDocument")
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
         let activeCount = activeProject.documentText.count
@@ -690,6 +714,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocumentAs() -> Bool {
+        commitLiveEditorStateBeforeSaving(reason: "saveCurrentDocumentAs")
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
         let activeCount = activeProject.documentText.count
@@ -721,6 +746,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func saveCurrentDocument(to url: URL) -> Bool {
+        commitLiveEditorStateBeforeSaving(reason: "saveCurrentDocument(to:)")
         let currentDocumentURLName = currentDocumentURL?.lastPathComponent ?? "nil"
         let dirty = isCurrentDocumentDirty
         let activeCount = activeProject.documentText.count

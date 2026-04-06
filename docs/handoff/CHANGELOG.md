@@ -197,6 +197,7 @@
 # 2026-04-06
 - Added a second tracing layer for the recurring save-loss investigation: the app now logs raw local key-down events at launch and logs `windowShouldClose` results, so the next repro can tell whether `Ctrl+S` or the close path is entering the responder chain before the editor/save bridge.
 - Added a third tracing layer in `StyledTextView` itself (`keyDown`, `performKeyEquivalent`, `doCommand(by:)`, and `insertText`) so the next repro can tell whether the typed text is being committed, intercepted, or replaced before save.
+- The save path now forces the active editor to end editing before writing the file, which commits the live NSTextView buffer into the SwiftUI binding so the save snapshot uses the latest hand-entered正文 instead of an older model copy.
 
 # 2026-04-06
 - Independent review of `QA_REPORT_2026-04-06.md` did not fully pass: the referenced macOS UI regression test `VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` failed in my environment while waiting for the main window to appear, so the report's completed verification set is not reproducible as written.
