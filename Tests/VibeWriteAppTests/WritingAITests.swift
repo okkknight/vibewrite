@@ -172,10 +172,12 @@ final class WritingAITests: XCTestCase {
         let metadataUserPrompt = metadataMessages.last?.content ?? ""
         XCTAssertTrue(metadataSystemPrompt.contains("metadata-only response builder"))
         XCTAssertTrue(metadataSystemPrompt.contains("emit_metadata"))
+        XCTAssertTrue(metadataSystemPrompt.contains("only valid response is a single `emit_metadata` tool call"))
         XCTAssertFalse(metadataSystemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(metadataUserPrompt.contains("Action: startDraft metadata"))
         XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
         XCTAssertTrue(metadataUserPrompt.contains("Use the `emit_metadata` tool"))
+        XCTAssertTrue(metadataUserPrompt.contains("Return exactly one `emit_metadata` tool call and nothing else."))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
 
         let textSchemaMetadataMessages = WritingAIPromptBuilder().messages(

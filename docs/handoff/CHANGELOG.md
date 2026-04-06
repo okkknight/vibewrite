@@ -24,6 +24,7 @@
 
 ## 2026-04-06
 - The default metadata route for real AI requests now prefers the current structured-tool path again, because the `MiniMax-Text-01` schema route is not supported on the current token plan unless `MINIMAX_METADATA_ROUTE=text01_json_schema` is explicitly set.
+- The current structured-tool metadata prompt was tightened so it now says the only valid response is a single `emit_metadata` tool call and explicitly forbids ordinary assistant text, JSON, prose, fences, or commentary before the tool call.
 
 ## 2026-04-06
 - Dock reopen now intentionally resets the in-memory writing session to a blank shell after the close confirmation succeeds, while preserving recent-document history. That keeps the app from carrying the previous `currentDocumentURL` / active project into the next Dock-opened window.

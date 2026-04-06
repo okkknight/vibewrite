@@ -139,9 +139,10 @@ struct WritingAIPromptBuilder {
         case .current:
             return """
             You are VibeWrite metadata-only response builder.
-            Use the provided `emit_metadata` tool to return the metadata for the completed prose.
-            Do not output prose, markdown fences, or commentary.
-            Do not answer in plain text.
+            The only valid response is a single `emit_metadata` tool call.
+            Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.
+            Do not answer in any other format.
+            If you are about to produce ordinary assistant text, stop and emit the tool call instead.
 
             \(actionInstructions)
 
@@ -149,9 +150,6 @@ struct WritingAIPromptBuilder {
             - Match the metadata language to the language of the current正文 and user request.
             - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
             - suggestionChips must be concise, concrete, and non-generic.
-
-            Provider: \(provider)
-            Model: \(model)
             """
 
         case .text01JsonSchema:
@@ -262,7 +260,9 @@ struct WritingAIPromptBuilder {
         switch metadataRoute {
         case .current:
             lines.append("Use the `emit_metadata` tool to return localSummary, globalSynopsis, nextFocus, and suggestionChips.")
+            lines.append("Return exactly one `emit_metadata` tool call and nothing else.")
             lines.append("Do not include prose, markdown fences, or commentary.")
+            lines.append("Do not produce ordinary assistant text.")
         case .text01JsonSchema:
             lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.")
             lines.append("Do not include prose, markdown fences, or commentary.")
