@@ -695,11 +695,11 @@ struct AnthropicToolInputSchema: Encodable {
 
     struct Properties: Encodable {
         let localSummary = StringProperty(
-            description: "A concise local summary of the completed prose."
+            description: "A concise local summary of the completed prose. Keep it brief."
         )
 
         let globalSynopsis = StringProperty(
-            description: "A stable overall synopsis of the story or article so far."
+            description: "A stable overall synopsis of the story or article so far. Keep it short and do not repeat the local summary."
         )
 
         let nextFocus = StringProperty(
@@ -707,7 +707,7 @@ struct AnthropicToolInputSchema: Encodable {
         )
 
         let suggestionChips = SuggestionChipsProperty(
-            description: "Exactly three concise suggestion chips for the next step."
+            description: "Exactly three concise suggestion chips for the next step. This is the most important output."
         )
     }
 
@@ -869,11 +869,11 @@ struct MiniMaxTextJSONSchemaDefinition: Encodable {
 
     struct Properties: Encodable {
         let localSummary = StringProperty(
-            description: "A concise local summary of the completed prose."
+            description: "A concise local summary of the completed prose. Keep it brief."
         )
 
         let globalSynopsis = StringProperty(
-            description: "A stable overall synopsis of the story or article so far."
+            description: "A stable overall synopsis of the story or article so far. Keep it short and do not repeat the local summary."
         )
 
         let nextFocus = StringProperty(
@@ -881,7 +881,7 @@ struct MiniMaxTextJSONSchemaDefinition: Encodable {
         )
 
         let suggestionChips = SuggestionChipsProperty(
-            description: "Exactly three concise suggestion chips for the next step."
+            description: "Exactly three concise suggestion chips for the next step. This is the most important output."
         )
     }
 

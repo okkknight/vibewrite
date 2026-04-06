@@ -173,11 +173,14 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(metadataSystemPrompt.contains("metadata-only response builder"))
         XCTAssertTrue(metadataSystemPrompt.contains("emit_metadata"))
         XCTAssertTrue(metadataSystemPrompt.contains("only valid response is a single `emit_metadata` tool call"))
+        XCTAssertTrue(metadataSystemPrompt.contains("Return suggestionChips as the primary output"))
+        XCTAssertTrue(metadataSystemPrompt.contains("Keep the global synopsis short and stable"))
         XCTAssertFalse(metadataSystemPrompt.contains("[[VIBEWRITE_METADATA]]"))
         XCTAssertTrue(metadataUserPrompt.contains("Action: startDraft metadata"))
         XCTAssertTrue(metadataUserPrompt.contains("Completed prose:"))
         XCTAssertTrue(metadataUserPrompt.contains("Use the `emit_metadata` tool"))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly one `emit_metadata` tool call and nothing else."))
+        XCTAssertTrue(metadataUserPrompt.contains("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable."))
         XCTAssertTrue(metadataUserPrompt.contains("Return exactly 3 concise suggestion chips."))
 
         let textSchemaMetadataMessages = WritingAIPromptBuilder().messages(
@@ -190,8 +193,11 @@ final class WritingAITests: XCTestCase {
         let textSchemaUserPrompt = textSchemaMetadataMessages.last?.content ?? ""
         XCTAssertTrue(textSchemaSystemPrompt.contains("metadata-only response builder"))
         XCTAssertTrue(textSchemaSystemPrompt.contains("Return only the metadata for the completed prose"))
+        XCTAssertTrue(textSchemaSystemPrompt.contains("Return suggestionChips as the primary output"))
+        XCTAssertTrue(textSchemaSystemPrompt.contains("Keep the global synopsis short and stable"))
         XCTAssertFalse(textSchemaSystemPrompt.contains("emit_metadata"))
         XCTAssertTrue(textSchemaUserPrompt.contains("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only."))
+        XCTAssertTrue(textSchemaUserPrompt.contains("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable."))
         XCTAssertFalse(textSchemaUserPrompt.contains("Use the `emit_metadata` tool"))
     }
 

@@ -114,22 +114,25 @@ struct WritingAIPromptBuilder {
         switch action {
         case .startDraft:
             actionInstructions = """
+            - Return suggestionChips as the primary output and keep them concrete.
             - Describe the current opening state as the local summary.
-            - Describe the overall story or article state as the global synopsis.
+            - Keep the global synopsis short and stable; it should preserve broader story state without repeating the local summary.
             - Suggest the next concrete step after the opening exists.
             - Return exactly 3 concise suggestion chips.
             """
         case .continueWriting:
             actionInstructions = """
+            - Return suggestionChips as the primary output and keep them concrete.
             - Describe the completed正文 as the local summary.
-            - Describe the overall story or article state as the global synopsis.
+            - Keep the global synopsis short and stable; it should preserve broader story state without repeating the local summary.
             - Suggest the next concrete step after the continuation.
             - Return exactly 3 concise suggestion chips.
             """
         case .edit:
             actionInstructions = """
+            - Return suggestionChips as the primary output and keep them concrete.
             - Describe the completed change as the local summary.
-            - Describe the overall story or article state as the global synopsis.
+            - Keep the global synopsis short and stable; it should preserve broader story state without repeating the local summary.
             - Suggest the next concrete step after the edit.
             - Return exactly 3 concise suggestion chips.
             """
@@ -147,6 +150,8 @@ struct WritingAIPromptBuilder {
             \(actionInstructions)
 
             - Keep the metadata specific to the current正文 and actionable for the next step.
+            - Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.
+            - Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete.
             - Match the metadata language to the language of the current正文 and user request.
             - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
             - suggestionChips must be concise, concrete, and non-generic.
@@ -162,6 +167,8 @@ struct WritingAIPromptBuilder {
             \(actionInstructions)
 
             - Keep the metadata specific to the current正文 and actionable for the next step.
+            - Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.
+            - Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete.
             - Match the metadata language to the language of the current正文 and user request.
             - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
             - suggestionChips must be concise, concrete, and non-generic.
@@ -260,11 +267,13 @@ struct WritingAIPromptBuilder {
         switch metadataRoute {
         case .current:
             lines.append("Use the `emit_metadata` tool to return localSummary, globalSynopsis, nextFocus, and suggestionChips.")
+            lines.append("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.")
             lines.append("Return exactly one `emit_metadata` tool call and nothing else.")
             lines.append("Do not include prose, markdown fences, or commentary.")
             lines.append("Do not produce ordinary assistant text.")
         case .text01JsonSchema:
             lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.")
+            lines.append("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.")
             lines.append("Do not include prose, markdown fences, or commentary.")
         }
 

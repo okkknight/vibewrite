@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-06
+- Tightened the metadata prompt so `suggestionChips` are treated as the highest-priority output and `globalSynopsis` stays short and stable, reducing the chance that the broader synopsis crowds out the next-step chips.
+
+# 2026-04-06
 - The save-loss regression was pinned to the正文 bridge, not the file writer: `saveCurrentDocument` now explicitly flushes the active first-responder `NSTextView` before snapshotting, so a live buffer commits into the SwiftUI binding before the file is written.
 - This round of tracing expands the same save-loss repro into one pass: the live正文 binding setter, `SelectableTextEditor` make/update/sync decisions, and the open/save/close boundary are all logged together now, so the next repro can follow a single input from `NSTextView` into `activeDocumentText` and then into the saved snapshot without adding more probes.
 
