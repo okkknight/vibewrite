@@ -1,7 +1,7 @@
 # Changelog
 
 # 2026-04-06
-- The save-loss regression was pinned to the正文 bridge, not the file writer: `saveCurrentDocument` now forces the active editor to end editing before snapshotting, and `SelectableTextEditor` also flushes on `textDidEndEditing` so a live NSTextView buffer commits into the SwiftUI binding before the file is written.
+- The save-loss regression was pinned to the正文 bridge, not the file writer: `saveCurrentDocument` now explicitly flushes the active first-responder `NSTextView` before snapshotting, so a live buffer commits into the SwiftUI binding before the file is written.
 
 ## 2026-04-06
 - Refactored the collaboration AI summary model to remove `continuationSummary` entirely and split the surviving state into `localSummary` for UI-facing subtitles and `globalSynopsis` for model-facing full-context guidance.
@@ -23,7 +23,7 @@
 - The same text-schema path now logs the full raw response body on decode failure, tool-call miss, and missing-content failures, so we can inspect the exact model / endpoint payload instead of only a truncated preview.
 
 ## 2026-04-06
-- The default metadata route for real AI requests now prefers `text01_json_schema`, so `startDraft` / `continueWriting` metadata normally go through the schema-enforced MiniMax text endpoint unless `MINIMAX_METADATA_ROUTE=current` is explicitly set.
+- The default metadata route for real AI requests now prefers the current structured-tool path again, because the `MiniMax-Text-01` schema route is not supported on the current token plan unless `MINIMAX_METADATA_ROUTE=text01_json_schema` is explicitly set.
 
 ## 2026-04-06
 - Dock reopen now intentionally resets the in-memory writing session to a blank shell after the close confirmation succeeds, while preserving recent-document history. That keeps the app from carrying the previous `currentDocumentURL` / active project into the next Dock-opened window.

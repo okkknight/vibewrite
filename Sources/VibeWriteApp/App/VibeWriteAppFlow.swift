@@ -587,6 +587,16 @@ final class VibeWriteAppFlow: ObservableObject {
         }
 
         let firstResponderName = window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        if let textView = window.firstResponder as? NSTextView {
+            let textCount = textView.string.utf16.count
+            VibeWriteLog.ai.info(
+                "flow commit editor flush first responder reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) textCount=\(textCount, privacy: .public) firstResponder=\(firstResponderName, privacy: .public)"
+            )
+            VibeWriteLog.launch.info(
+                "flow commit editor flush first responder reason=\(reason, privacy: .public) currentURL=\(currentURLName, privacy: .public) textCount=\(textCount, privacy: .public) firstResponder=\(firstResponderName, privacy: .public)"
+            )
+            textView.delegate?.textDidEndEditing?(Notification(name: NSText.didEndEditingNotification, object: textView))
+        }
         window.endEditing(for: nil)
         let resignedFirstResponder = window.makeFirstResponder(nil)
         VibeWriteLog.ai.info(
