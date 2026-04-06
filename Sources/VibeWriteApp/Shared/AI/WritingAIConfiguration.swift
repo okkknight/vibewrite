@@ -180,7 +180,7 @@ struct WritingAIConfiguration {
         case "current":
             return .current
         default:
-            return .text01JsonSchema
+            return .current
         }
     }
 }

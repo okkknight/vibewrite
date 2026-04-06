@@ -58,6 +58,8 @@ final class WritingAITests: XCTestCase {
         )
 
         XCTAssertEqual(cleanLaunchConfiguration.mode, .stub)
+        XCTAssertEqual(cleanLaunchConfiguration.metadataRoute, .current)
+        XCTAssertEqual(cleanLaunchConfiguration.metadataModel, "MiniMax-M2.5-highspeed")
 
         let ignoredOverrideConfiguration = WritingAIConfiguration.configuration(
             from: [
@@ -75,8 +77,8 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(ignoredOverrideConfiguration.baseURL.absoluteString, "https://api.minimaxi.com/anthropic")
         XCTAssertEqual(ignoredOverrideConfiguration.textBaseURL.absoluteString, "https://api.minimaxi.com")
         XCTAssertEqual(ignoredOverrideConfiguration.model, "MiniMax-M2.5-highspeed")
-        XCTAssertEqual(ignoredOverrideConfiguration.metadataRoute, .text01JsonSchema)
-        XCTAssertEqual(ignoredOverrideConfiguration.metadataModel, "MiniMax-Text-01")
+        XCTAssertEqual(ignoredOverrideConfiguration.metadataRoute, .current)
+        XCTAssertEqual(ignoredOverrideConfiguration.metadataModel, "MiniMax-M2.5-highspeed")
         XCTAssertEqual(ignoredOverrideConfiguration.apiKey, "bundle-key-123")
         XCTAssertTrue(ignoredOverrideConfiguration.shouldUseRealClient)
 
