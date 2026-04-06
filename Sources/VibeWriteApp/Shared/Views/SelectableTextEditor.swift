@@ -12,6 +12,22 @@ struct WritingLocalEditFlash: Equatable, Hashable {
 }
 
 @MainActor
+struct SelectableTextEditorViewportState: Equatable {
+    var contentHeight: CGFloat = 0
+    var visibleHeight: CGFloat = 0
+    var currentScrollOffsetY: CGFloat = 0
+    var maximumScrollOffsetY: CGFloat = 0
+
+    var canScrollDown: Bool {
+        maximumScrollOffsetY > 1
+    }
+
+    var isAtDocumentEnd: Bool {
+        !canScrollDown || currentScrollOffsetY >= (maximumScrollOffsetY - 1)
+    }
+}
+
+@MainActor
 struct SelectableTextEditor: NSViewRepresentable {
     @Binding var text: String
     @Binding var selectedText: String?
@@ -29,6 +45,7 @@ struct SelectableTextEditor: NSViewRepresentable {
     var isViewportLockedDuringLocalEdit: Bool = false
     var shouldPreserveSelectionOverlayDuringPendingLocalEdit: Bool = false
     var onScrollViewReady: ((NSScrollView) -> Void)? = nil
+    var onViewportStateChanged: ((SelectableTextEditorViewportState) -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -116,6 +133,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         context.coordinator.setSelectionOverlayPreservationDuringPendingLocalEdit(
             shouldPreserveSelectionOverlayDuringPendingLocalEdit
         )
+        context.coordinator.viewportStateChangedHandler = onViewportStateChanged
         context.coordinator.syncTypography(
             isEditable: isEditable,
             font: textFont,
@@ -151,6 +169,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             in: textView,
             scrollView: scrollView
         )
+        context.coordinator.reportViewportStateIfNeeded(in: scrollView, textView: textView)
         context.coordinator.logTextEvent(
             "update nsview end bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) didMutateText=\(didMutateText) selection=\(context.coordinator.debugRange(textView.selectedRange()))"
         )
@@ -183,6 +202,8 @@ struct SelectableTextEditor: NSViewRepresentable {
         private var lastAppliedLocalEditFlashID: UUID?
         private weak var localEditFlashOverlayView: LocalEditFlashOverlayView?
         private var shouldPreserveSelectionOverlayDuringPendingLocalEdit = false
+        private var lastReportedViewportState: SelectableTextEditorViewportState?
+        var viewportStateChangedHandler: ((SelectableTextEditorViewportState) -> Void)?
 
         private var isApplyingProgrammaticChange: Bool {
             programmaticChangeDepth > 0
@@ -236,6 +257,31 @@ struct SelectableTextEditor: NSViewRepresentable {
             guard let onScrollViewReady else { return }
             DispatchQueue.main.async {
                 onScrollViewReady(scrollView)
+            }
+        }
+
+        func reportViewportStateIfNeeded(
+            in scrollView: NSScrollView,
+            textView: NSTextView
+        ) {
+            guard let viewportStateChangedHandler else { return }
+            let handler = viewportStateChangedHandler
+
+            let visibleHeight = max(scrollView.contentView.bounds.height, 1)
+            let contentHeight = max(textView.frame.height, visibleHeight)
+            let maximumScrollOffsetY = max(contentHeight - visibleHeight, 0)
+            let currentScrollOffsetY = max(scrollView.contentView.bounds.origin.y, 0)
+            let viewportState = SelectableTextEditorViewportState(
+                contentHeight: contentHeight,
+                visibleHeight: visibleHeight,
+                currentScrollOffsetY: currentScrollOffsetY,
+                maximumScrollOffsetY: maximumScrollOffsetY
+            )
+
+            guard lastReportedViewportState != viewportState else { return }
+            lastReportedViewportState = viewportState
+            DispatchQueue.main.async {
+                handler(viewportState)
             }
         }
 
@@ -562,6 +608,7 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             scrollView.reflectScrolledClipView(scrollView.contentView)
             localEditFlashOverlayView?.needsDisplay = true
+            reportViewportStateIfNeeded(in: scrollView, textView: textView)
             logLayoutIfNeeded(
                 textView: textView,
                 scrollView: scrollView,
@@ -679,6 +726,41 @@ struct SelectableTextEditor: NSViewRepresentable {
             )
             setTextIfNeeded(textView.string)
             syncSelectionOverlayState(from: textView)
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            guard let textView = notification.object as? NSTextView else {
+                return
+            }
+
+            let currentStringCount = textView.string.utf16.count
+            let currentSelection = debugRange(textView.selectedRange())
+            let isProgrammatic = isApplyingProgrammaticChange
+            let isLayoutSync = isPerformingLayoutSync
+            let isEditable = textView.isEditable
+            VibeWriteLog.ai.info(
+                "textDidEndEditing entry stringCount=\(currentStringCount, privacy: .public) applyingProgrammatic=\(isProgrammatic, privacy: .public) layoutSync=\(isLayoutSync, privacy: .public) editable=\(isEditable, privacy: .public) selection=\(currentSelection, privacy: .public)"
+            )
+            logTextEvent(
+                "text did end editing stringCount=\(currentStringCount) applyingProgrammatic=\(isProgrammatic) layoutSync=\(isLayoutSync) editable=\(isEditable) selection=\(currentSelection)"
+            )
+            guard textView.isEditable else { return }
+            guard !isApplyingProgrammaticChange else { return }
+
+            pendingUserTextChange = textView.string
+            pendingTextBindingUpdateAfterLayoutSync = nil
+
+            let commitCount = textView.string.utf16.count
+            let commitSelection = debugRange(textView.selectedRange())
+            VibeWriteLog.ai.info(
+                "textDidEndEditing immediate commit count=\(commitCount, privacy: .public) selection=\(commitSelection, privacy: .public)"
+            )
+            logTextEvent(
+                "text did end editing immediate commit count=\(commitCount) selection=\(commitSelection)"
+            )
+            setTextIfNeeded(textView.string)
+            syncSelectionOverlayState(from: textView)
+            pendingUserTextChange = nil
         }
 
         fileprivate func setTextIfNeeded(_ newText: String) {

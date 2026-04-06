@@ -1,5 +1,8 @@
 # Changelog
 
+# 2026-04-06
+- The save-loss regression was pinned to the正文 bridge, not the file writer: `saveCurrentDocument` now forces the active editor to end editing before snapshotting, and `SelectableTextEditor` also flushes on `textDidEndEditing` so a live NSTextView buffer commits into the SwiftUI binding before the file is written.
+
 ## 2026-04-06
 - Refactored the collaboration AI summary model to remove `continuationSummary` entirely and split the surviving state into `localSummary` for UI-facing subtitles and `globalSynopsis` for model-facing full-context guidance.
 - The collaboration metadata store schema moved to version 3 so it persists `localSummary` and `globalSynopsis` together with the existing collaboration state, and the markdown file recovery path now seeds both fields from the file body when metadata is missing.
