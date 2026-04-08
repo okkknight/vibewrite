@@ -166,6 +166,7 @@ struct WritingProjectView: View {
                 writingBodyPane(topPadding: 16, bottomPadding: 0)
                 composerSection(verticalPadding: 0)
             }
+            .padding(.bottom, 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -206,6 +207,7 @@ struct WritingProjectView: View {
                 )
                 composerSection(verticalPadding: 0)
             }
+            .padding(.bottom, shellLayoutMode.isCompact ? 14 : 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: shellLayoutMode.isCompact ? .infinity : 872, alignment: .top)
