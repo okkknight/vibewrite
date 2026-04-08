@@ -24,11 +24,10 @@ struct ProjectComposerBar: View {
             .overlay(alignment: .topLeading) {
                 if shouldShowGuidanceRail {
                     guidanceRail
-                        .offset(y: -48)
+                        .offset(y: -30)
                 }
             }
         .padding(.horizontal, 12)
-        .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityIdentifier)
     }

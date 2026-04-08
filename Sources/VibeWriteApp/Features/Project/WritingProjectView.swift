@@ -162,8 +162,8 @@ struct WritingProjectView: View {
                     messageFieldFocused = false
                 })
 
-            ZStack(alignment: .bottom) {
-                writingBodyPane(topPadding: 16, bottomPadding: composerBottomClearance)
+            VStack(spacing: 0) {
+                writingBodyPane(topPadding: 16, bottomPadding: 0)
                 composerSection(verticalPadding: 0)
             }
         }
@@ -199,10 +199,10 @@ struct WritingProjectView: View {
                     messageFieldFocused = false
                 })
 
-            ZStack(alignment: .bottom) {
+            VStack(spacing: 0) {
                 writingBodyPane(
                     topPadding: shellLayoutMode.isCompact ? 14 : 16,
-                    bottomPadding: composerBottomClearance
+                    bottomPadding: 0
                 )
                 composerSection(verticalPadding: 0)
             }
@@ -558,10 +558,6 @@ struct WritingProjectView: View {
             onAssistantSuggestionTap: handleSuggestionTap
         )
         .frame(maxWidth: writingContentMaxWidth, alignment: .leading)
-    }
-
-    private var composerBottomClearance: CGFloat {
-        140
     }
 
     private func composerSection(verticalPadding: CGFloat) -> some View {
