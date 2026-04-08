@@ -162,7 +162,7 @@ struct WritingProjectView: View {
                     messageFieldFocused = false
                 })
 
-            writingBodyPane(topPadding: 16, bottomPadding: 0)
+            writingBodyPane(topPadding: 16, bottomPadding: composerBottomClearance)
 
             composerSection(verticalPadding: 0)
         }
@@ -200,7 +200,7 @@ struct WritingProjectView: View {
 
             writingBodyPane(
                 topPadding: shellLayoutMode.isCompact ? 14 : 16,
-                bottomPadding: 18
+                bottomPadding: composerBottomClearance
             )
 
             composerSection(verticalPadding: 0)
@@ -556,6 +556,11 @@ struct WritingProjectView: View {
             onAssistantSuggestionTap: handleSuggestionTap
         )
         .frame(maxWidth: writingContentMaxWidth, alignment: .leading)
+    }
+
+    private var composerBottomClearance: CGFloat {
+        let baseClearance: CGFloat = shellLayoutMode.isCompact ? 172 : 160
+        return selectionSummaryText == nil ? baseClearance : baseClearance + 54
     }
 
     private func composerSection(verticalPadding: CGFloat) -> some View {

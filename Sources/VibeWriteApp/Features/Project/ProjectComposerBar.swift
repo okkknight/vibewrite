@@ -20,12 +20,15 @@ struct ProjectComposerBar: View {
     let onAssistantSuggestionTap: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 4) {
-            guidanceRail
-            composerSurface
-        }
+        composerSurface
+            .overlay(alignment: .topLeading) {
+                if shouldShowGuidanceRail {
+                    guidanceRail
+                        .offset(y: -24)
+                }
+            }
         .padding(.horizontal, 12)
-        .padding(.vertical, 2)
+        .padding(.vertical, 4)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -74,21 +77,29 @@ struct ProjectComposerBar: View {
                 )
                 .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
 
-            TextField(messageFieldPlaceholder, text: $messageDraft)
+            TextEditor(text: $messageDraft)
                 .focused(messageFieldFocused)
-                .onSubmit(onSubmit)
-                .textFieldStyle(.plain)
+                .scrollContentBackground(.hidden)
                 .font(.system(size: 14, weight: .medium, design: .default))
                 .foregroundStyle(textColor)
-                .lineLimit(1)
-                .padding(.leading, 16)
-                .padding(.trailing, 146)
-                .padding(.top, 11)
-                .padding(.bottom, 34)
+                .padding(.leading, 14)
+                .padding(.trailing, 14)
+                .padding(.top, 14)
+                .padding(.bottom, 44)
                 .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
                 .disabled(isComposerLocked)
                 .accessibilityLabel("协作输入框")
                 .accessibilityIdentifier(messageInputIdentifier)
+
+            if messageDraft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                Text(messageFieldPlaceholder)
+                    .font(.system(size: 14, weight: .medium, design: .default))
+                    .foregroundStyle(textColor.opacity(0.48))
+                    .padding(.leading, 18)
+                    .padding(.top, 18)
+                    .allowsHitTesting(false)
+                    .accessibilityHidden(true)
+            }
 
             Button(action: onSubmit) {
                 submitButtonLabel
@@ -96,37 +107,37 @@ struct ProjectComposerBar: View {
             .buttonStyle(.plain)
             .disabled(isRequestInFlight || isComposerLocked)
             .opacity(isRequestInFlight || isComposerLocked ? 0.66 : 1)
-            .frame(width: 120, height: 50)
+            .frame(width: 84, height: 34)
             .padding(.trailing, 12)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
             .accessibilityIdentifier(sendButtonIdentifier)
             .accessibilityLabel(primaryActionTitle)
         }
-        .frame(minHeight: 64, alignment: .topLeading)
+        .frame(height: 132, alignment: .topLeading)
         .accessibilityElement(children: .contain)
     }
 
     private var submitButtonLabel: some View {
         HStack(spacing: 7) {
             Image(systemName: isPrimaryActionInFlight ? "ellipsis" : "arrow.up")
-                .font(.system(size: 12.5, weight: .semibold, design: .default))
+                .font(.system(size: 12, weight: .semibold, design: .default))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(submitButtonTextColor)
 
             Text(primaryActionTitle)
-                .font(.system(size: 14.2, weight: .semibold, design: .default))
+                .font(.system(size: 12.7, weight: .semibold, design: .default))
                 .foregroundStyle(submitButtonTextColor)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity)
         .background {
-            RoundedRectangle(cornerRadius: 12, style: .continuous)
+            RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(submitButtonBackgroundColor)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                    RoundedRectangle(cornerRadius: 10, style: .continuous)
                         .strokeBorder(submitButtonStrokeColor, lineWidth: 1)
                 )
-                .shadow(color: submitButtonShadowColor, radius: 9, x: 0, y: 4)
+                .shadow(color: submitButtonShadowColor, radius: 5, x: 0, y: 2)
         }
     }
 

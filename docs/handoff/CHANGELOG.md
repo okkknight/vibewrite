@@ -1,6 +1,7 @@
 # Changelog
 
 # 2026-04-08
+- Reworked the composer input again so the entire surface body is a multiline editor, the guidance chips float as a non-layout overlay, the submit control is smaller and more compact, and the正文 pane now reserves space so the final paragraph stays visible above the composer stack.
 - Tightened the composer again so the text anchors to the upper-left of the surface, the composer itself sits flush against the正文 instead of covering it, and the submit control now reads as a larger button-like action instead of a tiny capsule.
 - Redesigned the Composer into a single rounded input surface, replaced the former top-left fixed capsule with the submit capsule slot, and moved the guidance chips to float above the input while keeping the existing state flow intact.
 - Replaced the selection popover with an inline selection rail above the composer that shows a blank-line-collapsed summary and preset润色 chips, and updated the visible action labels / placeholder copy to reduce onboarding friction.
