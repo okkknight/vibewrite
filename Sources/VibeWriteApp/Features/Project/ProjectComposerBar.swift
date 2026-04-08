@@ -106,7 +106,6 @@ struct ProjectComposerBar: View {
             }
             .buttonStyle(.plain)
             .disabled(isRequestInFlight || isComposerLocked)
-            .opacity(isRequestInFlight || isComposerLocked ? 0.66 : 1)
             .frame(width: 84, height: 34)
             .padding(.trailing, 12)
             .padding(.bottom, 12)
@@ -120,10 +119,14 @@ struct ProjectComposerBar: View {
 
     private var submitButtonLabel: some View {
         HStack(spacing: 7) {
-            Image(systemName: isPrimaryActionInFlight ? "ellipsis" : "arrow.up")
+            Image(systemName: "arrow.up")
                 .font(.system(size: 12, weight: .semibold, design: .default))
                 .symbolRenderingMode(.hierarchical)
                 .foregroundStyle(submitButtonTextColor)
+
+            if isPrimaryActionInFlight {
+                ThinkingPulseDot(color: submitButtonTextColor)
+            }
 
             Text(primaryActionTitle)
                 .font(.system(size: 12.7, weight: .semibold, design: .default))
@@ -142,10 +145,6 @@ struct ProjectComposerBar: View {
     }
 
     private var submitButtonBackgroundColor: Color {
-        if isRequestInFlight || isComposerLocked {
-            return Color.vibeCanvasAccent.opacity(0.56)
-        }
-
         return appearanceMode == .day
             ? Color.vibeCanvasAccent.opacity(0.96)
             : Color.vibeCanvasAccent.opacity(0.88)
@@ -156,7 +155,7 @@ struct ProjectComposerBar: View {
     }
 
     private var submitButtonTextColor: Color {
-        Color.white.opacity(isRequestInFlight || isComposerLocked ? 0.82 : 0.96)
+        Color.white.opacity(0.96)
     }
 
     private var submitButtonShadowColor: Color {
@@ -271,6 +270,24 @@ struct ProjectComposerBar: View {
                 )
         }
         .accessibilityLabel("建议生成中")
+    }
+
+    private struct ThinkingPulseDot: View {
+        let color: Color
+
+        var body: some View {
+            TimelineView(.animation) { context in
+                let time = context.date.timeIntervalSinceReferenceDate
+                let phase = (sin(time * 5.2) + 1) / 2
+                Circle()
+                    .fill(color)
+                    .frame(width: 5.5, height: 5.5)
+                    .opacity(0.42 + (phase * 0.58))
+                    .scaleEffect(0.82 + (phase * 0.32))
+                    .accessibilityHidden(true)
+            }
+            .frame(width: 9, height: 9)
+        }
     }
 
     private func guidanceExampleChip(title: String) -> some View {

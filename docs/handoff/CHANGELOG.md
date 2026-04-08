@@ -8,6 +8,7 @@
 - Removed the selection summary card above the composer and kept only the preset润色 chips, with the rail inset to align to the dialog instead of spilling past it.
 - Unified the capsule spacing across opening, continuation, and selection-edit states so the rail sits at a consistent breathing distance from the dialog.
 - Tightened that shared rail inset again, cutting the dialog-to-capsule gap roughly in half without changing the正文/composer seam.
+- Gave the submit button a dedicated thinking breathing dot and removed the thinking-state fade from the button itself, while leaving the input lock/dim behavior intact.
 - Redesigned the Composer into a single rounded input surface, replaced the former top-left fixed capsule with the submit capsule slot, and moved the guidance chips to float above the input while keeping the existing state flow intact.
 - Replaced the selection popover with an inline selection rail above the composer that shows a blank-line-collapsed summary and preset润色 chips, and updated the visible action labels / placeholder copy to reduce onboarding friction.
 - Kept the same day/night theme language and the warmer capsule contrast treatment so the new layout still reads like VibeWrite rather than a new visual system.
