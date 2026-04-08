@@ -20,12 +20,12 @@ struct ProjectComposerBar: View {
     let onAssistantSuggestionTap: (String) -> Void
 
     var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
+        VStack(alignment: .leading, spacing: 4) {
             guidanceRail
             composerSurface
         }
         .padding(.horizontal, 12)
-        .padding(.vertical, 8)
+        .padding(.vertical, 2)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -51,7 +51,7 @@ struct ProjectComposerBar: View {
     }
 
     private var composerSurface: some View {
-        ZStack(alignment: .bottomTrailing) {
+        ZStack(alignment: .topLeading) {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(composerBackgroundColor)
                 .overlay(
@@ -74,43 +74,82 @@ struct ProjectComposerBar: View {
                 )
                 .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
 
-            HStack(alignment: .bottom, spacing: 12) {
-                TextField(messageFieldPlaceholder, text: $messageDraft)
-                    .focused(messageFieldFocused)
-                    .onSubmit(onSubmit)
-                    .textFieldStyle(.plain)
-                    .font(.system(size: 13.8, weight: .medium, design: .default))
-                    .foregroundStyle(textColor)
-                    .lineLimit(1)
-                    .padding(.leading, 14)
-                    .padding(.trailing, 6)
-                    .padding(.top, 16)
-                    .padding(.bottom, 16)
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                    .disabled(isComposerLocked)
-                    .accessibilityLabel("协作输入框")
-                    .accessibilityIdentifier(messageInputIdentifier)
+            TextField(messageFieldPlaceholder, text: $messageDraft)
+                .focused(messageFieldFocused)
+                .onSubmit(onSubmit)
+                .textFieldStyle(.plain)
+                .font(.system(size: 14, weight: .medium, design: .default))
+                .foregroundStyle(textColor)
+                .lineLimit(1)
+                .padding(.leading, 16)
+                .padding(.trailing, 146)
+                .padding(.top, 11)
+                .padding(.bottom, 34)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
+                .disabled(isComposerLocked)
+                .accessibilityLabel("协作输入框")
+                .accessibilityIdentifier(messageInputIdentifier)
 
-                Button(action: onSubmit) {
-                    AccentPill(
-                        title: primaryActionTitle,
-                        icon: nil,
-                        tint: .vibeCanvasAccent,
-                        showsThinkingDot: isPrimaryActionInFlight
-                    )
-                    .padding(.trailing, 2)
-                }
-                .buttonStyle(.plain)
-                .disabled(isRequestInFlight || isComposerLocked)
-                .opacity(isRequestInFlight || isComposerLocked ? 0.66 : 1)
-                .accessibilityIdentifier(sendButtonIdentifier)
-                .accessibilityLabel(primaryActionTitle)
+            Button(action: onSubmit) {
+                submitButtonLabel
             }
-            .frame(minHeight: 86, alignment: .bottomLeading)
-            .padding(.horizontal, 3)
-            .padding(.vertical, 10)
+            .buttonStyle(.plain)
+            .disabled(isRequestInFlight || isComposerLocked)
+            .opacity(isRequestInFlight || isComposerLocked ? 0.66 : 1)
+            .frame(width: 120, height: 50)
+            .padding(.trailing, 12)
+            .padding(.bottom, 12)
+            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .accessibilityIdentifier(sendButtonIdentifier)
+            .accessibilityLabel(primaryActionTitle)
         }
+        .frame(minHeight: 64, alignment: .topLeading)
         .accessibilityElement(children: .contain)
+    }
+
+    private var submitButtonLabel: some View {
+        HStack(spacing: 7) {
+            Image(systemName: isPrimaryActionInFlight ? "ellipsis" : "arrow.up")
+                .font(.system(size: 12.5, weight: .semibold, design: .default))
+                .symbolRenderingMode(.hierarchical)
+                .foregroundStyle(submitButtonTextColor)
+
+            Text(primaryActionTitle)
+                .font(.system(size: 14.2, weight: .semibold, design: .default))
+                .foregroundStyle(submitButtonTextColor)
+        }
+        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .background {
+            RoundedRectangle(cornerRadius: 12, style: .continuous)
+                .fill(submitButtonBackgroundColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 12, style: .continuous)
+                        .strokeBorder(submitButtonStrokeColor, lineWidth: 1)
+                )
+                .shadow(color: submitButtonShadowColor, radius: 9, x: 0, y: 4)
+        }
+    }
+
+    private var submitButtonBackgroundColor: Color {
+        if isRequestInFlight || isComposerLocked {
+            return Color.vibeCanvasAccent.opacity(0.56)
+        }
+
+        return appearanceMode == .day
+            ? Color.vibeCanvasAccent.opacity(0.96)
+            : Color.vibeCanvasAccent.opacity(0.88)
+    }
+
+    private var submitButtonStrokeColor: Color {
+        Color.white.opacity(appearanceMode == .day ? 0.20 : 0.10)
+    }
+
+    private var submitButtonTextColor: Color {
+        Color.white.opacity(isRequestInFlight || isComposerLocked ? 0.82 : 0.96)
+    }
+
+    private var submitButtonShadowColor: Color {
+        Color.black.opacity(appearanceMode == .day ? 0.14 : 0.22)
     }
 
     private var isOpeningState: Bool {

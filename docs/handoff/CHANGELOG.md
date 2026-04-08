@@ -1,6 +1,7 @@
 # Changelog
 
 # 2026-04-08
+- Tightened the composer again so the text anchors to the upper-left of the surface, the composer itself sits flush against the正文 instead of covering it, and the submit control now reads as a larger button-like action instead of a tiny capsule.
 - Redesigned the Composer into a single rounded input surface, replaced the former top-left fixed capsule with the submit capsule slot, and moved the guidance chips to float above the input while keeping the existing state flow intact.
 - Replaced the selection popover with an inline selection rail above the composer that shows a blank-line-collapsed summary and preset润色 chips, and updated the visible action labels / placeholder copy to reduce onboarding friction.
 - Kept the same day/night theme language and the warmer capsule contrast treatment so the new layout still reads like VibeWrite rather than a new visual system.
