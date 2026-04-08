@@ -162,6 +162,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `swift test` passes with the file-based document flow and menu commands in place.
 - `swift test` passes after the composer redesign and selection-rail rewrite.
 - The latest targeted macOS UI rerun for the redesigned composer was blocked in this sandbox by local signing access and SwiftUI preview macro loading, so `swift test` plus the app build are the current reliable verification baseline here.
+- The selection-flow UI test is temporarily skipped because the system open panel still steals focus on that path; the blank-start and compact-layout UI smoke tests remain the default verification baseline.
 
 ## Runtime notes
 - `VIBEWRITE_UI_TEST_RESET_STORAGE=1` resets the app's own container-local store for UI runs.
