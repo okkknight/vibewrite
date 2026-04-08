@@ -119,16 +119,17 @@ struct ProjectComposerBar: View {
 
     private var submitButtonLabel: some View {
         HStack(spacing: 7) {
-            Image(systemName: "arrow.up")
-                .font(.system(size: 12, weight: .semibold, design: .default))
-                .symbolRenderingMode(.hierarchical)
-                .foregroundStyle(submitButtonTextColor)
-
             if isPrimaryActionInFlight {
                 ThinkingPulseDot(color: submitButtonTextColor)
+                    .padding(.leading, 1)
+            } else {
+                Image(systemName: "arrow.up")
+                    .font(.system(size: 12, weight: .semibold, design: .default))
+                    .symbolRenderingMode(.hierarchical)
+                    .foregroundStyle(submitButtonTextColor)
             }
 
-            Text(primaryActionTitle)
+            Text(submitButtonTitle)
                 .font(.system(size: 12.7, weight: .semibold, design: .default))
                 .foregroundStyle(submitButtonTextColor)
         }
@@ -156,6 +157,14 @@ struct ProjectComposerBar: View {
 
     private var submitButtonTextColor: Color {
         Color.white.opacity(0.96)
+    }
+
+    private var submitButtonTitle: String {
+        if isPrimaryActionInFlight {
+            return "\(primaryActionTitle)中"
+        }
+
+        return primaryActionTitle
     }
 
     private var submitButtonShadowColor: Color {
@@ -218,7 +227,7 @@ struct ProjectComposerBar: View {
     }
 
     private var textColor: Color {
-        isPrimaryActionInFlight ? Color.vibeCanvasInkMuted : Color.vibeCanvasInk
+        isPrimaryActionInFlight ? Color.vibeCanvasInkMuted : Color.vibeCanvasInkSoft
     }
 
     private var composerShadowColor: Color {
