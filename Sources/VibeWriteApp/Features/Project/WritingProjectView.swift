@@ -33,7 +33,7 @@ struct WritingProjectView: View {
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
     private var projectHeaderVerticalPadding: CGFloat { shellLayoutMode.isCompact ? 7 : 8 }
-    private var composerRailBottomInset: CGFloat { 73 }
+    private var composerRailBottomInset: CGFloat { 138 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
@@ -524,7 +524,7 @@ struct WritingProjectView: View {
 
     private var assistantNextFocusPlaceholderText: String {
         let trimmedNextFocus = project.nextFocus.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedNextFocus.isEmpty ? "你想怎么展开下一段。" : trimmedNextFocus
+        return trimmedNextFocus.isEmpty ? "你想怎么展开下一段" : trimmedNextFocus
     }
 
     private var composerBar: some View {
