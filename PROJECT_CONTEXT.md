@@ -12,8 +12,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 ## Current state
 - The app's default launch window size is now 1024x700.
 - The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.
-- The wide Composer now keeps extra internal breathing room at its lower edge while preserving the zero-gap body-to-composer seam above it.
-- The wide Composer card now also keeps an external bottom margin, so the card floats above the window edge instead of sitting flush against it.
+- The wide Composer now keeps the zero-gap body-to-composer seam while preserving its shadow and internal padding.
+- The wide Composer card still floats above the window edge so the panel keeps bottom breathing room.
 - V2 docs under `docs/V2/` are the source of truth.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` remains the persisted metadata/snapshot shell. `WritingProjectView` no longer writes正文 back through `projectDocumentTextBinding`; title and metadata updates still go through the project snapshot.
 - Saving now serializes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 state the editor is showing instead of depending on a last-second window flush.
@@ -35,7 +35,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection summary shown above the composer collapses blank lines before display, and the stage-specific placeholder copy now switches between direct opening, continuation, and润色 prompts.
 - The selection/context and assistant suggestion capsules still use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
-- The latest committed change before this update is `370ec50`, which split the metadata routing between the current structured-tool path and `MiniMax-Text-01` `json_schema`; this update then removes `continuationSummary` entirely and replaces it with `localSummary` plus `globalSynopsis`.
+- The latest committed change before this update is `ec2ec86`, which removed the extra composer spacing gaps so the正文/composer seam is visually zero-gap again while keeping the card shadow.
+- The commit before that, `370ec50`, split the metadata routing between the current structured-tool path and `MiniMax-Text-01` `json_schema`; this update then removes `continuationSummary` entirely and replaces it with `localSummary` plus `globalSynopsis`.
 - The default metadata route for real AI requests now prefers the current structured-tool path again, because the `MiniMax-Text-01` schema route is not supported on the current token plan unless an explicit `MINIMAX_METADATA_ROUTE=text01_json_schema` override is present.
 - The MiniMax text-schema metadata path now logs a relaxed probe on decode failure plus parsed `choicesCount`, `baseResp`, and first-content diagnostics when the response does decode, so `choices:null` / missing-content failures can be distinguished from plain JSON decode errors in the runtime logs.
 - The MiniMax text-schema metadata path now also logs the full raw response body on decode failure, tool-call miss, and missing-content failures, so the next repro can inspect exactly what the model / endpoint returned instead of only a truncated preview.
