@@ -473,7 +473,7 @@ struct WritingProjectView: View {
     }
 
     private func logSelectionOverlayState(trigger: String) {
-        let selectionPreview = selectionSummaryText?.vibewriteLogPreview(maxLength: 60) ?? normalizedSelectedText?.vibewriteLogPreview(maxLength: 60) ?? "nil"
+        let selectionPreview = normalizedSelectedText?.vibewriteLogPreview(maxLength: 60) ?? "nil"
         let originPreview = selectionPopoverOrigin.map {
             String(format: "(%.1f, %.1f)", Double($0.x), Double($0.y))
         } ?? "nil"
@@ -526,19 +526,6 @@ struct WritingProjectView: View {
         return trimmedNextFocus.isEmpty ? "你想怎么展开下一段。" : trimmedNextFocus
     }
 
-    private var selectionSummaryText: String? {
-        guard let selectedText else { return nil }
-
-        let lines = selectedText
-            .split(whereSeparator: \.isNewline)
-            .map { String($0).trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-
-        let collapsed = lines.joined(separator: " ")
-            .trimmingCharacters(in: .whitespacesAndNewlines)
-        return collapsed.isEmpty ? nil : collapsed
-    }
-
     private var composerBar: some View {
         ProjectComposerBar(
             messageDraft: $messageDraft,
@@ -567,17 +554,17 @@ struct WritingProjectView: View {
             composerBar
                 .padding(.vertical, verticalPadding)
                 .overlay(alignment: .bottomLeading) {
-                    if let selectionSummaryText {
+                    if normalizedSelectedText != nil {
                         SelectionContextRail(
-                            selectionSummaryText: selectionSummaryText,
                             isRequestInFlight: flow.isAIRequestInFlight || isComposerLocked,
                             onPresetTap: triggerSelectionPresetEdit
                         )
+                        .padding(.horizontal, 14)
                         .padding(.bottom, 140)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }
-                .animation(.easeInOut(duration: 0.16), value: selectionSummaryText)
+                .animation(.easeInOut(duration: 0.16), value: normalizedSelectedText != nil)
         }
     }
 
@@ -1142,14 +1129,11 @@ private enum SelectionEditPreset: CaseIterable, Hashable {
 }
 
 private struct SelectionContextRail: View {
-    let selectionSummaryText: String
     let isRequestInFlight: Bool
     let onPresetTap: (SelectionEditPreset) -> Void
 
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
-            selectionSummaryCard
-
             TwoRowFlowLayout(itemSpacing: 8, rowSpacing: 8) {
                 ForEach(SelectionEditPreset.allCases, id: \.self) { preset in
                     ActionChip(
@@ -1166,42 +1150,6 @@ private struct SelectionContextRail: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPopover)
-    }
-
-    private var selectionSummaryCard: some View {
-        Text(selectionSummaryText)
-            .font(.system(size: 12.6, weight: .medium, design: .default))
-            .foregroundStyle(Color.vibeCanvasInk)
-            .lineLimit(2)
-            .truncationMode(.tail)
-            .frame(maxWidth: .infinity, alignment: .leading)
-            .padding(.horizontal, 14)
-            .padding(.vertical, 10)
-            .background {
-                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                    .fill(Color.vibeCanvasRaised.opacity(0.96))
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(
-                                LinearGradient(
-                                    colors: [
-                                        Color.white.opacity(0.02),
-                                        .clear
-                                    ],
-                                    startPoint: .topLeading,
-                                    endPoint: .bottomTrailing
-                                )
-                            )
-                            .blendMode(.softLight)
-                    )
-                    .overlay(
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .strokeBorder(Color.vibeCanvasStroke.opacity(0.58), lineWidth: 1)
-                    )
-                    .shadow(color: Color.black.opacity(0.08), radius: 8, x: 0, y: 3)
-            }
-            .accessibilityLabel("选中内容")
-            .accessibilityValue(selectionSummaryText)
     }
 }
 @MainActor

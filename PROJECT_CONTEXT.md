@@ -33,7 +33,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The正文 pane now restores a fixed bottom clearance equal to the composer's visible height, so the正文 background no longer runs all the way to the software bottom while the composer still remains aligned to the bottom edge.
 - The bottom content stack now keeps a small outer bottom margin, so the dialog still breathes off the software edge without changing the正文/composer seam.
 - Both the guidance chips and the selection-summary rail now render as overlays, so neither chip row reserves its own layout height inside the composer stack; the visible composer height stays fixed while the background/stacking does the work.
-- The selection summary shown above the composer collapses blank lines before display, and the stage-specific placeholder copy now switches between direct opening, continuation, and润色 prompts.
+- The selection flow now keeps the preset润色 chips only, and the stage-specific placeholder copy still switches between direct opening, continuation, and润色 prompts.
 - The selection/context and assistant suggestion capsules still use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - The latest committed change before this update is `ec2ec86`, which removed the extra composer spacing gaps so the正文/composer seam is visually zero-gap again while keeping the card shadow.

@@ -5,6 +5,7 @@
 - Kept the composer input as a multiline surface with floating guidance chips, but the layout now removes the last external padding that was making the seam look detached.
 - Left the composer card floating above the window edge so the bottom of the window still has breathing room even though the正文 now meets the composer directly.
 - Restored a small outer bottom margin for the full bottom content stack so the dialog breathes off the software edge without changing the正文/composer seam.
+- Removed the selection summary card above the composer and kept only the preset润色 chips, with the rail inset to align to the dialog instead of spilling past it.
 - Redesigned the Composer into a single rounded input surface, replaced the former top-left fixed capsule with the submit capsule slot, and moved the guidance chips to float above the input while keeping the existing state flow intact.
 - Replaced the selection popover with an inline selection rail above the composer that shows a blank-line-collapsed summary and preset润色 chips, and updated the visible action labels / placeholder copy to reduce onboarding friction.
 - Kept the same day/night theme language and the warmer capsule contrast treatment so the new layout still reads like VibeWrite rather than a new visual system.
