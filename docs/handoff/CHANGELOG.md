@@ -1,5 +1,10 @@
 # Changelog
 
+# 2026-04-08
+- Redesigned the Composer into a single rounded input surface, replaced the former top-left fixed capsule with the submit capsule slot, and moved the guidance chips to float above the input while keeping the existing state flow intact.
+- Replaced the selection popover with an inline selection rail above the composer that shows a blank-line-collapsed summary and preset润色 chips, and updated the visible action labels / placeholder copy to reduce onboarding friction.
+- Kept the same day/night theme language and the warmer capsule contrast treatment so the new layout still reads like VibeWrite rather than a new visual system.
+
 # 2026-04-06
 - Removed the remaining gap between正文 and Composer in the wide layout so the composer board now sits flush against the正文 with no extra spacer.
 - Kept the body-to-composer seam flush, but gave the composer card more breathing room on its lower interior edge so the bottom feels less cramped.

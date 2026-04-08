@@ -229,7 +229,7 @@ final class VibeWriteUITests: XCTestCase {
 
         XCTAssertTrue(waitForElementToAppear(
             in: window,
-            identifier: "project.selectionCustomButton",
+            identifier: "project.selectionPopover",
             timeout: 10
         ))
 
@@ -306,9 +306,10 @@ final class VibeWriteUITests: XCTestCase {
             identifier: "project.selectionCompellingButton",
             timeout: 10
         ))
+
         XCTAssertTrue(waitForElementToAppear(
             in: window,
-            identifier: "project.selectionCustomButton",
+            identifier: "project.selectionPopover",
             timeout: 10
         ))
 

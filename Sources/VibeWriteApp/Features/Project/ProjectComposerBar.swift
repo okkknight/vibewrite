@@ -6,7 +6,6 @@ struct ProjectComposerBar: View {
     let primaryActionTitle: String
     let messageFieldPlaceholder: String
     let showsAssistantSuggestions: Bool
-    let assistantNextFocus: String?
     let assistantSuggestionChips: [String]
     let isComposerLocked: Bool
     let isRequestInFlight: Bool
@@ -22,176 +21,155 @@ struct ProjectComposerBar: View {
 
     var body: some View {
         VStack(alignment: .leading, spacing: 10) {
-            if showsAssistantSuggestions {
-                TwoRowFlowLayout(itemSpacing: 8, rowSpacing: 8) {
-                    AccentPill(
-                        title: primaryActionTitle,
-                        icon: actionIcon,
-                        tint: .vibeCanvasAccent,
-                        showsThinkingDot: isPrimaryActionInFlight
-                    )
+            guidanceRail
+            composerSurface
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 8)
+        .accessibilityElement(children: .contain)
+        .accessibilityIdentifier(accessibilityIdentifier)
+    }
 
-                    if shouldShowSuggestionLoadingPill {
-                        suggestionLoadingPill
-                    }
-
+    @ViewBuilder
+    private var guidanceRail: some View {
+        if shouldShowGuidanceRail {
+            TwoRowFlowLayout(itemSpacing: 8, rowSpacing: 8) {
+                if isSuggestionGenerationInFlight {
+                    suggestionLoadingPill
+                } else if isOpeningState {
+                    guidanceExampleChip(title: openingExampleTitle)
+                } else {
                     ForEach(normalizedAssistantSuggestionChips, id: \.self) { chip in
                         AssistantSuggestionChip(title: chip) {
                             onAssistantSuggestionTap(chip)
                         }
                     }
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-            } else {
-                HStack(alignment: .firstTextBaseline, spacing: 8) {
-                    AccentPill(
-                        title: primaryActionTitle,
-                        icon: actionIcon,
-                        tint: .vibeCanvasAccent,
-                        showsThinkingDot: isPrimaryActionInFlight
-                    )
-
-                    Spacer(minLength: 0)
-                }
-                .frame(maxWidth: .infinity, alignment: .leading)
             }
-
-            HStack(alignment: .center, spacing: 12) {
-                TextField(composerPlaceholderText, text: $messageDraft)
-                    .focused(messageFieldFocused)
-                    .onSubmit(onSubmit)
-                    .textFieldStyle(.plain)
-                    .padding(.vertical, 12)
-                    .padding(.leading, 12)
-                    .padding(.trailing, 8)
-                .background {
-                        RoundedRectangle(cornerRadius: 16, style: .continuous)
-                            .fill(Color.vibeCanvasLift.opacity(backgroundOpacity))
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .fill(
-                                        LinearGradient(
-                                            colors: [
-                                                Color.white.opacity(gradientOpacity),
-                                                .clear
-                                            ],
-                                            startPoint: .topLeading,
-                                            endPoint: .bottomTrailing
-                                        )
-                                    )
-                                    .blendMode(.softLight)
-                            )
-                            .overlay(
-                                RoundedRectangle(cornerRadius: 16, style: .continuous)
-                                    .strokeBorder(Color.vibeCanvasStroke.opacity(strokeOpacity), lineWidth: 1)
-                            )
-                            .shadow(color: highlightShadowColor, radius: highlightShadowRadius, x: 0, y: 0)
-                    }
-                    .foregroundStyle(isPrimaryActionInFlight ? Color.vibeCanvasInkMuted : Color.vibeCanvasInk)
-                    .disabled(isComposerLocked)
-                    .overlay(alignment: .topLeading) {
-                        if isPrimaryActionInFlight {
-                            ComposerThinkingGlow()
-                                .frame(width: 320, height: 42, alignment: .leading)
-                                .offset(x: 2, y: -16)
-                                .transition(.opacity)
-                                .allowsHitTesting(false)
-                        }
-                    }
-                    .accessibilityLabel("协作输入框")
-                    .accessibilityIdentifier(messageInputIdentifier)
-
-                Button(action: onSubmit) {
-                    SubmitGlyph(isThinking: isPrimaryActionInFlight)
-                        .background {
-                            ZStack {
-                                Circle()
-                                    .fill(Color.vibeCanvasLift.opacity(submitButtonFillOpacity))
-
-                                if isPrimaryActionInFlight {
-                                    Circle()
-                                        .fill(Color.vibeCanvasAccent.opacity(0.08))
-                                        .blendMode(.softLight)
-
-                                    Circle()
-                                        .strokeBorder(Color.vibeCanvasAccent.opacity(0.20), lineWidth: 1)
-                                } else {
-                                    Circle()
-                                        .strokeBorder(Color.vibeCanvasStroke.opacity(submitButtonStrokeOpacity), lineWidth: 1)
-                                }
-                            }
-                        }
-                        .shadow(color: submitButtonShadowColor, radius: submitButtonShadowRadius, x: 0, y: submitButtonShadowYOffset)
-                }
-                .buttonStyle(.plain)
-                .disabled(isRequestInFlight || isComposerLocked)
-                .opacity(isRequestInFlight || isComposerLocked ? 0.65 : 1)
-                .accessibilityIdentifier(sendButtonIdentifier)
-                .accessibilityLabel(primaryActionTitle)
-            }
-            .accessibilityElement(children: .contain)
+            .frame(maxWidth: .infinity, alignment: .leading)
         }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .padding(.top, 8)
-        .padding(.bottom, 10)
-        .accessibilityElement(children: .contain)
-        .background {
-            RoundedRectangle(cornerRadius: 22, style: .continuous)
-                .fill(Color.vibeCanvasRaised.opacity(0.96))
+    }
+
+    private var composerSurface: some View {
+        ZStack(alignment: .bottomTrailing) {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(composerBackgroundColor)
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
                         .fill(
                             LinearGradient(
                                 colors: [
-                                    Color.white.opacity(0.035),
+                                    Color.white.opacity(gradientOpacity),
                                     .clear
                                 ],
                                 startPoint: .topLeading,
-                                endPoint: .center
+                                endPoint: .bottomTrailing
                             )
                         )
                         .blendMode(.softLight)
                 )
                 .overlay(
-                    RoundedRectangle(cornerRadius: 22, style: .continuous)
-                        .strokeBorder(Color.vibeCanvasStroke.opacity(0.78), lineWidth: 1)
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(composerStrokeColor, lineWidth: 1)
                 )
                 .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
+
+            HStack(alignment: .bottom, spacing: 12) {
+                TextField(messageFieldPlaceholder, text: $messageDraft)
+                    .focused(messageFieldFocused)
+                    .onSubmit(onSubmit)
+                    .textFieldStyle(.plain)
+                    .font(.system(size: 13.8, weight: .medium, design: .default))
+                    .foregroundStyle(textColor)
+                    .lineLimit(1)
+                    .padding(.leading, 14)
+                    .padding(.trailing, 6)
+                    .padding(.top, 16)
+                    .padding(.bottom, 16)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .disabled(isComposerLocked)
+                    .accessibilityLabel("协作输入框")
+                    .accessibilityIdentifier(messageInputIdentifier)
+
+                Button(action: onSubmit) {
+                    AccentPill(
+                        title: primaryActionTitle,
+                        icon: nil,
+                        tint: .vibeCanvasAccent,
+                        showsThinkingDot: isPrimaryActionInFlight
+                    )
+                    .padding(.trailing, 2)
+                }
+                .buttonStyle(.plain)
+                .disabled(isRequestInFlight || isComposerLocked)
+                .opacity(isRequestInFlight || isComposerLocked ? 0.66 : 1)
+                .accessibilityIdentifier(sendButtonIdentifier)
+                .accessibilityLabel(primaryActionTitle)
+            }
+            .frame(minHeight: 86, alignment: .bottomLeading)
+            .padding(.horizontal, 3)
+            .padding(.vertical, 10)
         }
-        .accessibilityIdentifier(accessibilityIdentifier)
+        .accessibilityElement(children: .contain)
     }
 
-    private var backgroundOpacity: Double {
-        if isPrimaryActionInFlight {
-            return 0.66
+    private var isOpeningState: Bool {
+        primaryActionTitle == "开场"
+    }
+
+    private var openingExampleTitle: String {
+        "写一个XXX"
+    }
+
+    private var shouldShowGuidanceRail: Bool {
+        if isOpeningState {
+            return true
         }
 
-        return isMessageFieldHighlighted ? 0.90 : 0.82
+        if isSuggestionGenerationInFlight {
+            return true
+        }
+
+        return showsAssistantSuggestions && !normalizedAssistantSuggestionChips.isEmpty
+    }
+
+    private var normalizedAssistantSuggestionChips: [String] {
+        assistantSuggestionChips.compactMap { chip in
+            let trimmed = chip.trimmingCharacters(in: .whitespacesAndNewlines)
+            return trimmed.isEmpty ? nil : trimmed
+        }
     }
 
     private var gradientOpacity: Double {
         if isPrimaryActionInFlight {
-            return 0.008
+            return 0.01
         }
 
         return isMessageFieldHighlighted ? 0.022 : 0.014
     }
 
-    private var strokeOpacity: Double {
-        if isPrimaryActionInFlight {
-            return 0.48
+    private var composerBackgroundColor: Color {
+        if isMessageFieldHighlighted {
+            return appearanceMode == .day
+                ? Color.vibeCanvasRaised.opacity(0.985)
+                : Color.vibeCanvasRaised.opacity(0.965)
         }
 
-        return isMessageFieldHighlighted ? 0.86 : 0.68
+        return Color.vibeCanvasRaised.opacity(appearanceMode == .day ? 0.975 : 0.955)
     }
 
-    private var highlightShadowColor: Color {
-        isMessageFieldHighlighted && !isPrimaryActionInFlight ? Color.vibeCanvasAccent.opacity(0.18) : .clear
+    private var composerStrokeColor: Color {
+        if isPrimaryActionInFlight {
+            return Color.vibeCanvasAccent.opacity(0.38)
+        }
+
+        return isMessageFieldHighlighted
+            ? Color.vibeCanvasAccent.opacity(0.20)
+            : Color.vibeCanvasStroke.opacity(appearanceMode == .day ? 0.64 : 0.50)
     }
 
-    private var highlightShadowRadius: CGFloat {
-        isMessageFieldHighlighted && !isPrimaryActionInFlight ? 10 : 0
+    private var textColor: Color {
+        isPrimaryActionInFlight ? Color.vibeCanvasInkMuted : Color.vibeCanvasInk
     }
 
     private var composerShadowColor: Color {
@@ -221,185 +199,38 @@ struct ProjectComposerBar: View {
         }
     }
 
-    private var submitButtonFillOpacity: Double {
-        if isRequestInFlight || isComposerLocked {
-            return 0.72
-        }
-
-        return isPrimaryActionInFlight ? 0.99 : 0.96
-    }
-
-    private var submitButtonStrokeOpacity: Double {
-        if isRequestInFlight || isComposerLocked {
-            return 0.35
-        }
-
-        return isPrimaryActionInFlight ? 0.82 : 0.58
-    }
-
-    private var submitButtonShadowColor: Color {
-        if isPrimaryActionInFlight {
-            switch appearanceMode {
-            case .day:
-                return Color.black.opacity(0.34)
-            case .night:
-                return Color.black.opacity(0.42)
-            }
-        }
-
-        return Color.black.opacity(0.16)
-    }
-
-    private var submitButtonShadowRadius: CGFloat {
-        if isPrimaryActionInFlight {
-            return 18
-        }
-
-        return 8
-    }
-
-    private var submitButtonShadowYOffset: CGFloat {
-        if isPrimaryActionInFlight {
-            return 9
-        }
-
-        return 4
-    }
-
-    private var normalizedAssistantNextFocus: String? {
-        let trimmed = assistantNextFocus?.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let trimmed, !trimmed.isEmpty else {
-            return nil
-        }
-
-        return trimmed
-    }
-
-    private var normalizedAssistantSuggestionChips: [String] {
-        var seen = Set<String>()
-        return assistantSuggestionChips
-            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
-            .filter { !$0.isEmpty }
-            .filter { seen.insert($0).inserted }
-    }
-
-    private var shouldShowSuggestionLoadingPill: Bool {
-        normalizedAssistantSuggestionChips.isEmpty && isSuggestionGenerationInFlight
-    }
-
-    private var composerPlaceholderText: String {
-        guard showsAssistantSuggestions, let normalizedAssistantNextFocus else {
-            return messageFieldPlaceholder
-        }
-
-        return normalizedAssistantNextFocus
-    }
-
-    private var actionIcon: String {
-        switch primaryActionTitle {
-        case "生成开场":
-            return "sparkles"
-        case "继续写":
-            return "arrow.forward"
-        case "修改这段":
-            return "pencil"
-        case "编辑这段":
-            return "pencil"
-        default:
-            return "text.cursor"
-        }
-    }
-
     private var suggestionLoadingPill: some View {
-        HStack(spacing: 6) {
-            Text("建议生成中")
-                .font(.system(size: 11.8, weight: .semibold, design: .default))
-                .foregroundStyle(Color.vibeCanvasInkSoft)
-                .lineLimit(1)
+        HStack(spacing: 7) {
+            ProgressView()
+                .progressViewStyle(.circular)
+                .controlSize(.small)
+                .tint(Color.vibeCanvasAccent)
 
-            Circle()
-                .fill(Color.vibeCanvasAccent.opacity(0.32))
-                .frame(width: 5.5, height: 5.5)
+            Text("建议生成中")
+                .font(.system(size: 12, weight: .semibold, design: .default))
+                .foregroundStyle(Color.vibeCanvasInkSoft)
         }
         .padding(.vertical, 7)
         .padding(.horizontal, 12)
         .background {
             Capsule(style: .continuous)
-                .fill(Color.vibeCanvasLift.opacity(0.56))
+                .fill(Color.vibeCanvasLift.opacity(0.62))
                 .overlay(
                     Capsule(style: .continuous)
                         .strokeBorder(Color.vibeCanvasStroke.opacity(0.30), lineWidth: 1)
                 )
         }
         .accessibilityLabel("建议生成中")
-        .accessibilityHidden(false)
     }
-}
 
-private struct SubmitGlyph: View {
-    let isThinking: Bool
-
-    var body: some View {
-        Group {
-            if isThinking {
-                ProgressView()
-                    .progressViewStyle(.circular)
-                    .controlSize(.small)
-                    .tint(Color.vibeCanvasInk)
-                    .frame(width: 34, height: 34)
-            } else {
-                Image(systemName: "arrow.up")
-                    .font(.system(size: 13.5, weight: .semibold, design: .default))
-                    .foregroundStyle(Color.vibeCanvasInkMuted)
-                    .frame(width: 34, height: 34)
+    private func guidanceExampleChip(title: String) -> some View {
+        ActionChip(
+            title,
+            tint: .vibeCanvasAccent,
+            action: {
+                onAssistantSuggestionTap(title)
             }
-        }
-    }
-}
-
-private struct ComposerThinkingGlow: View {
-    var body: some View {
-        TimelineView(.animation) { context in
-            let t = context.date.timeIntervalSinceReferenceDate
-            let pulse = 0.55 + 0.45 * sin(t * 1.0)
-            let shimmer = 0.55 + 0.45 * sin(t * 0.62 + 1.15)
-            let opacity = 0.34 + 0.22 * pulse
-
-            ZStack {
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .fill(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.24 * pulse),
-                                Color.vibeCanvasAccent.opacity(0.18 * shimmer),
-                                .clear
-                            ],
-                            startPoint: .topLeading,
-                            endPoint: .bottomTrailing
-                        )
-                    )
-                    .blur(radius: 18)
-                    .offset(y: -10)
-
-                RoundedRectangle(cornerRadius: 18, style: .continuous)
-                    .strokeBorder(
-                        LinearGradient(
-                            colors: [
-                                Color.white.opacity(0.42 * pulse),
-                                Color.vibeCanvasAccent.opacity(0.28 * shimmer),
-                                .clear
-                            ],
-                            startPoint: .leading,
-                            endPoint: .trailing
-                        ),
-                        lineWidth: 1
-                    )
-                    .blur(radius: 5)
-            }
-            .opacity(opacity)
-            .blendMode(.screen)
-            .allowsHitTesting(false)
-        }
+        )
     }
 }
 
@@ -443,7 +274,7 @@ private struct AssistantSuggestionChip: View {
     }
 }
 
-private struct TwoRowFlowLayout: Layout {
+struct TwoRowFlowLayout: Layout {
     let itemSpacing: CGFloat
     let rowSpacing: CGFloat
 
@@ -520,15 +351,15 @@ private struct TwoRowFlowLayout: Layout {
 
         return rows
     }
-}
 
-private struct MeasuredRow {
-    let elements: [MeasuredElement]
-    let width: CGFloat
-    let height: CGFloat
-}
+    private struct MeasuredRow {
+        let elements: [MeasuredElement]
+        let width: CGFloat
+        let height: CGFloat
+    }
 
-private struct MeasuredElement {
-    let index: Int
-    let size: CGSize
+    private struct MeasuredElement {
+        let index: Int
+        let size: CGSize
+    }
 }

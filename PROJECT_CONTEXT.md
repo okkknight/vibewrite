@@ -26,10 +26,9 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The正文 editor now also exposes a floating bottom-center `回到底端` button when content is scrolled up and hidden below the viewport; tapping it jumps straight back to the document end without changing the editor layout.
 - The project title header now uses a tighter bottom spacing before正文, so the title background feels shorter and the正文 sits closer without changing colors, typography, or other shell styling.
 - The capsule system now distinguishes fixed chips from clickable chips in both day and night themes, and the header title/subtitle block is vertically centered more evenly inside the shortened top area.
-- Clicking selection-popover `自定义` now reveals a same-width context capsule above the bottom composer, keeps the input focused/highlighted, and hides the old popover while the user stays in the custom-edit flow.
-- The selection popover loading label now reads `思考中` instead of `AI 正在思考`, keeping the spinner but removing the extra wording.
-- The selection popover preview now collapses blank lines out of multi-paragraph selections before displaying them, so the top preview shows the selected content as a continuous excerpt instead of stopping at the first paragraph.
-- The selection/context and assistant suggestion capsules now use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
+- The Composer shell was redesigned into a single rounded input surface: the former fixed top-left capsule now lives in the submit button slot, the guidance chips float above the input, the visible actions read `开场` / `续写` / `润色`, and the selection edit flow now shows an inline rail above the composer instead of a popover while keeping the underlying state flow unchanged.
+- The selection summary shown above the composer collapses blank lines before display, and the stage-specific placeholder copy now switches between direct opening, continuation, and润色 prompts.
+- The selection/context and assistant suggestion capsules still use a warmer gold-brown day-mode foreground with slightly stronger background contrast so the light theme stays readable without changing the night theme feel.
 - The app now boots into day mode by default, while the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - The latest committed change before this update is `370ec50`, which split the metadata routing between the current structured-tool path and `MiniMax-Text-01` `json_schema`; this update then removes `continuationSummary` entirely and replaces it with `localSummary` plus `globalSynopsis`.
 - The default metadata route for real AI requests now prefers the current structured-tool path again, because the `MiniMax-Text-01` schema route is not supported on the current token plan unless an explicit `MINIMAX_METADATA_ROUTE=text01_json_schema` override is present.
@@ -41,7 +40,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `scripts/package_dmg.sh` now builds a Release app with `ENABLE_DEBUG_DYLIB=NO` and stages it with an `/Applications` link, so we have a simple friend-test DMG path when we want to ship the current build without large-scale distribution.
 - The document storage model has been redesigned so the Markdown file carries only正文 plus a hidden identity marker, while the collaboration metadata lives in an app-side metadata store keyed by `docID`. `xattr` owns the primary identity marker, the body marker is a fallback, Save As generates a fresh `docID`, and malformed metadata always degrades to正文-only editing.
 - On the first Save As of a never-before-saved正文, the filename the user chose now backfills the project title as well, but later title/file-name edits stay independent.
-- The selection popover bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before SwiftUI could show the popover.
+- The selection bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before the inline rail had a chance to render.
 - `.edit` now preserves already-visible assistant suggestion chips instead of replacing them. If the suggestion area was empty before the edit completed, the edit response can still populate it.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps revealing the remaining text one character at a time instead of flushing the tail in one jump.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.
@@ -157,9 +156,12 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `swift test --filter VibeWriteAppFlowTests/testDocumentIdentityPrefersXattrOverHiddenMarker`
 - `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`
 - `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`
+- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -derivedDataPath /tmp/VibeWriteBuild CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY=''`
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` currently gets past the second-submit path, but the UI suite still fails later at the assistant rail shell assertion
 - `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit` passes and covers the new selection-preset edit path end-to-end on the real macOS app
 - `swift test` passes with the file-based document flow and menu commands in place.
+- `swift test` passes after the composer redesign and selection-rail rewrite.
+- The latest targeted macOS UI rerun for the redesigned composer was blocked in this sandbox by local signing access and SwiftUI preview macro loading, so `swift test` plus the app build are the current reliable verification baseline here.
 
 ## Runtime notes
 - `VIBEWRITE_UI_TEST_RESET_STORAGE=1` resets the app's own container-local store for UI runs.
@@ -176,6 +178,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - If you touch collaboration state persistence, keep the recent-conversation cap at 20 rounds and keep the `localSummary` and `globalSynopsis` in sync with the latest metadata record.
 - The current save-loss tracing pass now logs the live正文 binding setter plus the editor bridge's make/update/sync decisions in one shot; the next repro should be able to follow a single input from `NSTextView` into `activeDocumentText` and then into the saved snapshot without adding more probes.
 - The正文 edge treatment is now a soft top/bottom fade in `WritingProjectView.editorBody`, and the bottom Composer spacing was tightened so the writing surface sits closer to the composer while keeping the layout centered.
+- The redesigned composer keeps the same state flow as the prior version, but the stage labels, placeholders, guidance rail, and selection edit entry are intentionally reorganized to reduce onboarding friction.
+- Targeted macOS UI tests for the redesigned composer currently need a fully signed local Xcode environment; in this sandbox they were blocked by missing signing access and SwiftUI preview macro loading, so use `swift test` plus the app build as the current verification baseline.
 
 ## Working rules
 - Keep the handoff concise and durable.
