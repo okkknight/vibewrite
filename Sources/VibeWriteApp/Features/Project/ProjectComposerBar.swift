@@ -24,7 +24,7 @@ struct ProjectComposerBar: View {
             .overlay(alignment: .topLeading) {
                 if shouldShowGuidanceRail {
                     guidanceRail
-                        .offset(y: -24)
+                        .offset(y: -48)
                 }
             }
         .padding(.horizontal, 12)

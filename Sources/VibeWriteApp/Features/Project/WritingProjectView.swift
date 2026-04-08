@@ -162,9 +162,10 @@ struct WritingProjectView: View {
                     messageFieldFocused = false
                 })
 
-            writingBodyPane(topPadding: 16, bottomPadding: composerBottomClearance)
-
-            composerSection(verticalPadding: 0)
+            ZStack(alignment: .bottom) {
+                writingBodyPane(topPadding: 16, bottomPadding: 0)
+                composerSection(verticalPadding: 0)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
     }
@@ -198,12 +199,13 @@ struct WritingProjectView: View {
                     messageFieldFocused = false
                 })
 
-            writingBodyPane(
-                topPadding: shellLayoutMode.isCompact ? 14 : 16,
-                bottomPadding: composerBottomClearance
-            )
-
-            composerSection(verticalPadding: 0)
+            ZStack(alignment: .bottom) {
+                writingBodyPane(
+                    topPadding: shellLayoutMode.isCompact ? 14 : 16,
+                    bottomPadding: 0
+                )
+                composerSection(verticalPadding: 0)
+            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
         .frame(maxWidth: shellLayoutMode.isCompact ? .infinity : 872, alignment: .top)
@@ -558,29 +560,23 @@ struct WritingProjectView: View {
         .frame(maxWidth: writingContentMaxWidth, alignment: .leading)
     }
 
-    private var composerBottomClearance: CGFloat {
-        let baseClearance: CGFloat = shellLayoutMode.isCompact ? 172 : 160
-        return selectionSummaryText == nil ? baseClearance : baseClearance + 54
-    }
-
     private func composerSection(verticalPadding: CGFloat) -> some View {
         writingContentColumn {
-            VStack(alignment: .leading, spacing: 8) {
-                if let selectionSummaryText {
-                    SelectionContextRail(
-                        selectionSummaryText: selectionSummaryText,
-                        isRequestInFlight: flow.isAIRequestInFlight || isComposerLocked,
-                        onPresetTap: triggerSelectionPresetEdit
-                    )
-                    .transition(.opacity.combined(with: .move(edge: .top)))
+            composerBar
+                .padding(.vertical, verticalPadding)
+                .overlay(alignment: .bottomLeading) {
+                    if let selectionSummaryText {
+                        SelectionContextRail(
+                            selectionSummaryText: selectionSummaryText,
+                            isRequestInFlight: flow.isAIRequestInFlight || isComposerLocked,
+                            onPresetTap: triggerSelectionPresetEdit
+                        )
+                        .padding(.bottom, 140)
+                        .transition(.opacity.combined(with: .move(edge: .bottom)))
+                    }
                 }
-
-                composerBar
-                    .padding(.vertical, verticalPadding)
-            }
-            .animation(.easeInOut(duration: 0.16), value: selectionSummaryText)
+                .animation(.easeInOut(duration: 0.16), value: selectionSummaryText)
         }
-        .padding(.bottom, 16)
     }
 
     private func writingContentColumn<Content: View>(
