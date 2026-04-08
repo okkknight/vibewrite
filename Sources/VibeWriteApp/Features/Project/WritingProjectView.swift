@@ -33,6 +33,7 @@ struct WritingProjectView: View {
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
     private var projectHeaderVerticalPadding: CGFloat { shellLayoutMode.isCompact ? 7 : 8 }
+    private var composerRailBottomInset: CGFloat { 146 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
@@ -540,6 +541,7 @@ struct WritingProjectView: View {
             isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
             isMessageFieldHighlighted: normalizedSelectedText != nil,
+            guidanceRailBottomInset: composerRailBottomInset,
             accessibilityIdentifier: VibeWriteAutomationID.projectComposerBar,
             messageInputIdentifier: VibeWriteAutomationID.projectMessageInput,
             sendButtonIdentifier: VibeWriteAutomationID.projectSendButton,
@@ -560,7 +562,7 @@ struct WritingProjectView: View {
                             onPresetTap: triggerSelectionPresetEdit
                         )
                         .padding(.horizontal, 14)
-                        .padding(.bottom, 140)
+                        .padding(.bottom, composerRailBottomInset)
                         .transition(.opacity.combined(with: .move(edge: .bottom)))
                     }
                 }

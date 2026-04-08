@@ -13,6 +13,7 @@ struct ProjectComposerBar: View {
     let isSuggestionGenerationInFlight: Bool
     let messageFieldFocused: FocusState<Bool>.Binding
     let isMessageFieldHighlighted: Bool
+    let guidanceRailBottomInset: CGFloat
     let accessibilityIdentifier: String
     let messageInputIdentifier: String
     let sendButtonIdentifier: String
@@ -21,10 +22,10 @@ struct ProjectComposerBar: View {
 
     var body: some View {
         composerSurface
-            .overlay(alignment: .topLeading) {
+            .overlay(alignment: .bottomLeading) {
                 if shouldShowGuidanceRail {
                     guidanceRail
-                        .offset(y: -30)
+                        .padding(.bottom, guidanceRailBottomInset)
                 }
             }
         .padding(.horizontal, 12)
