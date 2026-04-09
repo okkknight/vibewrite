@@ -10,6 +10,7 @@
 - Tightened that shared rail inset again, cutting the dialog-to-capsule gap roughly in half without changing the正文/composer seam.
 - Gave the submit button a dedicated thinking breathing dot and removed the thinking-state fade from the button itself, while leaving the input lock/dim behavior intact.
 - Refined the submit button so it never fades, shows only `X中` plus the breathing dot while thinking, and the composer text now uses a softer ink tone instead of the darkest ink.
+- Kept the submit button disabled for behavior, but rendered its chrome from an enabled overlay so the system disabled tint no longer washes out the thinking state.
 - Redesigned the Composer into a single rounded input surface, replaced the former top-left fixed capsule with the submit capsule slot, and moved the guidance chips to float above the input while keeping the existing state flow intact.
 - Replaced the selection popover with an inline selection rail above the composer that shows a blank-line-collapsed summary and preset润色 chips, and updated the visible action labels / placeholder copy to reduce onboarding friction.
 - Kept the same day/night theme language and the warmer capsule contrast treatment so the new layout still reads like VibeWrite rather than a new visual system.

@@ -102,14 +102,19 @@ struct ProjectComposerBar: View {
             }
 
             Button(action: onSubmit) {
-                submitButtonLabel
+                Color.clear
+                    .frame(width: 84, height: 34)
             }
             .buttonStyle(.plain)
             .disabled(isRequestInFlight || isComposerLocked)
-            .frame(width: 84, height: 34)
             .padding(.trailing, 12)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+            .overlay(alignment: .center) {
+                submitButtonVisual
+                    .environment(\.isEnabled, true)
+                    .allowsHitTesting(false)
+            }
             .accessibilityIdentifier(sendButtonIdentifier)
             .accessibilityLabel(primaryActionTitle)
         }
@@ -117,7 +122,7 @@ struct ProjectComposerBar: View {
         .accessibilityElement(children: .contain)
     }
 
-    private var submitButtonLabel: some View {
+    private var submitButtonVisual: some View {
         HStack(spacing: 7) {
             if isPrimaryActionInFlight {
                 ThinkingPulseDot(color: submitButtonTextColor)
@@ -133,7 +138,7 @@ struct ProjectComposerBar: View {
                 .font(.system(size: 12.7, weight: .semibold, design: .default))
                 .foregroundStyle(submitButtonTextColor)
         }
-        .frame(maxWidth: .infinity, maxHeight: .infinity)
+        .frame(width: 84, height: 34)
         .background {
             RoundedRectangle(cornerRadius: 10, style: .continuous)
                 .fill(submitButtonBackgroundColor)
