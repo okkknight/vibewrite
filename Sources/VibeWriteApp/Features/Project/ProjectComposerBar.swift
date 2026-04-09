@@ -9,6 +9,7 @@ struct ProjectComposerBar: View {
     let assistantSuggestionChips: [String]
     let isComposerLocked: Bool
     let isRequestInFlight: Bool
+    let isPrimaryOutputInFlight: Bool
     let isPrimaryActionInFlight: Bool
     let isSuggestionGenerationInFlight: Bool
     let messageFieldFocused: FocusState<Bool>.Binding
@@ -192,7 +193,7 @@ struct ProjectComposerBar: View {
         }
 
         if isSuggestionGenerationInFlight {
-            return true
+            return !isPrimaryOutputInFlight
         }
 
         return showsAssistantSuggestions && !normalizedAssistantSuggestionChips.isEmpty

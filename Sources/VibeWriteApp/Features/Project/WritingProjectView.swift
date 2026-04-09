@@ -301,7 +301,7 @@ struct WritingProjectView: View {
                 .truncationMode(.tail)
                 .multilineTextAlignment(.center)
 
-            if flow.isProseRequestInFlight {
+            if flow.isBodyThinkingInFlight {
                 ThinkingDots()
                     .font(.system(size: 11.5, weight: .medium, design: .default))
                     .foregroundStyle(Color.vibeCanvasInkSoft)
@@ -421,7 +421,7 @@ struct WritingProjectView: View {
             project: project,
             isExpanded: true,
             presentation: shellLayoutMode.isCompact ? .drawer : .column,
-            isRequestInFlight: flow.isProseRequestInFlight,
+            isRequestInFlight: flow.isBodyThinkingInFlight,
             errorMessage: flow.aiErrorMessage,
             accessibilityIdentifier: VibeWriteAutomationID.projectAssistantRailShell,
             onToggle: toggleAssistantLayer,
@@ -537,7 +537,8 @@ struct WritingProjectView: View {
             assistantSuggestionChips: project.suggestionChips,
             isComposerLocked: isComposerLocked,
             isRequestInFlight: flow.isAIRequestInFlight,
-            isPrimaryActionInFlight: flow.isProseRequestInFlight,
+            isPrimaryOutputInFlight: flow.isProseRequestInFlight,
+            isPrimaryActionInFlight: flow.isBodyThinkingInFlight,
             isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
             isMessageFieldHighlighted: normalizedSelectedText != nil,

@@ -1,5 +1,9 @@
 # Changelog
 
+# 2026-04-09
+- Split the正文 thinking state from the metadata loading state so the subtitle, assistant sidebar subtitle, and submit button thinking visuals now follow the正文 network/thinking phase only.
+- Kept the metadata request and suggestion rendering order the same, but the composer now waits for正文 output to settle before showing `建议生成中`, so suggestion loading no longer keeps the正文 chrome stuck in thinking.
+
 # 2026-04-08
 - Removed the extra composer spacing gaps again so the正文/composer seam is truly zero-gap while the card shadow and internal padding remain intact.
 - Kept the composer input as a multiline surface with floating guidance chips, but the layout now removes the last external padding that was making the seam look detached.

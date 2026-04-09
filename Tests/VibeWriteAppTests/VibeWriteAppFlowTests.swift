@@ -363,6 +363,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         }
         XCTAssertTrue(metadataPhaseObserved)
         XCTAssertTrue(flow.isAIRequestInFlight)
+        XCTAssertFalse(flow.isBodyThinkingInFlight)
         XCTAssertTrue(flow.isProseRequestInFlight)
         XCTAssertTrue(flow.isMetadataRequestInFlight)
         XCTAssertFalse(flow.activeProject.documentText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -371,6 +372,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         try await task.value
 
         XCTAssertFalse(flow.isAIRequestInFlight)
+        XCTAssertFalse(flow.isBodyThinkingInFlight)
         XCTAssertFalse(flow.isProseRequestInFlight)
         XCTAssertFalse(flow.isMetadataRequestInFlight)
         XCTAssertFalse(flow.activeProject.suggestionChips.isEmpty)

@@ -8,6 +8,7 @@ final class VibeWriteAppFlow: ObservableObject {
     @Published private(set) var projects: [WritingProject]
     @Published private(set) var activeProjectID: UUID?
     @Published private(set) var isAIRequestInFlight = false
+    @Published private(set) var isBodyThinkingInFlight = false
     @Published private(set) var isProseRequestInFlight = false
     @Published private(set) var isMetadataRequestInFlight = false
     @Published private(set) var activeEditLock: WritingEditLock?
@@ -246,6 +247,7 @@ final class VibeWriteAppFlow: ObservableObject {
         activeEditLock = nil
         aiErrorMessage = nil
         isAIRequestInFlight = false
+        isBodyThinkingInFlight = false
         isProseRequestInFlight = false
         isMetadataRequestInFlight = false
     }
@@ -273,6 +275,7 @@ final class VibeWriteAppFlow: ObservableObject {
 
         let project = activeEditingProject
         isAIRequestInFlight = true
+        isBodyThinkingInFlight = true
         isProseRequestInFlight = true
         isMetadataRequestInFlight = false
         activeEditLock = WritingEditLock(
@@ -283,6 +286,7 @@ final class VibeWriteAppFlow: ObservableObject {
         aiErrorMessage = nil
         defer {
             isAIRequestInFlight = false
+            isBodyThinkingInFlight = false
             isProseRequestInFlight = false
             isMetadataRequestInFlight = false
             activeEditLock = nil
@@ -464,6 +468,7 @@ final class VibeWriteAppFlow: ObservableObject {
             VibeWriteLog.ai.info(
                 "Flow prose network stream finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) streamSeconds=\(proseNetworkElapsed, privacy: .public) streamedCount=\(streamedText.count, privacy: .public) previewTailWillContinue=true"
             )
+            isBodyThinkingInFlight = false
 
             previewRenderer.markStreamCompleted()
             guard let response = finalResponse else {
