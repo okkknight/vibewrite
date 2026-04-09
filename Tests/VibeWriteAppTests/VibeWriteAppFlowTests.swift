@@ -362,7 +362,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
             flow.isProseRequestInFlight && flow.isMetadataRequestInFlight
         }
         XCTAssertTrue(metadataPhaseObserved)
-        XCTAssertTrue(flow.isAIRequestInFlight)
+        XCTAssertFalse(flow.isAIRequestInFlight)
         XCTAssertFalse(flow.isBodyThinkingInFlight)
         XCTAssertTrue(flow.isProseRequestInFlight)
         XCTAssertTrue(flow.isMetadataRequestInFlight)
@@ -376,6 +376,52 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertFalse(flow.isProseRequestInFlight)
         XCTAssertFalse(flow.isMetadataRequestInFlight)
         XCTAssertFalse(flow.activeProject.suggestionChips.isEmpty)
+    }
+
+    func testNewDraftCanStartAfterBodyFinishesEvenIfMetadataStillLoads() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(
+            storageURL: storageURL,
+            aiClient: OverlappingMetadataWritingAIClient()
+        )
+        flow.openProject(
+            WritingProject.entryShell(
+                prompt: "第一轮",
+                mode: .collaboration,
+                automationKey: "project.metadata.overlap"
+            )
+        )
+
+        let firstTask = Task { @MainActor in
+            try await flow.performWritingAction(
+                .startDraft,
+                userMessage: "第一轮",
+                selectionText: nil
+            )
+        }
+
+        let firstBodyFinished = await waitUntil(timeout: 4) {
+            !flow.isAIRequestInFlight && flow.isMetadataRequestInFlight
+        }
+        XCTAssertTrue(firstBodyFinished)
+
+        let secondTask = Task { @MainActor in
+            try await flow.performWritingAction(
+                .continueWriting,
+                userMessage: nil,
+                selectionText: nil
+            )
+        }
+
+        try await secondTask.value
+        try await firstTask.value
+
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertEqual(flow.activeProject.suggestionChips, ["继续写建议"])
     }
 
     func testEditAppliesPatchAtCompletionWhilePreservingPatchBoundaries() async throws {
@@ -1126,6 +1172,49 @@ private struct DelayedMetadataWritingAIClient: WritingAIClient {
                 for: request,
                 documentText: request.project.documentText,
                 metadata: MockWritingEngine.completionMetadata(for: request)
+            )
+        }
+
+        return WritingProjectResponseBuilder.response(
+            for: request,
+            documentText: MockWritingEngine.streamedDocumentText(for: request)
+        )
+    }
+}
+
+private struct OverlappingMetadataWritingAIClient: WritingAIClient {
+    private let streamClient = StubWritingAIClient()
+    private let firstMetadataDelayNanoseconds: UInt64 = 400_000_000
+
+    func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        streamClient.streamResponse(for: request)
+    }
+
+    func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
+        if request.kind == .metadata {
+            if request.action == .startDraft {
+                try await Task.sleep(nanoseconds: firstMetadataDelayNanoseconds)
+                return WritingProjectResponseBuilder.response(
+                    for: request,
+                    documentText: request.project.documentText,
+                    metadata: WritingAICompletionMetadata(
+                        localSummary: "第一轮摘要",
+                        globalSynopsis: "第一轮总览",
+                        nextFocus: "第一轮下一步",
+                        suggestionChips: ["第一轮建议"]
+                    )
+                )
+            }
+
+            return WritingProjectResponseBuilder.response(
+                for: request,
+                documentText: request.project.documentText,
+                metadata: WritingAICompletionMetadata(
+                    localSummary: "继续写摘要",
+                    globalSynopsis: "继续写总览",
+                    nextFocus: "继续写下一步",
+                    suggestionChips: ["继续写建议"]
+                )
             )
         }
 

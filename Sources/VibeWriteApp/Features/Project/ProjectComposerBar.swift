@@ -107,7 +107,7 @@ struct ProjectComposerBar: View {
                     .frame(width: 84, height: 34)
             }
             .buttonStyle(.plain)
-            .disabled(isRequestInFlight || isComposerLocked)
+            .disabled(isRequestInFlight)
             .padding(.trailing, 12)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)

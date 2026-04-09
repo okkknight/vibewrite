@@ -25,6 +25,7 @@ final class VibeWriteAppFlow: ObservableObject {
     private let emptyProjectShell: WritingProject
     private var savedDocumentContents: String?
     private var documentHydrationProtectedProjectID: UUID?
+    private var activeRequestToken: UUID?
 
     init(
         storageURL: URL? = nil,
@@ -250,6 +251,7 @@ final class VibeWriteAppFlow: ObservableObject {
         isBodyThinkingInFlight = false
         isProseRequestInFlight = false
         isMetadataRequestInFlight = false
+        activeRequestToken = nil
     }
 
     @discardableResult
@@ -274,22 +276,28 @@ final class VibeWriteAppFlow: ObservableObject {
         }
 
         let project = activeEditingProject
-        isAIRequestInFlight = true
-        isBodyThinkingInFlight = true
-        isProseRequestInFlight = true
-        isMetadataRequestInFlight = false
-        activeEditLock = WritingEditLock(
+        let requestToken = UUID()
+        let requestLock = WritingEditLock(
             action: action,
             lockedSelectionText: selectionRange.flatMap { $0.substring(in: project.documentText)?.trimmingCharacters(in: .whitespacesAndNewlines) } ?? selectionText,
             lockedDocumentText: project.documentText
         )
+        activeRequestToken = requestToken
+        isAIRequestInFlight = true
+        isBodyThinkingInFlight = true
+        isProseRequestInFlight = true
+        isMetadataRequestInFlight = false
+        activeEditLock = requestLock
         aiErrorMessage = nil
         defer {
-            isAIRequestInFlight = false
-            isBodyThinkingInFlight = false
-            isProseRequestInFlight = false
-            isMetadataRequestInFlight = false
-            activeEditLock = nil
+            if self.activeRequestToken == requestToken {
+                self.isAIRequestInFlight = false
+                self.isBodyThinkingInFlight = false
+                self.isProseRequestInFlight = false
+                self.isMetadataRequestInFlight = false
+                self.activeEditLock = nil
+                self.activeRequestToken = nil
+            }
         }
 
         let requestUserMessage = requestUserMessage(
@@ -381,10 +389,16 @@ final class VibeWriteAppFlow: ObservableObject {
                     selectionRange: selectionRange,
                     userMessage: requestUserMessage
                 )
+                guard isCurrentRequest(requestToken) else {
+                    return
+                }
                 let updatedDocumentText = try patch.apply(
                     to: beforeSnapshot.documentText,
-                    lock: activeEditLock
+                    lock: requestLock
                 )
+                guard isCurrentRequest(requestToken) else {
+                    return
+                }
                 liveProject.applyEditingResponse(response, documentText: updatedDocumentText)
                 liveProject.recordRevision(
                     patch: patch,
@@ -439,6 +453,7 @@ final class VibeWriteAppFlow: ObservableObject {
             var streamedText = ""
             let proseNetworkStartedAt = Date()
             let previewRenderer = WritingStreamingPreviewRenderer(configuration: streamingConfiguration) { renderedText in
+                guard self.isCurrentRequest(requestToken) else { return }
                 liveProject.documentText = renderedText
                 self.replaceActiveProject(liveProject)
             }
@@ -469,8 +484,12 @@ final class VibeWriteAppFlow: ObservableObject {
                 "Flow prose network stream finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) streamSeconds=\(proseNetworkElapsed, privacy: .public) streamedCount=\(streamedText.count, privacy: .public) previewTailWillContinue=true"
             )
             isBodyThinkingInFlight = false
+            isAIRequestInFlight = false
 
             previewRenderer.markStreamCompleted()
+            guard isCurrentRequest(requestToken) else {
+                return
+            }
             guard let response = finalResponse else {
                 throw WritingAIClientError.invalidResponse("AI stream did not produce a final response.")
             }
@@ -481,10 +500,16 @@ final class VibeWriteAppFlow: ObservableObject {
                 selectionRange: selectionRange,
                 userMessage: requestUserMessage
             )
+            guard isCurrentRequest(requestToken) else {
+                return
+            }
             let updatedDocumentText = try patch.apply(
                 to: beforeSnapshot.documentText,
-                lock: activeEditLock
+                lock: requestLock
             )
+            guard isCurrentRequest(requestToken) else {
+                return
+            }
             liveProject.applyWritingProseResponse(response, documentText: updatedDocumentText)
             liveProject.recordRevision(
                 patch: patch,
@@ -529,6 +554,9 @@ final class VibeWriteAppFlow: ObservableObject {
 
             do {
                 let metadataResponse = try await metadataTask.value
+                guard isCurrentRequest(requestToken) else {
+                    return
+                }
                 let metadata = metadataResponse.completionMetadata
                 liveProject.applyWritingMetadata(metadata)
                 replaceActiveProject(liveProject)
@@ -545,8 +573,13 @@ final class VibeWriteAppFlow: ObservableObject {
                     "Flow metadata request failed action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
                 )
             }
-            isMetadataRequestInFlight = false
+            if isCurrentRequest(requestToken) {
+                isMetadataRequestInFlight = false
+            }
         } catch {
+            guard isCurrentRequest(requestToken) else {
+                return
+            }
             VibeWriteLog.ai.error(
                 "Flow AI request failed action=\(action.rawValue, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
             )
@@ -589,8 +622,14 @@ final class VibeWriteAppFlow: ObservableObject {
         activeEditLock = nil
         aiErrorMessage = nil
         isAIRequestInFlight = false
+        isBodyThinkingInFlight = false
         isProseRequestInFlight = false
         isMetadataRequestInFlight = false
+        activeRequestToken = nil
+    }
+
+    private func isCurrentRequest(_ requestToken: UUID) -> Bool {
+        activeRequestToken == requestToken
     }
 
     private func replaceActiveProject(_ project: WritingProject) {

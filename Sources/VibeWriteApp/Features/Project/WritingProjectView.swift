@@ -19,6 +19,7 @@ struct WritingProjectView: View {
     @State private var showAssistantLayer = false
     @State private var showHistoryLayer = false
     @State private var isComposerLocked = false
+    @State private var composerRequestSessionID = UUID()
     @FocusState private var messageFieldFocused: Bool
 
     private var project: WritingProject { flow.activeEditingProject }
@@ -630,16 +631,20 @@ struct WritingProjectView: View {
 
         switch primaryAction {
         case .startDraft:
-            beginComposerThinking()
-            generateFirstDraft(trigger: draftInstructionText() ?? draftTriggerText())
+            let sessionID = beginComposerThinking()
+            generateFirstDraft(
+                trigger: draftInstructionText() ?? draftTriggerText(),
+                composerSessionID: sessionID
+            )
 
         case .continueWriting:
-            beginComposerThinking()
+            let sessionID = beginComposerThinking()
             applyRevision(
                 .continueWriting,
                 selectionText: nil,
                 userMessage: draftInstructionText(),
-                clearDraftOnSuccess: true
+                clearDraftOnSuccess: true,
+                composerSessionID: sessionID
             )
 
         case .edit:
@@ -649,14 +654,15 @@ struct WritingProjectView: View {
                 messageFieldFocused = true
                 return
             }
-            beginComposerThinking()
+            let sessionID = beginComposerThinking()
             beginLocalEditPresentation()
             applyRevision(
                 .edit,
                 selectionText: selection,
                 selectionRange: selectedTextRange,
                 userMessage: userMessage,
-                clearDraftOnSuccess: true
+                clearDraftOnSuccess: true,
+                composerSessionID: sessionID
             )
         }
     }
@@ -665,14 +671,15 @@ struct WritingProjectView: View {
         guard !flow.isAIRequestInFlight else { return }
         guard let selection = normalizedSelectedText else { return }
 
-        beginComposerThinking()
+        let sessionID = beginComposerThinking()
         beginLocalEditPresentation()
         applyRevision(
             .edit,
             selectionText: selection,
             selectionRange: selectedTextRange,
             userMessage: preset.prompt,
-            clearDraftOnSuccess: true
+            clearDraftOnSuccess: true,
+            composerSessionID: sessionID
         )
     }
 
@@ -694,7 +701,7 @@ struct WritingProjectView: View {
         }
     }
 
-    private func generateFirstDraft(trigger: String) {
+    private func generateFirstDraft(trigger: String, composerSessionID: UUID) {
         beginDocumentEndFollow()
         Task { @MainActor in
             do {
@@ -702,11 +709,12 @@ struct WritingProjectView: View {
                 schedulePostActionCleanup(
                     action: .startDraft,
                     clearDraftOnSuccess: true,
-                    keepHistoryDrawerOpen: false
+                    keepHistoryDrawerOpen: false,
+                    composerSessionID: composerSessionID
                 )
             } catch {
                 endDocumentEndFollow()
-                unlockComposerAfterRequest()
+                unlockComposerAfterRequest(composerSessionID: composerSessionID)
             }
         }
     }
@@ -717,7 +725,8 @@ struct WritingProjectView: View {
         selectionRange: WritingTextSelectionRange? = nil,
         userMessage: String? = nil,
         clearDraftOnSuccess: Bool = false,
-        keepHistoryDrawerOpen: Bool = false
+        keepHistoryDrawerOpen: Bool = false,
+        composerSessionID: UUID
     ) {
         if action == .startDraft || action == .continueWriting {
             beginDocumentEndFollow()
@@ -733,20 +742,25 @@ struct WritingProjectView: View {
                 schedulePostActionCleanup(
                     action: action,
                     clearDraftOnSuccess: clearDraftOnSuccess,
-                    keepHistoryDrawerOpen: keepHistoryDrawerOpen
+                    keepHistoryDrawerOpen: keepHistoryDrawerOpen,
+                    composerSessionID: composerSessionID
                 )
             } catch {
                 if action == .startDraft || action == .continueWriting {
                     endDocumentEndFollow()
                 }
-                unlockComposerAfterRequest()
+                unlockComposerAfterRequest(composerSessionID: composerSessionID)
             }
         }
     }
 
-    private func beginComposerThinking() {
+    @discardableResult
+    private func beginComposerThinking() -> UUID {
+        let sessionID = UUID()
+        composerRequestSessionID = sessionID
         isComposerLocked = true
         messageFieldFocused = false
+        return sessionID
     }
 
     private func beginDocumentEndFollow() {
@@ -760,7 +774,8 @@ struct WritingProjectView: View {
     private func schedulePostActionCleanup(
         action: WritingAIAction,
         clearDraftOnSuccess: Bool,
-        keepHistoryDrawerOpen: Bool
+        keepHistoryDrawerOpen: Bool,
+        composerSessionID: UUID
     ) {
         let shouldClearSelection = selectedText != nil
         let shouldCloseComparison = showComparison
@@ -780,6 +795,7 @@ struct WritingProjectView: View {
         )
 
         DispatchQueue.main.async {
+            guard self.composerRequestSessionID == composerSessionID else { return }
             VibeWriteDebugTrace.append(
                 "local edit cleanup action=\(action.rawValue) shouldFlash=\(shouldFlashLocalEdit) flashRange=\(flashRangePreview)"
             )
@@ -838,7 +854,8 @@ struct WritingProjectView: View {
         }
     }
 
-    private func unlockComposerAfterRequest() {
+    private func unlockComposerAfterRequest(composerSessionID: UUID) {
+        guard composerRequestSessionID == composerSessionID else { return }
         isComposerLocked = false
         localEditFlash = nil
         isLocalEditViewportLocked = false
@@ -862,8 +879,18 @@ struct WritingProjectView: View {
         }
 
         if revision.action == .edit {
-            beginComposerThinking()
+            let sessionID = beginComposerThinking()
             beginLocalEditPresentation()
+            applyRevision(
+                revision.action,
+                selectionText: revision.lockedSelectionText,
+                selectionRange: revision.lockedSelectionRange,
+                userMessage: revision.patch.userMessage,
+                clearDraftOnSuccess: revision.patch.userMessage != nil || revision.action == .startDraft,
+                keepHistoryDrawerOpen: true,
+                composerSessionID: sessionID
+            )
+            return
         }
 
         applyRevision(
@@ -872,7 +899,8 @@ struct WritingProjectView: View {
             selectionRange: revision.lockedSelectionRange,
             userMessage: revision.patch.userMessage,
             clearDraftOnSuccess: revision.patch.userMessage != nil || revision.action == .startDraft,
-            keepHistoryDrawerOpen: true
+            keepHistoryDrawerOpen: true,
+            composerSessionID: composerRequestSessionID
         )
     }
 

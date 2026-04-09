@@ -1,6 +1,10 @@
 # Changelog
 
 # 2026-04-09
+- Separated the submit button's clickable state from the metadata wait, so the button can submit again once正文 streaming finishes even if the previous suggestion request is still running.
+- Kept the composer input locked until the active request settles, and made stale metadata / cleanup ignore newer request sessions so an older tail cannot overwrite the fresh one.
+
+# 2026-04-09
 - Split the正文 thinking state from the metadata loading state so the subtitle, assistant sidebar subtitle, and submit button thinking visuals now follow the正文 network/thinking phase only.
 - Kept the metadata request and suggestion rendering order the same, but the composer now waits for正文 output to settle before showing `建议生成中`, so suggestion loading no longer keeps the正文 chrome stuck in thinking.
 
