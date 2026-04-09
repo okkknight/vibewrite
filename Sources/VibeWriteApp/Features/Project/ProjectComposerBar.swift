@@ -110,10 +110,12 @@ struct ProjectComposerBar: View {
             .padding(.trailing, 12)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            .overlay(alignment: .center) {
+            .overlay(alignment: .bottomTrailing) {
                 submitButtonVisual
                     .environment(\.isEnabled, true)
                     .allowsHitTesting(false)
+                    .padding(.trailing, 12)
+                    .padding(.bottom, 12)
             }
             .accessibilityIdentifier(sendButtonIdentifier)
             .accessibilityLabel(primaryActionTitle)
