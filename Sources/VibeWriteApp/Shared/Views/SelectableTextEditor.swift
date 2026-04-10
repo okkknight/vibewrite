@@ -45,7 +45,6 @@ struct SelectableTextEditor: NSViewRepresentable {
     var isViewportLockedDuringLocalEdit: Bool = false
     var shouldPreserveSelectionOverlayDuringPendingLocalEdit: Bool = false
     var onScrollViewReady: ((NSScrollView) -> Void)? = nil
-    var onSubmitRequested: (() -> Void)? = nil
 
     func makeCoordinator() -> Coordinator {
         Coordinator(
@@ -64,7 +63,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         textView.onLiveTextMutation = { [weak coordinator = context.coordinator] textView in
             coordinator?.handleLiveTextMutation(from: textView, source: "insertText")
         }
-        textView.onSubmitRequested = onSubmitRequested
         textView.delegate = context.coordinator
         textView.isRichText = false
         textView.allowsUndo = true
@@ -113,7 +111,6 @@ struct SelectableTextEditor: NSViewRepresentable {
         scrollView.documentView = textView
 
         context.coordinator.textView = textView
-        textView.onSubmitRequested = onSubmitRequested
         context.coordinator.installObservers(for: scrollView, textView: textView)
         context.coordinator.syncTypography(
             isEditable: isEditable,
@@ -1311,7 +1308,6 @@ private final class LocalEditFlashOverlayView: NSView {
 
 private final class StyledTextView: NSTextView {
     var onLiveTextMutation: ((NSTextView) -> Void)?
-    var onSubmitRequested: (() -> Void)?
 
     override func keyDown(with event: NSEvent) {
         let chars = debugEventString(event.characters)
@@ -1322,16 +1318,6 @@ private final class StyledTextView: NSTextView {
         VibeWriteLog.launch.info(
             "styled text view keyDown keyCode=\(event.keyCode, privacy: .public) chars=\(chars, privacy: .public) ignoringModifiers=\(ignoringModifiers, privacy: .public) modifiers=\(modifierFlags, privacy: .public) firstResponder=\(firstResponderName, privacy: .public) editable=\(self.isEditable, privacy: .public) textCount=\(textCount, privacy: .public)"
         )
-
-        let normalizedFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
-        if isEditable,
-           normalizedFlags.isEmpty,
-           (event.keyCode == 36 || event.keyCode == 76),
-           let onSubmitRequested {
-            onSubmitRequested()
-            return
-        }
-
         super.keyDown(with: event)
     }
 

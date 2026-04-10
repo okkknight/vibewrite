@@ -344,9 +344,6 @@ struct WritingProjectView: View {
                     shouldPreserveSelectionOverlayDuringPendingLocalEdit: isComposerLocked,
                     onScrollViewReady: { scrollView in
                         bodyEditorScrollView = scrollView
-                    },
-                    onSubmitRequested: {
-                        handlePrimaryAction()
                     }
                 )
                 .id(project.id)

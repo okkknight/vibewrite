@@ -1,7 +1,7 @@
 # Changelog
 
 # 2026-04-10
-- Made bare `Enter` in the正文 editor trigger the primary composer submit action instead of inserting a newline, while keeping the existing AppKit bridge and selection handling intact.
+- Made bare `Enter` in the bottom composer trigger the primary submit action instead of inserting a newline, while leaving the正文 editor bridge untouched.
 - Made the composer's assistant suggestion rail strictly single-line: chips now stay in order, and any chip that would force a wrap is dropped instead of spilling into a second row.
 
 # 2026-04-09

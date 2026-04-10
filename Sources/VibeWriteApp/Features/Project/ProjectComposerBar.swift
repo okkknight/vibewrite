@@ -1,3 +1,4 @@
+import AppKit
 import SwiftUI
 
 struct ProjectComposerBar: View {
@@ -78,11 +79,15 @@ struct ProjectComposerBar: View {
                 )
                 .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
 
-            TextEditor(text: $messageDraft)
-                .focused(messageFieldFocused)
-                .scrollContentBackground(.hidden)
-                .font(.system(size: 14, weight: .medium, design: .default))
-                .foregroundStyle(textColor)
+            ComposerTextEditor(
+                text: $messageDraft,
+                messageFieldFocused: messageFieldFocused,
+                isEditable: !isComposerLocked,
+                textFont: .systemFont(ofSize: 14, weight: .medium),
+                textColor: composerTextNSColor,
+                insertionPointColor: .vibeAccent,
+                onSubmitRequested: onSubmit
+            )
                 .padding(.leading, 14)
                 .padding(.trailing, 14)
                 .padding(.top, 14)
@@ -232,6 +237,18 @@ struct ProjectComposerBar: View {
         isPrimaryActionInFlight ? Color.vibeCanvasInkMuted : Color.vibeCanvasInkSoft
     }
 
+    private var composerTextNSColor: NSColor {
+        if isPrimaryActionInFlight {
+            return appearanceMode == .day
+                ? NSColor(calibratedRed: 0.57, green: 0.52, blue: 0.44, alpha: 1)
+                : NSColor(calibratedRed: 0.54, green: 0.56, blue: 0.61, alpha: 1)
+        }
+
+        return appearanceMode == .day
+            ? NSColor(calibratedRed: 0.44, green: 0.39, blue: 0.31, alpha: 1)
+            : NSColor(calibratedRed: 0.76, green: 0.78, blue: 0.82, alpha: 1)
+    }
+
     private var composerShadowColor: Color {
         switch appearanceMode {
         case .day:
@@ -309,6 +326,150 @@ struct ProjectComposerBar: View {
                 onAssistantSuggestionTap(title)
             }
         )
+    }
+}
+
+private struct ComposerTextEditor: NSViewRepresentable {
+    @Binding var text: String
+    let messageFieldFocused: FocusState<Bool>.Binding
+    let isEditable: Bool
+    let textFont: NSFont
+    let textColor: NSColor
+    let insertionPointColor: NSColor
+    let onSubmitRequested: () -> Void
+
+    func makeCoordinator() -> Coordinator {
+        Coordinator(
+            text: $text,
+            onFocusChanged: { isFocused in
+                messageFieldFocused.wrappedValue = isFocused
+            }
+        )
+    }
+
+    func makeNSView(context: Context) -> NSScrollView {
+        let textView = ComposerSubmitAwareTextView(frame: .zero)
+        textView.onSubmitRequested = onSubmitRequested
+        textView.delegate = context.coordinator
+        textView.isRichText = false
+        textView.allowsUndo = true
+        textView.isEditable = isEditable
+        textView.isSelectable = true
+        textView.isVerticallyResizable = true
+        textView.isHorizontallyResizable = false
+        textView.drawsBackground = false
+        textView.backgroundColor = .clear
+        textView.textColor = textColor
+        textView.insertionPointColor = insertionPointColor
+        textView.font = textFont
+        textView.typingAttributes = [
+            .font: textFont,
+            .foregroundColor: textColor
+        ]
+        textView.isAutomaticQuoteSubstitutionEnabled = false
+        textView.isAutomaticDashSubstitutionEnabled = false
+        textView.isAutomaticTextCompletionEnabled = false
+        textView.isContinuousSpellCheckingEnabled = false
+        textView.usesFindBar = false
+        textView.postsFrameChangedNotifications = true
+        textView.textContainerInset = .zero
+        textView.textContainer?.widthTracksTextView = false
+        textView.textContainer?.containerSize = NSSize(
+            width: CGFloat.greatestFiniteMagnitude,
+            height: CGFloat.greatestFiniteMagnitude
+        )
+        textView.minSize = .zero
+        textView.maxSize = NSSize(width: CGFloat.greatestFiniteMagnitude, height: CGFloat.greatestFiniteMagnitude)
+        textView.autoresizingMask = [.width]
+        textView.string = text
+
+        let scrollView = NSScrollView(frame: .zero)
+        scrollView.hasVerticalScroller = false
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+        scrollView.drawsBackground = false
+        scrollView.borderType = .noBorder
+        scrollView.documentView = textView
+
+        context.coordinator.textView = textView
+        context.coordinator.syncText(text, in: textView)
+        return scrollView
+    }
+
+    func updateNSView(_ scrollView: NSScrollView, context: Context) {
+        guard let textView = scrollView.documentView as? ComposerSubmitAwareTextView else {
+            return
+        }
+
+        context.coordinator.textView = textView
+        textView.onSubmitRequested = onSubmitRequested
+        textView.isEditable = isEditable
+        textView.textColor = textColor
+        textView.insertionPointColor = insertionPointColor
+        textView.font = textFont
+
+        context.coordinator.syncText(text, in: textView)
+
+        if messageFieldFocused.wrappedValue {
+            if textView.window?.firstResponder !== textView {
+                textView.window?.makeFirstResponder(textView)
+            }
+        } else if textView.window?.firstResponder === textView {
+            textView.window?.makeFirstResponder(nil)
+        }
+    }
+
+    @MainActor
+    final class Coordinator: NSObject, NSTextViewDelegate {
+        @Binding private var text: String
+        private let onFocusChanged: (Bool) -> Void
+        weak var textView: NSTextView?
+        private var programmaticChangeDepth = 0
+
+        init(text: Binding<String>, onFocusChanged: @escaping (Bool) -> Void) {
+            _text = text
+            self.onFocusChanged = onFocusChanged
+        }
+
+        func syncText(_ newText: String, in textView: NSTextView) {
+            guard textView.string != newText else { return }
+            programmaticChangeDepth += 1
+            textView.string = newText
+            programmaticChangeDepth -= 1
+        }
+
+        func textDidBeginEditing(_ notification: Notification) {
+            onFocusChanged(true)
+        }
+
+        func textDidEndEditing(_ notification: Notification) {
+            onFocusChanged(false)
+        }
+
+        func textDidChange(_ notification: Notification) {
+            guard programmaticChangeDepth == 0,
+                  let textView = notification.object as? NSTextView else {
+                return
+            }
+            text = textView.string
+        }
+    }
+}
+
+private final class ComposerSubmitAwareTextView: NSTextView {
+    var onSubmitRequested: (() -> Void)?
+
+    override func keyDown(with event: NSEvent) {
+        let normalizedFlags = event.modifierFlags.intersection(.deviceIndependentFlagsMask)
+        if isEditable,
+           normalizedFlags.isEmpty,
+           (event.keyCode == 36 || event.keyCode == 76),
+           let onSubmitRequested {
+            onSubmitRequested()
+            return
+        }
+
+        super.keyDown(with: event)
     }
 }
 
