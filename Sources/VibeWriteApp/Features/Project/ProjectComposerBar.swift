@@ -37,7 +37,7 @@ struct ProjectComposerBar: View {
     @ViewBuilder
     private var guidanceRail: some View {
         if shouldShowGuidanceRail {
-            TwoRowFlowLayout(itemSpacing: 8, rowSpacing: 8) {
+            SingleLineOverflowHidingLayout(itemSpacing: 8) {
                 if isSuggestionGenerationInFlight {
                     suggestionLoadingPill
                 } else if isOpeningState {
@@ -439,5 +439,89 @@ struct TwoRowFlowLayout: Layout {
     private struct MeasuredElement {
         let index: Int
         let size: CGSize
+    }
+}
+
+struct SingleLineOverflowHidingLayout: Layout {
+    let itemSpacing: CGFloat
+
+    init(itemSpacing: CGFloat = 8) {
+        self.itemSpacing = itemSpacing
+    }
+
+    func sizeThatFits(
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) -> CGSize {
+        let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let line = SingleLineOverflowHidingLayoutMetrics.line(
+            maxWidth: maxWidth,
+            itemSpacing: itemSpacing,
+            sizes: sizes
+        )
+        return CGSize(width: line.width, height: line.height)
+    }
+
+    func placeSubviews(
+        in bounds: CGRect,
+        proposal: ProposedViewSize,
+        subviews: Subviews,
+        cache: inout ()
+    ) {
+        let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
+        let line = SingleLineOverflowHidingLayoutMetrics.line(
+            maxWidth: bounds.width,
+            itemSpacing: itemSpacing,
+            sizes: sizes
+        )
+        var x = bounds.minX
+
+        for element in line.elements {
+            subviews[element.index].place(
+                at: CGPoint(x: x, y: bounds.minY),
+                anchor: .topLeading,
+                proposal: ProposedViewSize(element.size)
+            )
+            x += element.size.width + itemSpacing
+        }
+    }
+}
+
+enum SingleLineOverflowHidingLayoutMetrics {
+    struct Line {
+        let elements: [Element]
+        let width: CGFloat
+        let height: CGFloat
+    }
+
+    struct Element {
+        let index: Int
+        let size: CGSize
+    }
+
+    static func line(maxWidth: CGFloat, itemSpacing: CGFloat, sizes: [CGSize]) -> Line {
+        var elements: [Element] = []
+        var currentWidth: CGFloat = 0
+        var currentHeight: CGFloat = 0
+
+        for (index, size) in sizes.enumerated() {
+            let proposedWidth = elements.isEmpty ? size.width : currentWidth + itemSpacing + size.width
+
+            if !elements.isEmpty && proposedWidth > maxWidth {
+                break
+            }
+
+            if elements.isEmpty && size.width > maxWidth {
+                break
+            }
+
+            elements.append(Element(index: index, size: size))
+            currentWidth = elements.count == 1 ? size.width : currentWidth + itemSpacing + size.width
+            currentHeight = max(currentHeight, size.height)
+        }
+
+        return Line(elements: elements, width: currentWidth, height: currentHeight)
     }
 }

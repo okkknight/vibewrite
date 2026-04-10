@@ -1,5 +1,8 @@
 # Changelog
 
+# 2026-04-10
+- Made the composer's assistant suggestion rail strictly single-line: chips now stay in order, and any chip that would force a wrap is dropped instead of spilling into a second row.
+
 # 2026-04-09
 - Separated the submit button's clickable state from the metadata wait, so the button can submit again once正文 streaming finishes even if the previous suggestion request is still running.
 - Kept the composer input locked until the active request settles, and made stale metadata / cleanup ignore newer request sessions so an older tail cannot overwrite the fresh one.

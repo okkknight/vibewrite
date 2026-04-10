@@ -176,6 +176,22 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(ProjectShellLayoutMode(windowWidth: 1080).isWide)
     }
 
+    func testSingleLineOverflowHidingLayoutDropsTrailingItemsThatDoNotFit() {
+        let line = SingleLineOverflowHidingLayoutMetrics.line(
+            maxWidth: 278,
+            itemSpacing: 8,
+            sizes: [
+                CGSize(width: 120, height: 32),
+                CGSize(width: 104, height: 32),
+                CGSize(width: 96, height: 32)
+            ]
+        )
+
+        XCTAssertEqual(line.elements.map(\.index), [0, 1])
+        XCTAssertEqual(line.width, 232)
+        XCTAssertEqual(line.height, 32)
+    }
+
     func testForceBlankStartupIgnoresPersistedProjectsAndResetsStore() throws {
         let storageURL = try makeTempStorageURL()
         defer {
