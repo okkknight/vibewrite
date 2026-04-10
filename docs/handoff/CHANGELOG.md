@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-10
+- Reviewer verification passed: `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` both succeeded after the guidance rail moved into normal layout flow.
+
+# 2026-04-10
 - Moved the assistant guidance rail out of the composer overlay and into normal layout flow, so the composer card now grows when `建议生成中` or suggestion chips are present and collapses back when they disappear.
 
 # 2026-04-10
