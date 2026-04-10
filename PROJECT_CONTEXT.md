@@ -35,6 +35,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The submit button remains functionally disabled during thinking, but its visible chrome is overlaid from an enabled visual layer so the macOS disabled tint does not wash it out.
 - The submit button chrome is anchored back to the bottom-trailing corner after the enabled overlay workaround, so the opening state stays aligned while the thinking state still renders normally.
 - The bottom composer was tightened again so the text now anchors in the upper-left corner of the surface, the submit control is a larger button-like action instead of a tiny capsule, and the overall block stays flush to the正文 without overlapping it.
+- The正文 editor now treats bare `Enter` as submit and routes it back to the primary composer action, while preserving the same editor bridge and selection behavior.
 - The composer input surface now uses a true multiline editor that fills the whole panel body, while the guidance chips are rendered as a floating overlay so they no longer consume layout height.
 - The composer stack now sits as a bottom overlay over the正文 area instead of being pushed down by layout spacing, which keeps the输入框上缘贴着正文下边缘 while preserving the visible composer height and making the body text disappear naturally behind the bottom panel.
 - The正文 pane now restores a fixed bottom clearance equal to the composer's visible height, so the正文 background no longer runs all the way to the software bottom while the composer still remains aligned to the bottom edge.
