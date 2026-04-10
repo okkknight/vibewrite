@@ -103,21 +103,15 @@ struct ProjectComposerBar: View {
             }
 
             Button(action: onSubmit) {
-                Color.clear
-                    .frame(width: 84, height: 34)
+                submitButtonVisual
+                    .environment(\.isEnabled, true)
             }
             .buttonStyle(.plain)
             .disabled(isRequestInFlight)
+            .frame(width: 84, height: 34)
             .padding(.trailing, 12)
             .padding(.bottom, 12)
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            .overlay(alignment: .bottomTrailing) {
-                submitButtonVisual
-                    .environment(\.isEnabled, true)
-                    .allowsHitTesting(false)
-                    .padding(.trailing, 12)
-                    .padding(.bottom, 12)
-            }
             .accessibilityIdentifier(sendButtonIdentifier)
             .accessibilityLabel(primaryActionTitle)
         }
