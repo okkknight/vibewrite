@@ -392,6 +392,12 @@ private struct ComposerTextEditor: NSViewRepresentable {
         scrollView.documentView = textView
 
         context.coordinator.textView = textView
+        VibeWriteDebugTrace.append(
+            "composer text editor make view bindingCount=\(text.utf16.count) focused=\(messageFieldFocused.wrappedValue) editable=\(isEditable)"
+        )
+        VibeWriteLog.launch.info(
+            "composer text editor make view bindingCount=\(text.utf16.count, privacy: .public) focused=\(messageFieldFocused.wrappedValue, privacy: .public) editable=\(isEditable, privacy: .public)"
+        )
         context.coordinator.syncText(text, in: textView)
         return scrollView
     }
@@ -408,15 +414,40 @@ private struct ComposerTextEditor: NSViewRepresentable {
         textView.insertionPointColor = insertionPointColor
         textView.font = textFont
 
+        let firstResponderDescription = textView.window.map {
+            $0.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        } ?? "no-window"
+        let isFirstResponder = textView.window?.firstResponder === textView
+        VibeWriteDebugTrace.append(
+            "composer text editor update start bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) focused=\(messageFieldFocused.wrappedValue) firstResponder=\(firstResponderDescription) isFirstResponder=\(isFirstResponder) editable=\(isEditable)"
+        )
+        VibeWriteLog.launch.info(
+            "composer text editor update start bindingCount=\(text.utf16.count, privacy: .public) textViewCount=\(textView.string.utf16.count, privacy: .public) focused=\(messageFieldFocused.wrappedValue, privacy: .public) firstResponder=\(firstResponderDescription, privacy: .public) isFirstResponder=\(isFirstResponder, privacy: .public) editable=\(isEditable, privacy: .public)"
+        )
         context.coordinator.syncText(text, in: textView)
 
         if messageFieldFocused.wrappedValue {
             if textView.window?.firstResponder !== textView {
+                VibeWriteDebugTrace.append(
+                    "composer text editor request focus bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count)"
+                )
+                VibeWriteLog.launch.info(
+                    "composer text editor request focus bindingCount=\(text.utf16.count, privacy: .public) textViewCount=\(textView.string.utf16.count, privacy: .public)"
+                )
                 textView.window?.makeFirstResponder(textView)
             }
-        } else if textView.window?.firstResponder === textView {
-            textView.window?.makeFirstResponder(nil)
         }
+
+        let endFirstResponderDescription = textView.window.map {
+            $0.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        } ?? "no-window"
+        let endIsFirstResponder = textView.window?.firstResponder === textView
+        VibeWriteDebugTrace.append(
+            "composer text editor update end bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) focused=\(messageFieldFocused.wrappedValue) firstResponder=\(endFirstResponderDescription) isFirstResponder=\(endIsFirstResponder)"
+        )
+        VibeWriteLog.launch.info(
+            "composer text editor update end bindingCount=\(text.utf16.count, privacy: .public) textViewCount=\(textView.string.utf16.count, privacy: .public) focused=\(messageFieldFocused.wrappedValue, privacy: .public) firstResponder=\(endFirstResponderDescription, privacy: .public) isFirstResponder=\(endIsFirstResponder, privacy: .public)"
+        )
     }
 
     @MainActor
@@ -439,10 +470,42 @@ private struct ComposerTextEditor: NSViewRepresentable {
         }
 
         func textDidBeginEditing(_ notification: Notification) {
+            let firstResponderDescription = textView?.window.map {
+                $0.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+            } ?? "no-window"
+            let isFirstResponder = textView?.window?.firstResponder === textView
+            VibeWriteDebugTrace.append(
+                "composer text editor focus begin textCount=\(text.utf16.count) firstResponder=\(firstResponderDescription) isFirstResponder=\(isFirstResponder)"
+            )
+            VibeWriteLog.launch.info(
+                "composer text editor focus begin textCount=\(self.text.utf16.count, privacy: .public) firstResponder=\(firstResponderDescription, privacy: .public) isFirstResponder=\(isFirstResponder, privacy: .public)"
+            )
             onFocusChanged(true)
         }
 
         func textDidEndEditing(_ notification: Notification) {
+            let firstResponderDescription = textView?.window.map {
+                $0.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+            } ?? "no-window"
+            let isFirstResponder = textView?.window?.firstResponder === textView
+            let notificationInfoDescription = String(describing: notification.userInfo ?? [:])
+            VibeWriteDebugTrace.append(
+                "composer text editor focus end textCount=\(text.utf16.count) firstResponder=\(firstResponderDescription) isFirstResponder=\(isFirstResponder) userInfo=\(notificationInfoDescription)"
+            )
+            VibeWriteLog.launch.info(
+                "composer text editor focus end textCount=\(self.text.utf16.count, privacy: .public) firstResponder=\(firstResponderDescription, privacy: .public) isFirstResponder=\(isFirstResponder, privacy: .public) userInfo=\(notificationInfoDescription, privacy: .public)"
+            )
+            // AppKit can emit a transient end-editing callback while the text view
+            // still remains first responder after the first typed character.
+            guard isFirstResponder == false else {
+                VibeWriteDebugTrace.append(
+                    "composer text editor focus end ignored because view remains first responder textCount=\(text.utf16.count)"
+                )
+                VibeWriteLog.launch.info(
+                    "composer text editor focus end ignored because view remains first responder textCount=\(self.text.utf16.count, privacy: .public)"
+                )
+                return
+            }
             onFocusChanged(false)
         }
 
@@ -451,6 +514,16 @@ private struct ComposerTextEditor: NSViewRepresentable {
                   let textView = notification.object as? NSTextView else {
                 return
             }
+            let firstResponderDescription = textView.window.map {
+                $0.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+            } ?? "no-window"
+            let isFirstResponder = textView.window?.firstResponder === textView
+            VibeWriteDebugTrace.append(
+                "composer text editor text changed textViewCount=\(textView.string.utf16.count) bindingCount=\(text.utf16.count) firstResponder=\(firstResponderDescription) isFirstResponder=\(isFirstResponder) programmaticDepth=\(programmaticChangeDepth)"
+            )
+            VibeWriteLog.launch.info(
+                "composer text editor text changed textViewCount=\(textView.string.utf16.count, privacy: .public) bindingCount=\(self.text.utf16.count, privacy: .public) firstResponder=\(firstResponderDescription, privacy: .public) isFirstResponder=\(isFirstResponder, privacy: .public) programmaticDepth=\(self.programmaticChangeDepth, privacy: .public)"
+            )
             text = textView.string
         }
     }

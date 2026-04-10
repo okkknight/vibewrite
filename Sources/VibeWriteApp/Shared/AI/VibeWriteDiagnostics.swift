@@ -6,9 +6,21 @@ enum VibeWriteLog {
     static let ai = Logger(subsystem: "com.knightspace.vibewrite", category: "ai")
 }
 
+@MainActor
 enum VibeWriteDebugTrace {
+    private static var lines: [String] = []
+
     static func append(_ line: String) {
-        _ = line
+        lines.append(line)
+        if lines.count > 10_000 {
+            lines.removeFirst(lines.count - 10_000)
+        }
+    }
+
+    static func drain() -> [String] {
+        let snapshot = lines
+        lines.removeAll(keepingCapacity: true)
+        return snapshot
     }
 }
 
