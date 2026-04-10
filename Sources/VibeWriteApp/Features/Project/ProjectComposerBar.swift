@@ -192,10 +192,12 @@ struct ProjectComposerBar: View {
         }
 
         if isSuggestionGenerationInFlight {
-            return !isPrimaryOutputInFlight
+            return true
         }
 
-        return showsAssistantSuggestions && !normalizedAssistantSuggestionChips.isEmpty
+        return showsAssistantSuggestions
+            && !normalizedAssistantSuggestionChips.isEmpty
+            && !isPrimaryOutputInFlight
     }
 
     private var normalizedAssistantSuggestionChips: [String] {

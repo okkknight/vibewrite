@@ -1,6 +1,7 @@
 # Changelog
 
 # 2026-04-10
+- Made `建议生成中` visible as soon as the metadata request starts, while keeping the final suggestion chips gated until the正文 tail finishes.
 - Fixed the bottom composer focus bridge so it no longer resigns first responder just because the SwiftUI focus binding briefly reads false during the first character input; `textDidEndEditing` now ignores the spurious callback while the editor remains first responder.
 - Started metadata as soon as the backend prose result is available, while keeping the suggestion rail hidden until the prose tail finishes so visible chips still appear after正文 settles.
 - Kept the submit button disabled until正文 streaming fully finishes, so the metadata tail can no longer re-enable it early while the正文 is still on the screen.
