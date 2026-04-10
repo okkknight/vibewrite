@@ -537,7 +537,7 @@ struct WritingProjectView: View {
             showsAssistantSuggestions: shouldShowAssistantSuggestions,
             assistantSuggestionChips: project.suggestionChips,
             isComposerLocked: isComposerLocked,
-            isRequestInFlight: flow.isAIRequestInFlight,
+            isRequestInFlight: flow.isProseRequestInFlight,
             isPrimaryOutputInFlight: flow.isProseRequestInFlight,
             isPrimaryActionInFlight: flow.isBodyThinkingInFlight,
             isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
@@ -627,7 +627,7 @@ struct WritingProjectView: View {
     }
 
     private func handlePrimaryAction() {
-        guard !flow.isAIRequestInFlight else { return }
+        guard !flow.isProseRequestInFlight else { return }
 
         switch primaryAction {
         case .startDraft:
@@ -686,10 +686,8 @@ struct WritingProjectView: View {
     private func handleSuggestionTap(_ suggestion: String) {
         guard !flow.isAIRequestInFlight else { return }
 
+        messageDraft = suggestion
         messageFieldFocused = true
-        DispatchQueue.main.async {
-            messageDraft = suggestion
-        }
     }
 
     private struct ThinkingDots: View {

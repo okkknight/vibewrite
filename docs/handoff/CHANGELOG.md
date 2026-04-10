@@ -1,6 +1,8 @@
 # Changelog
 
 # 2026-04-10
+- Kept the submit button disabled until正文 streaming fully finishes, so the metadata tail can no longer re-enable it early while the正文 is still on the screen.
+- Made assistant suggestion taps synchronously seed the composer draft and refocus the input, so choosing a chip and pressing Enter can follow the normal submit path.
 - Made bare `Enter` in the bottom composer trigger the primary submit action instead of inserting a newline, while leaving the正文 editor bridge untouched.
 - Made the composer's assistant suggestion rail strictly single-line: chips now stay in order, and any chip that would force a wrap is dropped instead of spilling into a second row.
 
