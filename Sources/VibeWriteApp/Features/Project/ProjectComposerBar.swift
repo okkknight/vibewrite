@@ -22,10 +22,7 @@ struct ProjectComposerBar: View {
     let onAssistantSuggestionTap: (String) -> Void
 
     var body: some View {
-        ZStack(alignment: .bottomLeading) {
-            composerBackgroundReserve
-            composerSurface
-        }
+        composerBackgroundReserve
         .padding(.horizontal, 12)
         .animation(.easeInOut(duration: 0.18), value: shouldShowGuidanceRail)
         .accessibilityElement(children: .contain)
@@ -61,11 +58,10 @@ struct ProjectComposerBar: View {
         VStack(alignment: .leading, spacing: shouldShowGuidanceRail ? composerRailSpacing : 0) {
             if shouldShowGuidanceRail {
                 guidanceRail
+                    .transition(.opacity.combined(with: .move(edge: .top)))
             }
 
-            Color.clear
-                .frame(height: composerSurfaceHeight)
-                .accessibilityHidden(true)
+            composerSurface
         }
         .frame(maxWidth: .infinity, alignment: .leading)
         .background {
@@ -135,12 +131,12 @@ struct ProjectComposerBar: View {
             .disabled(isRequestInFlight)
             .frame(width: 84, height: 34)
             .padding(.trailing, 12)
-            .padding(.bottom, 12)
-            .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
-            .accessibilityIdentifier(sendButtonIdentifier)
-            .accessibilityLabel(primaryActionTitle)
+                .padding(.bottom, 12)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .bottomTrailing)
+                .accessibilityIdentifier(sendButtonIdentifier)
+                .accessibilityLabel(primaryActionTitle)
         }
-        .frame(height: 132, alignment: .topLeading)
+        .frame(height: composerSurfaceHeight, alignment: .topLeading)
         .accessibilityElement(children: .contain)
     }
 
