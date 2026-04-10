@@ -517,13 +517,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 after: liveProject.aiSnapshot
             )
             replaceActiveProject(liveProject)
-            if let currentDocumentURL {
-                _ = saveCurrentDocument(to: currentDocumentURL)
-            }
-            VibeWriteLog.ai.info(
-                "Flow prose response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
-            )
-
             let metadataRequest = WritingAIRequest(
                 action: action,
                 project: liveProject.aiSnapshot,
@@ -540,6 +533,13 @@ final class VibeWriteAppFlow: ObservableObject {
             let metadataTask = Task {
                 try await aiClient.generateResponse(for: metadataRequest)
             }
+
+            if let currentDocumentURL {
+                _ = saveCurrentDocument(to: currentDocumentURL)
+            }
+            VibeWriteLog.ai.info(
+                "Flow prose response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
+            )
 
             let prosePlaybackWaitStartedAt = Date()
             VibeWriteLog.ai.info(

@@ -1,6 +1,7 @@
 # Changelog
 
 # 2026-04-10
+- Started metadata as soon as the backend prose result is available, while keeping the suggestion rail hidden until the prose tail finishes so visible chips still appear after正文 settles.
 - Kept the submit button disabled until正文 streaming fully finishes, so the metadata tail can no longer re-enable it early while the正文 is still on the screen.
 - Made assistant suggestion taps synchronously seed the composer draft and refocus the input, so choosing a chip and pressing Enter can follow the normal submit path.
 - Made bare `Enter` in the bottom composer trigger the primary submit action instead of inserting a newline, while leaving the正文 editor bridge untouched.
