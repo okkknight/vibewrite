@@ -71,7 +71,6 @@ private struct ComposerFocusHarnessView: View {
             isSuggestionGenerationInFlight: false,
             messageFieldFocused: $focused,
             isMessageFieldHighlighted: focused,
-            guidanceRailBottomInset: 0,
             accessibilityIdentifier: "composer-bar",
             messageInputIdentifier: "composer-input",
             sendButtonIdentifier: "composer-submit",

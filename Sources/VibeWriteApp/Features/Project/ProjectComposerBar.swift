@@ -15,7 +15,6 @@ struct ProjectComposerBar: View {
     let isSuggestionGenerationInFlight: Bool
     let messageFieldFocused: FocusState<Bool>.Binding
     let isMessageFieldHighlighted: Bool
-    let guidanceRailBottomInset: CGFloat
     let accessibilityIdentifier: String
     let messageInputIdentifier: String
     let sendButtonIdentifier: String
@@ -23,13 +22,36 @@ struct ProjectComposerBar: View {
     let onAssistantSuggestionTap: (String) -> Void
 
     var body: some View {
-        composerSurface
-            .overlay(alignment: .bottomLeading) {
-                if shouldShowGuidanceRail {
-                    guidanceRail
-                        .padding(.bottom, guidanceRailBottomInset)
-                }
+        VStack(alignment: .leading, spacing: shouldShowGuidanceRail ? composerRailSpacing : 0) {
+            if shouldShowGuidanceRail {
+                guidanceRail
             }
+            composerSurface
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(composerBackgroundColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(gradientOpacity),
+                                    .clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blendMode(.softLight)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(composerStrokeColor, lineWidth: 1)
+                )
+                .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
+        }
         .padding(.horizontal, 12)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityIdentifier)
@@ -55,30 +77,12 @@ struct ProjectComposerBar: View {
         }
     }
 
+    private var composerRailSpacing: CGFloat {
+        10
+    }
+
     private var composerSurface: some View {
         ZStack(alignment: .topLeading) {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(composerBackgroundColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(gradientOpacity),
-                                    .clear
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .blendMode(.softLight)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(composerStrokeColor, lineWidth: 1)
-                )
-                .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
-
             ComposerTextEditor(
                 text: $messageDraft,
                 messageFieldFocused: messageFieldFocused,

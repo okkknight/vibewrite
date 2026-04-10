@@ -513,19 +513,27 @@ struct WritingProjectView: View {
     }
 
     private var messageFieldPlaceholder: String {
+        let placeholder: String
         switch primaryAction {
         case .startDraft:
-            return "先从一段开场，开启写作之旅。"
+            placeholder = "先从一段开场，开启写作之旅"
         case .continueWriting:
-            return assistantNextFocusPlaceholderText
+            placeholder = assistantNextFocusPlaceholderText
         case .edit:
-            return "输入你的修改建议"
+            placeholder = "输入你的修改建议"
         }
+
+        return sanitizedPlaceholderText(placeholder)
     }
 
     private var assistantNextFocusPlaceholderText: String {
         let trimmedNextFocus = project.nextFocus.trimmingCharacters(in: .whitespacesAndNewlines)
-        return trimmedNextFocus.isEmpty ? "你想怎么展开下一段" : trimmedNextFocus
+        return sanitizedPlaceholderText(trimmedNextFocus.isEmpty ? "你想怎么展开下一段" : trimmedNextFocus)
+    }
+
+    private func sanitizedPlaceholderText(_ text: String) -> String {
+        let trimmed = text.trimmingCharacters(in: .whitespacesAndNewlines)
+        return trimmed.trimmingCharacters(in: CharacterSet(charactersIn: "。．."))
     }
 
     private var composerBar: some View {
@@ -543,7 +551,6 @@ struct WritingProjectView: View {
             isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
             isMessageFieldHighlighted: normalizedSelectedText != nil,
-            guidanceRailBottomInset: composerRailBottomInset,
             accessibilityIdentifier: VibeWriteAutomationID.projectComposerBar,
             messageInputIdentifier: VibeWriteAutomationID.projectMessageInput,
             sendButtonIdentifier: VibeWriteAutomationID.projectSendButton,
