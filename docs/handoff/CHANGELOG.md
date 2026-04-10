@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-10
+- Added a light ease-in-out transition to the guidance reserve so the composer expands and contracts more smoothly when `建议生成中` or suggestion chips appear and disappear, while keeping the fixed 132pt body unchanged.
+
+# 2026-04-10
 - Corrected the guidance rail layout so it reserves background height above the fixed 132pt composer body instead of pushing the body down. The composer card now expands and contracts only through its background reserve, which keeps正文 clear without changing the body height.
 - Verification for this layout correction passed with `swift test`.
 

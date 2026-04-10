@@ -27,6 +27,7 @@ struct ProjectComposerBar: View {
             composerSurface
         }
         .padding(.horizontal, 12)
+        .animation(.easeInOut(duration: 0.18), value: shouldShowGuidanceRail)
         .accessibilityElement(children: .contain)
         .accessibilityIdentifier(accessibilityIdentifier)
     }
@@ -48,6 +49,7 @@ struct ProjectComposerBar: View {
                 }
             }
             .frame(maxWidth: .infinity, alignment: .leading)
+            .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }
 
