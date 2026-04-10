@@ -1,6 +1,10 @@
 # Changelog
 
 # 2026-04-10
+- Corrected the guidance rail layout so it reserves background height above the fixed 132pt composer body instead of pushing the body down. The composer card now expands and contracts only through its background reserve, which keeps正文 clear without changing the body height.
+- Verification for this layout correction passed with `swift test`.
+
+# 2026-04-10
 - Reviewer verification passed: `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` both succeeded after the guidance rail moved into normal layout flow.
 
 # 2026-04-10
