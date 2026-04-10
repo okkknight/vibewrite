@@ -67,25 +67,6 @@ struct ProjectComposerBar: View {
         .background {
             RoundedRectangle(cornerRadius: 24, style: .continuous)
                 .fill(composerBackgroundColor)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .fill(
-                            LinearGradient(
-                                colors: [
-                                    Color.white.opacity(gradientOpacity),
-                                    .clear
-                                ],
-                                startPoint: .topLeading,
-                                endPoint: .bottomTrailing
-                            )
-                        )
-                        .blendMode(.softLight)
-                )
-                .overlay(
-                    RoundedRectangle(cornerRadius: 24, style: .continuous)
-                        .strokeBorder(composerStrokeColor, lineWidth: 1)
-                )
-                .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
         }
     }
 
@@ -137,6 +118,29 @@ struct ProjectComposerBar: View {
                 .accessibilityLabel(primaryActionTitle)
         }
         .frame(height: composerSurfaceHeight, alignment: .topLeading)
+        .background {
+            RoundedRectangle(cornerRadius: 24, style: .continuous)
+                .fill(composerBackgroundColor)
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(gradientOpacity),
+                                    .clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blendMode(.softLight)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 24, style: .continuous)
+                        .strokeBorder(composerStrokeColor, lineWidth: 1)
+                )
+                .shadow(color: composerShadowColor, radius: composerShadowRadius, x: 0, y: composerShadowYOffset)
+        }
         .accessibilityElement(children: .contain)
     }
 
