@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-11
+- Added `task/TASK_20260411_026.md` as the next Phase 1 execution card. It defines the `VibeWriteShared` boundary so the pure shared models and AI contract can move out of the app target before any backend gateway work starts.
+
+# 2026-04-11
 - Independent review of `TASK_20260411_025.md` passed on the `7a24f23` worktree: `WritingAIContracts.swift` now contains the contract/DTO types, `WritingAIModels.swift` retains the decoder/helper/default implementation logic, the project file includes the new source, and the task's acceptance criteria are satisfied without changing runtime behavior.
 - Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 

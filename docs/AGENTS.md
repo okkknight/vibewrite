@@ -26,6 +26,7 @@ For V3 planning and split-architecture work, use:
 - `docs/V3/IA3.0.md`
 - `docs/V3/ROADMAP3.0.md`
 - `task/TASK_20260411_025.md`
+- `task/TASK_20260411_026.md`
 - `docs/V3/FRONTEND3.0.md`
 - `docs/V3/BACKEND3.0.md`
 - `docs/V3/DATA3.0.md`

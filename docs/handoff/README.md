@@ -29,13 +29,14 @@ This directory is the compact handoff layer for VibeWrite.
 24. `docs/V3/IA3.0.md`
 25. `docs/V3/ROADMAP3.0.md`
 26. `task/TASK_20260411_025.md`
-27. `docs/V3/FRONTEND3.0.md`
-28. `docs/V3/BACKEND3.0.md`
-29. `docs/V3/DATA3.0.md`
-30. `docs/V3/API3.0.md`
-31. `docs/V3/ADMIN3.0.md`
-32. `docs/V3/DEPLOY3.0.md`
-33. `docs/V3/MIGRATION3.0.md`
+27. `task/TASK_20260411_026.md`
+28. `docs/V3/FRONTEND3.0.md`
+29. `docs/V3/BACKEND3.0.md`
+30. `docs/V3/DATA3.0.md`
+31. `docs/V3/API3.0.md`
+32. `docs/V3/ADMIN3.0.md`
+33. `docs/V3/DEPLOY3.0.md`
+34. `docs/V3/MIGRATION3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -44,114 +45,14 @@ This directory is the compact handoff layer for VibeWrite.
 
 ## Current state
 - V2 docs under `docs/V2/` remain archival reference for the current runtime behavior; `docs/V1/` is archival only.
-- V3 planning docs now define the frontend/backend split target, backend AI gateway, data model, deployment shape, roadmap order, and migration order, but the runtime implementation is still the current V2 client.
-- The first Phase 1 execution card now lives in `task/TASK_20260411_025.md`; future task cards should follow the roadmap order instead of skipping directly into implementation details.
-- The shared AI contract layer now lives in `Sources/VibeWriteApp/Shared/AI/WritingAIContracts.swift`, while `WritingAIModels.swift` keeps the decoder, helper, and default implementation logic.
-- The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell. The old正文 project-body writeback bridge is gone, so title and metadata edits can stay on the project side without stealing正文 from the live editor.
+- V3 planning docs define the frontend/backend split target, backend AI gateway, data model, deployment shape, roadmap order, and migration order, but the runtime implementation is still the current V2 client.
+- `task/TASK_20260411_025.md` is the first Phase 1 execution card; `task/TASK_20260411_026.md` is the next shared-module card and promotes the pure shared model boundary into `VibeWriteShared`.
+- `Sources/VibeWriteApp/Shared/AI/WritingAIContracts.swift` currently holds the contract/DTO types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
+- The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
-- Project-level updates that intentionally change正文, such as open, undo, and AI responses, now sync the live正文 back into the session snapshot through `replaceActiveProject`, which keeps the live buffer and persisted project aligned.
-- Command logs now report live正文 counts, so Open / Save / Save As diagnostics match the new session layer instead of stale project-body counts.
-- `startDraft` and `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request that starts as soon as the backend prose result is available and can overlap the preview renderer's tail finish. The subtitle and submit-button thinking visuals now stop when the正文 network stream finishes, while metadata continues independently; the composer still shows a lightweight `建议生成中` pill during the metadata wait and keeps the input locked until the active request settles; metadata updates `summary`, `nextFocus`, and `suggestionChips` only after the prose phase succeeds, and the metadata prompt still has two routeable implementations, the current Anthropic-compatible `emit_metadata` tool path selected by default and a `MiniMax-Text-01` `json_schema` path that can still be chosen explicitly with `MINIMAX_METADATA_ROUTE=text01_json_schema`; the current tool path prompt now hard-requires a single `emit_metadata` tool call and forbids ordinary assistant text, and the latest prompt tightening makes suggestion chips the highest-priority output while keeping the global synopsis short and stable; `.edit` keeps the legacy combined-response path unchanged.
-- Runtime AI logs now include a short action trace id plus prose-network, prose-playback, and metadata timing markers, which makes it easier to separate network failure, metadata parse failure, and playback-tail timing issues when QA reports a regression.
-- The正文 editor and bottom composer now share one outer content column, and the editor bridge no longer centers a separate readable-width block. The editor uses a fixed text inset while the visible vertical scroll indicator is rendered in a reserved far-right lane at the edge of the app, and the editor bridge keeps its internal text width aligned with that inset so the正文 does not clip on the right; the indicator fades in on scroll activity and fades back out after a short period of idle time, while still staying hidden when the正文 is not scrollable.
-- The Composer shell was redesigned into a single rounded input surface: the former fixed top-left capsule now lives in the submit button slot, the guidance rail now sits above the fixed 132pt composer body as a separate row, the visible actions read `开场` / `续写` / `润色`, and the selection edit flow now shows an inline rail above the composer instead of a popover while keeping the underlying state flow unchanged.
-- That guidance rail still animates its entry/exit lightly, so the composer expands and contracts more smoothly without changing the fixed body height.
-- The assistant suggestion rail now gets an explicit full-width anchor inside the composer, and the overflow cutoff always keeps the first chip even when it exceeds the available width while still dropping trailing chips instead of squeezing all three into one row.
-- The composer placeholder display now strips trailing句号 from the opening and continuation hints as well as the other visible placeholder prompts.
-- The submit button's `开场中` / `续写中` / `润色中` display now uses a dedicated button-only in-flight flag that stays alive until正文 playback finishes, while `isBodyThinkingInFlight` keeps its earlier network-phase meaning for the subtitle chrome.
-- The正文 thinking state is now separated from the metadata loading state: the subtitle, assistant sidebar subtitle, and submit button thinking visuals use the正文 network/thinking flag only, while the composer keeps `建议生成中` gated behind正文 output settling so suggestions still appear after正文 completion.
-- The submit button now stays disabled until正文 streaming itself has fully finished, instead of re-enabling as soon as the metadata wait begins, and choosing an assistant suggestion now synchronously seeds the draft and refocuses the composer so Enter can follow the normal submit path.
-- The composer was tightened again so the text sits in the upper-left of the input surface and the submit control reads as a larger button-like action instead of another capsule, while still keeping the same visual language in day and night themes.
-- The bottom composer now treats bare `Enter` as submit and routes it back to the primary composer action, while leaving the AppKit-backed正文 editor bridge untouched.
-- The composer input area now uses a multiline editor that fills the fixed body, while the suggestion rail sits above it as a separate row so the composer can grow without wrapping both elements in one extra rounded container.
-- The正文 pane now ends at the composer seam again, while the bottom content stack keeps a small outer bottom margin so the dialog breathes off the software edge without changing that seam.
-- The guidance rail now occupies its own row above the composer body, and the selection rail now does the same for preset润色 states, so both capsule groups expand the composer area instead of overlapping正文 while keeping the fixed composer body unchanged.
-- The selection flow now keeps only the preset润色 chips above the composer, and the stage-specific placeholder copy still switches between direct opening, continuation, and润色 prompts.
-- The selection-flow UI test is temporarily skipped in the default suite because the system open panel still steals focus on that path; the blank-start and compact-layout smoke tests are the current verification baseline.
-- The composer delete/backspace regression is still open and under investigation; this pass did not change that path.
-- Assistant suggestion taps now log the draft and focus handoff, and the composer logs when its focus binding changes, so the next repro can show whether the chip click actually returns first responder to the composer.
-- The selection context capsule and assistant suggestion chips now use a warmer gold-brown day-mode foreground with slightly stronger light-mode contrast so the day theme stays readable while the night theme remains unchanged.
-- The app now launches in day mode by default, and the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
-- The composer now shows `建议生成中` as soon as the metadata request starts, while the final suggestion chips still wait until the正文 tail has finished.
-- The bottom composer focus bridge no longer forces a resign when the SwiftUI focus binding briefly reads false; it only requests focus when the binding is true and ignores `textDidEndEditing` callbacks that fire while the editor is still first responder. That fixes the first-character focus-loss repro without changing real blur behavior.
-- External document opens now pass through a short hydration window so the freshly loaded正文 is not immediately overwritten by an empty binding sync on the first render.
-- The latest repo commit before this update is `ec2ec86`, which removed the extra composer spacing gaps so the正文/composer seam is visually zero-gap again while keeping the card shadow. The commit before that, `370ec50`, split metadata routing between the current structured-tool path and `MiniMax-Text-01` `json_schema`; this update then removes `continuationSummary` entirely and replaces it with `localSummary` plus `globalSynopsis`.
-- The正文 editor bridge now preserves live user text when the NSTextView is the active first responder and its content diverges from the SwiftUI binding, so selection/focus refreshes no longer overwrite freshly typed text before save.
-- The live-text preservation guard was narrowed so a focused but empty editor no longer overrides the first-open body of an external document. It now keys off a real pending user-text change instead of marked-text state, and bootstrap empty delegate mutations are ignored during hydration, which keeps manual typing saveable while restoring the first-open hydration behavior for file-backed documents.
-- The正文 editor viewport behavior is now split into explicit intents for document-end follow, selection visibility after real text mutation, and local-edit viewport lock. Ordinary scroll-bound updates no longer pull the current selection back into view, which fixes the selected-paragraph scroll jitter without changing prose-tail follow or local-edit anchoring.
-- Pristine blank startup sessions now bypass the discard prompt on window close, so the app does not ask to save when no real正文 or collaboration edits have happened yet.
-- When prose streaming completes, the正文 editor now keeps both the SwiftUI selection binding and the underlying NSTextView caret pinned to the end of the newly streamed text for a brief follow window, so the view no longer snaps back to the earlier selection position at completion.
-- `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` both pass after the current metadata routing split, so reviewer verification can focus on the localized prose-end and metadata-routing behavior first.
-- `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -only-testing:VibeWriteUITests/VibeWriteUITests/testBlankWritingShellOpensAndShowsCoreChrome -only-testing:VibeWriteUITests/VibeWriteUITests/testCompactLayoutShowsSidebarDrawers` passes after the composer tightening pass; the selection-flow UI test is still skipped because the open panel steals focus.
-- Closing the window via the macOS title-bar `×` now reuses the same dirty-check confirmation path as Open/New, so unsaved正文 changes prompt before the app closes.
-- `.edit` now keeps any already-visible assistant suggestion chips instead of replacing them; the new edit metadata only appears when the suggestion area was empty before the edit completed.
-- The duplicate top-level `File` menu was traced to a standalone `CommandMenu("File")` in `VibeWriteCommands`; the current fix routes those actions through standard `CommandGroup` placement so the app keeps one top-level File menu.
-- `Config/VibeWrite.local.xcconfig` stays local-only and currently contains a real `MINIMAX_API_KEY`; it is ignored and should not be committed.
-- `scripts/package_dmg.sh` is now the simple friend-trial packaging path: it builds a Release app with `ENABLE_DEBUG_DYLIB=NO` and stages it with an `/Applications` shortcut, so the current build can be turned into a DMG without adding a full installer flow.
-- The document storage model now keeps正文 and collaboration state separate: the Markdown file stores正文 plus a hidden identity marker, `xattr` carries the primary `docID`, and the app-side metadata store keeps conversation history, `localSummary`, `globalSynopsis`, and the latest collaboration context. Save As creates a fresh `docID`, and malformed metadata falls back to正文-only editing instead of blocking open/save.
-- On the first Save As of a never-before-saved正文, the filename the user chose now backfills the project title too; afterward the title and file name can diverge again.
-- The selection bridge was narrowed so update sync no longer clears a live NSTextView selection when the SwiftUI binding is nil, which let the non-empty selection stabilize before the inline rail rewrite.
-- Streaming正文 preview now uses a dedicated playback renderer: the first visible chunk is emitted immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps finishing the remaining text character by character instead of flushing the tail in one jump.
-- The流式 cadence is code-configurable through `WritingStreamingConfiguration` plus the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`, so we can tune the feel without scattering constants through the app.
-- Remote AI metadata is now explicitly constrained to the current document language for Chinese writing tasks, which keeps `localSummary`, `globalSynopsis`, `nextFocus`, and `suggestionChips` aligned with the prose language instead of drifting into English.
-- `startDraft` prose is now metadata-free; the metadata prompt is a separate request that runs after the prose phase completes.
-- `continueWriting` prose is now metadata-free; the metadata prompt is a separate request that runs after the prose phase completes, while the prose prompt still uses the persisted `globalSynopsis` and document tail.
-- `continueWriting` now also tells the model to advance only a little and avoid a fully closed ending, so the prompt leaves some forward momentum for the next step.
-- Continue-writing streaming playback now reveals from the end of the current正文 instead of starting from character 0, so the visible stream stays anchored to the latest paragraph.
-- Local edit requests now preserve the selected正文 position as a stable `selectionRange`, and the edit/revision/mock/preview layers use that exact range instead of re-finding text by content. That prevents repeated local edits from drifting to earlier duplicate passages.
-- Local edit completion now has its own transient presentation state: the正文 viewport stays anchored while the replacement lands, then the new text flashes briefly so users can see what changed without the page jumping away from the edited paragraph.
-- The local-edit flash was refined again: it now uses a rounded overlay highlight with a lighter yellow tint, the flash pops in immediately and fades out gradually, and the viewport stays anchored after the flash instead of snapping the cursor to the document end.
-- Trace logs confirmed the first flash frame was arriving fully transparent; the overlay timing now keeps the initial frame visible before the fade begins.
-- The正文 editor now buffers user text changes that arrive during layout sync and flushes the pending binding update once layout settles, so save operations preserve newly typed正文 instead of falling back to an older model snapshot.
-- The正文 editor bridge now also commits `insertText` directly into the live正文 binding, so manual typing no longer depends on `textDidChange` alone before save or selection refreshes.
-- The正文 editor bridge now also commits mutating `doCommand(by:)` text actions into the live正文 binding, which keeps deletions on the same live commit path as insertions.
-- The selection-preset loading state is now represented as a real busy/disabled state in the selection chips, and the targeted UI test waits for the preset button to disable instead of probing a fragile accessibility spinner node.
-- Blank startup no longer trips the discard prompt or wipes a newly opened file: the flow now starts from the blank shell's rendered snapshot, and the title/body bindings ignore stale writebacks from an inactive project so an external document is not overwritten by an empty buffer during the first load.
-- Edit mode no longer uses the streaming preview renderer to rewrite the正文 live. The final patch is applied once at completion so local edits do not visually flicker through chunk-by-chunk replacement.
-- The app now saves and opens user work as Markdown files with正文 plus a hidden marker. The File menu owns `Open`, `Save`, `Save As`, and `Open Recent`, the header title is editable in place, and bad or missing collaboration metadata never blocks正文 editing.
-- The app-owned local store now only keeps lightweight recent-document entries; the actual writing state lives in the Markdown file, and the collaboration state lives in the app-side metadata store keyed by `docID`.
-- Debug logs were added around正文 binding writeback and `saveCurrentDocument` so the current Ctrl+S save-loss repro can be traced with real `OSLog` instead of the no-op debug trace sink.
-- The current save-loss debugging pass also logs the menu command entry points and `SelectableTextEditor.textDidChange`, which should let the next repro distinguish command dispatch from editor commit and from disk save.
-- The current save-loss tracing pass now also logs the live正文 binding setter and the editor bridge's make/update/sync decisions in one shot, so the next repro can follow a single input from `NSTextView` into `activeDocumentText` and then into the saved snapshot without adding more probes.
-- Edit streaming now starts from the selected passage instead of replaying from the top of the document, so local patch responses feel anchored to the user’s selection.
-- The page header subtitle continues to use `project.localSummary`; if the text under the title is off-topic, the issue is in the local summary source, not the subtitle component.
-- The current head keeps `continueWriting` soft, but the collaboration metadata now stores `localSummary` and `globalSynopsis` instead of the old `continuationSummary`.
-- `task/TASK_20260403_024.md` completed the visual restyle pass, but the deeper post-submit diagnosis found an app-side hang rather than an XCTest idle issue.
-- The hang was fixed in `SelectableTextEditor` and `VibeWriteAppFlow`, and the targeted UI test now gets past the second submit.
-- The latest prompt-path fix restored `startDraft` user input into the actual LLM payload, and the正文 editor now applies a clearer, larger AppKit text style so remote drafts are readable on the dark shell.
-- The first-draft prompt-loss bug is now fixed too: `startDraft` keeps the user's input in the AI request even when it matches `project.prompt`, and the flow avoids duplicating that same message in conversation history during quick-start.
-- A follow-up editor fix now clamps `StyledTextView` resize sizes to non-zero values, refreshes layout during live resizing, and keeps the documentView pinned to the scroll view origin while reusing the visible clip bounds whenever resize geometry is still settling. That stopped正文 text from vanishing when the whole window is repeatedly stretched and shrunk, and the fix was verified in a real window with正文 content present.
-- The selection edit popover now follows the selected正文 area instead of staying fixed in the page's upper-right corner. The working fix keeps selection updates live and uses the scroll-view's top-left coordinate system directly; the previous y conversion could push the popover out of view. The edit/continue actions were left intact.
-- A follow-up root cause was found in the AppKit bridge: a nil selection binding could still be reflected back into `NSTextView` during update churn, which cleared the user's non-empty selection before SwiftUI could render the popover. The current sync logic only clears when there was an actual mirrored selection to clear.
-- The latest popover follow-up found a second bridge gap: direct non-empty selection changes were not reliably surfacing through the existing delegate path, so the popover often appeared only after the正文 scroll view moved and forced another snapshot. The bridge now observes `NSTextView.didChangeSelectionNotification` directly and flushes selection sync again after layout if the change arrived mid-layout.
-- The selection edit flow now shows explicit preset intents (`更画面` / `更克制` / `更抓人`) and no longer depends on the old floating popover path; the first three still route through the same `.edit` action with explicit prompts.
-- Selection edit no longer has an empty-instruction fallback from the composer. If a selection exists and the user submits with no text, the UI now treats that as `自定义` activation instead of silently sending a generic edit request.
-- Remote AI now separates prose and metadata for `startDraft` / `continueWriting`:正文 streams first, then a second request fills `summary`, `nextFocus`, and `suggestionChips`; `.edit` keeps the legacy combined path.
-- The composer guidance row is now intentionally sparse in the blank/start-draft state: initial empty正文 only shows the primary `生成开场` pill, while assistant guidance chips stay on a single line and no longer wrap into a second row.
-- The composer's assistant suggestion rail now stays on one line only: chips keep their order, and any chip that would overflow is dropped instead of wrapping.
-- Clicking an assistant suggestion now clears the current first responder, advances `composerFocusRequestID`, and lets `ComposerTextEditor` hard-set itself as first responder on the next view update, so Enter returns to composer submission instead of staying trapped in the正文 editor.
-- The window and project shell no longer impose hard minimum width/height constraints, so the app can now be resized freely for real-world layout testing.
-- Compact project layout now uses a full-window editor surface instead of the old nested rounded shell, so shrinking the window no longer falls back to a fake-looking big-frame/little-frame composition.
-- The AI and history sidebars have been flattened toward a Codex-style sliding panel treatment: softer shell, fewer nested section cards, and more list-like rows.
-- The history sidebar is now intentionally hidden from the UI, while the AI sidebar keeps only status and recent replies; the collaboration summary and next-step suggestion blocks are still in code but not rendered.
-- The正文 editor and composer now share the same centered content column and horizontal padding, so shrinking the window no longer makes the upper editor block and lower input bar drift out of alignment.
-- During the latest validation, the正文 editor disappearance was reproduced as a layout-height issue: adding a temporary min-height made the正文 visible again, and that diagnostic change was then reverted. The remaining question is prompt semantics / model behavior, not transport.
-- When the正文 is fully cleared, the title subtitle now falls back to the initial stage description instead of lingering on the last generated summary; while AI is thinking, the subtitle can append a light animated ellipsis.
-- Empty body state is now stripped down to the plain editor surface and cursor-ready input area; the old "还没有正文" prompt card has been removed from the正文 panel.
-- The top-left assistant sidebar toggle is clickable again; the centered project-title layer in the header now ignores hit testing so it no longer blocks the button.
-- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the prompt-loss fix; the document split now has targeted unit coverage for save/reopen, malformed metadata fallback, and xattr precedence.
-- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` passes after the local-edit flash and viewport refinements.
-- `swift test --filter VibeWriteAppFlowTests/testEditPatchExposesReplacementHighlightRangeForLocalFlash`
-- The new document split is covered by targeted tests for save/reopen, malformed metadata fallback, and xattr precedence, so the storage path has direct coverage instead of relying on the older embedded-metadata flow.
-- `swift test` now passes with the file-based document flow and menu commands in place.
-- `swift test` passes after the composer redesign and selection-rail rewrite.
-- `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS' -derivedDataPath /tmp/VibeWriteBuild CODE_SIGNING_ALLOWED=NO CODE_SIGNING_REQUIRED=NO CODE_SIGNING_IDENTITY=''` passes on this machine.
-- The targeted macOS UI rerun for the redesigned composer was blocked in this sandbox by local signing access and SwiftUI preview macro loading, so the current reliable baseline here is `swift test` plus the app build.
-- The latest resize regression is now handled at the editor bridge: the正文 editor keeps a stable identity across compact/wide shell switches and refreshes its AppKit layout geometry so shrinking and re-expanding the window does not leave the document visually blank.
-- Local Xcode-generated files and user workspace state are now ignored in git; double-check that only source, docs, and intended assets are staged before committing.
-- Keep `PROJECT_CONTEXT.md` as the primary source of truth and `CHANGELOG.md` as the append-only history.
-- The app no longer synthesizes fallback next-step suggestions when the model omits metadata: `summary`, `nextFocus`, and `suggestionChips` now stay empty unless the remote response provides them, and the sidebar/composer render only real model output.
-- Runtime AI logs now record whether completion metadata was actually parsed, along with the parsed summary/next-focus/suggestion counts, so the next real request can confirm whether the remote model is returning suggestions or the UI is simply receiving an empty block.
-- Crash tracing logs were added around the first-draft patch path so the next reproduce cycle can tell whether the segfault happens before `WritingEditPatch.init` finishes or inside one of its field assignments.
-- If you touch the file document parser or save flow, keep `xattr` as the first identity source, fall back to the hidden body marker only when needed, and make sure missing or malformed metadata still degrades to正文-only editing instead of blocking open/save.
-- If you touch collaboration state persistence, keep the latest 20 conversation rounds plus the `localSummary` and `globalSynopsis` in sync with the metadata store.
+- `startDraft` and `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request that starts as soon as the backend prose result is available; metadata updates `summary`, `nextFocus`, and `suggestionChips` only after the prose phase succeeds.
+- The app still needs the shared-module split work before any backend gateway lands, and the current handoff notes should be read together with the V3 roadmap rather than in isolation.
+
+## Notes
+- The durable historical log lives in `docs/handoff/CHANGELOG.md`.
+- If you are picking up implementation work, follow the V3 roadmap and the numbered task cards in order.
