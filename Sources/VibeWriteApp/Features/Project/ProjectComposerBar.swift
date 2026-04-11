@@ -64,10 +64,6 @@ struct ProjectComposerBar: View {
             composerSurface
         }
         .frame(maxWidth: .infinity, alignment: .leading)
-        .background {
-            RoundedRectangle(cornerRadius: 24, style: .continuous)
-                .fill(composerBackgroundColor)
-        }
     }
 
     private var composerSurfaceHeight: CGFloat {

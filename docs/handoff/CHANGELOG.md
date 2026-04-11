@@ -1,7 +1,7 @@
 # Changelog
 
 # 2026-04-10
-- Changed the guidance rail back to normal vertical flow above the fixed 132pt composer body, so the capsule now clearly sits above the input area instead of sharing the same stacked background reserve. The height transition still animates smoothly.
+- Removed the extra rounded container from the guidance rail area so the capsule now sits directly above the fixed 132pt composer body without an additional background layer. The height transition still animates smoothly.
 
 # 2026-04-10
 - Added a light ease-in-out transition to the guidance reserve so the composer expands and contracts more smoothly when `建议生成中` or suggestion chips appear and disappear, while keeping the fixed 132pt body unchanged.
