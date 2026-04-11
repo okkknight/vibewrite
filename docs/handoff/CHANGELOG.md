@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Independent review of `TASK_20260412_029.md` passed: the backend write transport envelope is now route-neutral, `POST /v3/writes/start` and `POST /v3/writes/continue` share the same bootstrap-token validation chain, and both routes return deterministic stub `WritingAIResponse` payloads for valid requests while rejecting invalid tokens. Verification passed with `swift test` in `Backend/`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and the backend test coverage for start/continue success and unauthorized paths.
+
+# 2026-04-12
 - Implemented `POST /v3/writes/continue` in `Backend/` with a route-neutral backend-only write transport envelope, bootstrap token validation against the in-memory device registry, and a deterministic stub `WritingAIResponse` that mirrors the requested project state. Added focused tests for the success path, the unauthorized path, and the start-route regression check, then verified the backend package with `swift test`.
 
 # 2026-04-12
