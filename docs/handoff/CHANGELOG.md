@@ -1,5 +1,11 @@
 # Changelog
 
+# 2026-04-12
+- Implemented `POST /v3/writes/start` in `Backend/` with a backend-only write transport envelope, bootstrap token validation against the in-memory device registry, and a deterministic stub `WritingAIResponse` that mirrors the current project state. Added focused tests for the success path and the unauthorized path, and verified the backend package with `swift test`.
+
+# 2026-04-11
+- Added `task/TASK_20260411_028.md` as the next Phase 1 execution card. It keeps the shared DTOs pure, adds a backend-only write transport envelope, and wires the first `POST /v3/writes/start` placeholder path on top of the bootstrap backend skeleton.
+
 # 2026-04-11
 - Independent review of `TASK_20260411_027.md` passed: the new `Backend/` Swift + Vapor package is present, it serves `GET /v3/health` and `POST /v3/client/bootstrap`, repeated bootstrap requests for the same `installationId` return the same `deviceToken`, and the root macOS app build still succeeds.
 - Verification passed with `swift test` in `Backend/`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and live HTTP checks against `GET /v3/health` plus repeated `POST /v3/client/bootstrap`.

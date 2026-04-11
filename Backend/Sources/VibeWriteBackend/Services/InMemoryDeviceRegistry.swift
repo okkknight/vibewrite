@@ -13,6 +13,10 @@ actor InMemoryDeviceRegistry {
         return newToken
     }
 
+    func isValidDevice(installationId: String, deviceToken: String) -> Bool {
+        deviceTokensByInstallationId[installationId] == deviceToken
+    }
+
     private static func makeDeviceToken() -> String {
         var generator = SystemRandomNumberGenerator()
         let bytes = (0..<32).map { _ in UInt8.random(in: UInt8.min...UInt8.max, using: &generator) }

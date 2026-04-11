@@ -1,6 +1,11 @@
 import Vapor
+import VibeWriteShared
 
-func routes(_ app: Application, deviceRegistry: InMemoryDeviceRegistry) throws {
+func routes(
+    _ app: Application,
+    deviceRegistry: InMemoryDeviceRegistry,
+    writeService: WriteService
+) throws {
     app.get("v3", "health") { _ in
         HealthResponse(status: "ok")
     }
@@ -14,5 +19,10 @@ func routes(_ app: Application, deviceRegistry: InMemoryDeviceRegistry) throws {
             deviceStatus: .active,
             quotaSummary: .default
         )
+    }
+
+    app.post("v3", "writes", "start") { req async throws -> WritingAIResponse in
+        let envelope = try req.content.decode(WriteStartEnvelope.self)
+        return try await writeService.startDraft(envelope)
     }
 }

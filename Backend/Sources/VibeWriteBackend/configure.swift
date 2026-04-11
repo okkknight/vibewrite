@@ -2,5 +2,6 @@ import Vapor
 
 func configure(_ app: Application) throws {
     let deviceRegistry = InMemoryDeviceRegistry()
-    try routes(app, deviceRegistry: deviceRegistry)
+    let writeService = WriteService(deviceRegistry: deviceRegistry)
+    try routes(app, deviceRegistry: deviceRegistry, writeService: writeService)
 }
