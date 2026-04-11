@@ -63,6 +63,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - On the first Save As of a never-before-saved正文, the filename the user chose now backfills the project title as well, but later title/file-name edits stay independent.
 - The selection bridge no longer writes a nil desired selection back into `NSTextView` during update sync, which was clearing live selections before the inline rail had a chance to render.
 - The composer delete/backspace regression is still open and under investigation; this pass did not change that path.
+- Debug logging is now instrumented around assistant suggestion taps and composer focus binding changes, so the next repro can tell whether clicking a chip actually hands first responder back to the composer or leaves it in the正文 editor.
 - `.edit` now preserves already-visible assistant suggestion chips instead of replacing them. If the suggestion area was empty before the edit completed, the edit response can still populate it.
 - Streaming正文 preview now uses a dedicated playback renderer: the first chunk appears immediately, later deltas are revealed on a frame-paced cadence, and when the upstream stream ends the renderer keeps revealing the remaining text one character at a time instead of flushing the tail in one jump.
 - The playback cadence is now code-configurable through `WritingStreamingConfiguration` and the `VIBEWRITE_STREAMING_*` build settings in `Config/VibeWrite.xcconfig`.

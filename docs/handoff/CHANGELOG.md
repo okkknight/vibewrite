@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-11
+- Added focused debug logging around assistant suggestion taps and composer focus binding changes so the next repro can confirm whether chip clicks actually hand first responder back to the composer or leave it in the正文 editor.
+
+# 2026-04-11
 - Split the正文 editor viewport behavior into explicit intents for document-end follow, selection visibility after real text mutation, and local-edit viewport lock. Normal scroll-bound updates no longer force the current selection back into view, which removes the selected-paragraph scroll jitter while preserving prose-tail follow and local-edit anchoring.
 
 # 2026-04-11

@@ -561,6 +561,11 @@ struct WritingProjectView: View {
             onAssistantSuggestionTap: handleSuggestionTap
         )
         .frame(maxWidth: writingContentMaxWidth, alignment: .leading)
+        .onChange(of: messageFieldFocused) { _, newValue in
+            let focusedComposer = newValue
+            VibeWriteDebugTrace.append("composer focus binding changed value=\(focusedComposer) draftCount=\(messageDraft.utf16.count)")
+            VibeWriteLog.launch.info("composer focus binding changed value=\(focusedComposer, privacy: .public) draftCount=\(messageDraft.utf16.count, privacy: .public)")
+        }
     }
 
     private func composerSection(verticalPadding: CGFloat) -> some View {
@@ -696,8 +701,24 @@ struct WritingProjectView: View {
     private func handleSuggestionTap(_ suggestion: String) {
         guard !flow.isAIRequestInFlight else { return }
 
+        let draftPreview = suggestion.vibewriteLogPreview(maxLength: 80)
+        let previousFocus = messageFieldFocused
+        VibeWriteDebugTrace.append(
+            "suggestion tap received suggestion=\(draftPreview) previousFocus=\(previousFocus) draftCount=\(messageDraft.utf16.count)"
+        )
+        VibeWriteLog.launch.info(
+            "suggestion tap received suggestion=\(draftPreview, privacy: .public) previousFocus=\(previousFocus, privacy: .public) draftCount=\(messageDraft.utf16.count, privacy: .public)"
+        )
+
         messageDraft = suggestion
         messageFieldFocused = true
+
+        VibeWriteDebugTrace.append(
+            "suggestion tap requested composer focus suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused)"
+        )
+        VibeWriteLog.launch.info(
+            "suggestion tap requested composer focus suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public)"
+        )
     }
 
     private struct ThinkingDots: View {

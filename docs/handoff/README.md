@@ -54,6 +54,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The selection flow now keeps only the preset润色 chips above the composer, and the stage-specific placeholder copy still switches between direct opening, continuation, and润色 prompts.
 - The selection-flow UI test is temporarily skipped in the default suite because the system open panel still steals focus on that path; the blank-start and compact-layout smoke tests are the current verification baseline.
 - The composer delete/backspace regression is still open and under investigation; this pass did not change that path.
+- Assistant suggestion taps now log the draft and focus handoff, and the composer logs when its focus binding changes, so the next repro can show whether the chip click actually returns first responder to the composer.
 - The selection context capsule and assistant suggestion chips now use a warmer gold-brown day-mode foreground with slightly stronger light-mode contrast so the day theme stays readable while the night theme remains unchanged.
 - The app now launches in day mode by default, and the fixed capsules stay more muted than the clickable suggestion chips in both day and night themes.
 - The composer now shows `建议生成中` as soon as the metadata request starts, while the final suggestion chips still wait until the正文 tail has finished.
