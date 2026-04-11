@@ -8,9 +8,21 @@ actor WriteService {
         self.deviceRegistry = deviceRegistry
     }
 
-    func startDraft(_ envelope: WriteStartEnvelope) async throws -> WritingAIResponse {
-        guard envelope.action == .startDraft else {
-            throw Abort(.badRequest, reason: "Only startDraft is supported in this task.")
+    func startDraft(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+        try await handle(envelope, expectedAction: .startDraft, routeLabel: "/v3/writes/start")
+    }
+
+    func continueWriting(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+        try await handle(envelope, expectedAction: .continueWriting, routeLabel: "/v3/writes/continue")
+    }
+
+    private func handle(
+        _ envelope: WriteRequestEnvelope,
+        expectedAction: WritingAIAction,
+        routeLabel: String
+    ) async throws -> WritingAIResponse {
+        guard envelope.action == expectedAction else {
+            throw Abort(.badRequest, reason: "Only \(expectedAction.rawValue) is supported in this task.")
         }
 
         guard await deviceRegistry.isValidDevice(
@@ -20,12 +32,12 @@ actor WriteService {
             throw Abort(.unauthorized, reason: "Device token does not match bootstrap registration.")
         }
 
-        return Self.makeStubResponse(from: envelope)
+        return Self.makeStubResponse(from: envelope, routeLabel: routeLabel)
     }
 
-    private static func makeStubResponse(from envelope: WriteStartEnvelope) -> WritingAIResponse {
+    private static func makeStubResponse(from envelope: WriteRequestEnvelope, routeLabel: String) -> WritingAIResponse {
         WritingAIResponse(
-            assistantMessage: "[stub] /v3/writes/start accepted",
+            assistantMessage: "[stub] \(routeLabel) accepted",
             documentText: envelope.project.documentText,
             localSummary: envelope.project.localSummary,
             globalSynopsis: envelope.project.globalSynopsis,

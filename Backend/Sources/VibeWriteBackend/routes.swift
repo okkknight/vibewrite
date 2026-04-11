@@ -22,7 +22,12 @@ func routes(
     }
 
     app.post("v3", "writes", "start") { req async throws -> WritingAIResponse in
-        let envelope = try req.content.decode(WriteStartEnvelope.self)
+        let envelope = try req.content.decode(WriteRequestEnvelope.self)
         return try await writeService.startDraft(envelope)
+    }
+
+    app.post("v3", "writes", "continue") { req async throws -> WritingAIResponse in
+        let envelope = try req.content.decode(WriteRequestEnvelope.self)
+        return try await writeService.continueWriting(envelope)
     }
 }

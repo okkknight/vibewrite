@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Implemented `POST /v3/writes/continue` in `Backend/` with a route-neutral backend-only write transport envelope, bootstrap token validation against the in-memory device registry, and a deterministic stub `WritingAIResponse` that mirrors the requested project state. Added focused tests for the success path, the unauthorized path, and the start-route regression check, then verified the backend package with `swift test`.
+
+# 2026-04-12
 - Added `task/TASK_20260412_029.md` as the next Phase 1 execution card. It generalizes the backend write transport envelope and keeps the same bootstrap-token gate so `POST /v3/writes/continue` can land without touching the shared DTO boundary or jumping to provider logic yet.
 
 # 2026-04-12

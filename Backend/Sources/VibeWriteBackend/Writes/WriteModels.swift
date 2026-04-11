@@ -2,7 +2,7 @@ import Foundation
 import Vapor
 import VibeWriteShared
 
-struct WriteStartEnvelope: Content {
+struct WriteRequestEnvelope: Content {
     let installationId: String
     let deviceToken: String
     let requestId: String

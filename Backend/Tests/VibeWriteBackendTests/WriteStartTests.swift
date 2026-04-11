@@ -27,7 +27,7 @@ final class WriteStartTests: XCTestCase {
             }
         })
 
-        let writeRequest = WriteStartEnvelope(
+        let writeRequest = WriteRequestEnvelope(
             installationId: bootstrapRequest.installationId,
             deviceToken: issuedToken,
             requestId: "request-001",
@@ -66,7 +66,7 @@ final class WriteStartTests: XCTestCase {
 
         try configure(app)
 
-        let writeRequest = WriteStartEnvelope(
+        let writeRequest = WriteRequestEnvelope(
             installationId: "installation-002",
             deviceToken: "not-a-real-token",
             requestId: "request-002",
