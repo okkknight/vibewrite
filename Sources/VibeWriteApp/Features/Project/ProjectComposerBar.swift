@@ -45,7 +45,6 @@ struct ProjectComposerBar: View {
                     }
                 }
             }
-            .frame(maxWidth: .infinity, alignment: .leading)
             .transition(.opacity.combined(with: .move(edge: .top)))
         }
     }

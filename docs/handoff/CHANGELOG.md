@@ -1,5 +1,8 @@
 # Changelog
 
+# 2026-04-11
+- Removed the guidance rail's own infinite-width frame so the assistant suggestion row now inherits the composer's finite width directly. That restores the single-line overflow cutoff and drops trailing chips again when all three suggestions would otherwise squeeze into one row.
+
 # 2026-04-10
 - Removed the extra rounded container from the guidance rail area so the capsule now sits directly above the fixed 132pt composer body without an additional background layer. The height transition still animates smoothly.
 
