@@ -34,7 +34,6 @@ struct WritingProjectView: View {
     private var writingContentMaxWidth: CGFloat { 900 }
     private var writingContentHorizontalPadding: CGFloat { shellLayoutMode.isCompact ? 16 : 30 }
     private var projectHeaderVerticalPadding: CGFloat { shellLayoutMode.isCompact ? 7 : 8 }
-    private var composerRailBottomInset: CGFloat { 138 }
     /// 正文编辑器的文本起始 inset，跟 composer 的输入节奏保持同一条视觉基线。
     private var writingBodyTextContainerInset: NSSize {
         NSSize(width: 12, height: 18)
@@ -547,7 +546,7 @@ struct WritingProjectView: View {
             isComposerLocked: isComposerLocked,
             isRequestInFlight: flow.isProseRequestInFlight,
             isPrimaryOutputInFlight: flow.isProseRequestInFlight,
-            isPrimaryActionInFlight: flow.isBodyThinkingInFlight,
+            isPrimaryActionInFlight: flow.isPrimaryActionDisplayInFlight,
             isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
             isMessageFieldHighlighted: normalizedSelectedText != nil,
@@ -562,20 +561,20 @@ struct WritingProjectView: View {
 
     private func composerSection(verticalPadding: CGFloat) -> some View {
         writingContentColumn {
-            composerBar
-                .padding(.vertical, verticalPadding)
-                .overlay(alignment: .bottomLeading) {
-                    if normalizedSelectedText != nil {
-                        SelectionContextRail(
-                            isRequestInFlight: flow.isAIRequestInFlight || isComposerLocked,
-                            onPresetTap: triggerSelectionPresetEdit
-                        )
-                        .padding(.horizontal, 14)
-                        .padding(.bottom, composerRailBottomInset)
-                        .transition(.opacity.combined(with: .move(edge: .bottom)))
-                    }
+            VStack(alignment: .leading, spacing: normalizedSelectedText != nil ? 10 : 0) {
+                if normalizedSelectedText != nil {
+                    SelectionContextRail(
+                        isRequestInFlight: flow.isAIRequestInFlight || isComposerLocked,
+                        onPresetTap: triggerSelectionPresetEdit
+                    )
+                    .padding(.horizontal, 14)
+                    .transition(.opacity.combined(with: .move(edge: .bottom)))
                 }
-                .animation(.easeInOut(duration: 0.16), value: normalizedSelectedText != nil)
+
+                composerBar
+            }
+            .padding(.vertical, verticalPadding)
+            .animation(.easeInOut(duration: 0.16), value: normalizedSelectedText != nil)
         }
     }
 

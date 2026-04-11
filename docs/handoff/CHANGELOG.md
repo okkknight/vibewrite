@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-11
+- Moved the selection preset rail out of the composer overlay so preset润色 chips now occupy their own in-flow row above the composer body, matching the assistant suggestion rail behavior and preventing正文 overlap.
+
+# 2026-04-11
+- Split the submit button's `开场中` / `续写中` / `润色中` display onto a dedicated button-only in-flight flag so it now stays alive until正文 playback finishes, while the subtitle chrome keeps using the earlier network-phase state and metadata / suggestion timing stays unchanged.
+
+# 2026-04-11
 - Removed the guidance rail's own infinite-width frame so the assistant suggestion row now inherits the composer's finite width directly. That restores the single-line overflow cutoff and drops trailing chips again when all three suggestions would otherwise squeeze into one row.
 
 # 2026-04-10

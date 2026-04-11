@@ -9,6 +9,7 @@ final class VibeWriteAppFlow: ObservableObject {
     @Published private(set) var activeProjectID: UUID?
     @Published private(set) var isAIRequestInFlight = false
     @Published private(set) var isBodyThinkingInFlight = false
+    @Published private(set) var isPrimaryActionDisplayInFlight = false
     @Published private(set) var isProseRequestInFlight = false
     @Published private(set) var isMetadataRequestInFlight = false
     @Published private(set) var activeEditLock: WritingEditLock?
@@ -249,6 +250,7 @@ final class VibeWriteAppFlow: ObservableObject {
         aiErrorMessage = nil
         isAIRequestInFlight = false
         isBodyThinkingInFlight = false
+        isPrimaryActionDisplayInFlight = false
         isProseRequestInFlight = false
         isMetadataRequestInFlight = false
         activeRequestToken = nil
@@ -285,6 +287,7 @@ final class VibeWriteAppFlow: ObservableObject {
         activeRequestToken = requestToken
         isAIRequestInFlight = true
         isBodyThinkingInFlight = true
+        isPrimaryActionDisplayInFlight = true
         isProseRequestInFlight = true
         isMetadataRequestInFlight = false
         activeEditLock = requestLock
@@ -293,6 +296,7 @@ final class VibeWriteAppFlow: ObservableObject {
             if self.activeRequestToken == requestToken {
                 self.isAIRequestInFlight = false
                 self.isBodyThinkingInFlight = false
+                self.isPrimaryActionDisplayInFlight = false
                 self.isProseRequestInFlight = false
                 self.isMetadataRequestInFlight = false
                 self.activeEditLock = nil
@@ -406,6 +410,7 @@ final class VibeWriteAppFlow: ObservableObject {
                     after: liveProject.aiSnapshot
                 )
                 replaceActiveProject(liveProject)
+                isPrimaryActionDisplayInFlight = false
                 if let currentDocumentURL {
                     _ = saveCurrentDocument(to: currentDocumentURL)
                 }
@@ -546,6 +551,7 @@ final class VibeWriteAppFlow: ObservableObject {
                 "Flow prose playback wait start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public)"
             )
             await previewRenderer.waitForCompletion()
+            isPrimaryActionDisplayInFlight = false
             isProseRequestInFlight = false
             let prosePlaybackElapsed = Self.elapsedSeconds(since: prosePlaybackWaitStartedAt)
             VibeWriteLog.ai.info(
