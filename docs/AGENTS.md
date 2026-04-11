@@ -19,4 +19,19 @@ For historical V1 context, use:
 - `docs/V1/VibeWrite MVP Wireframes.md`
 - `docs/V1/VibeWrite MVP Milestones.md`
 
-Current implementation and task execution should follow the V2 docs.
+For V3 planning and split-architecture work, use:
+
+- `docs/V3/AGENTS.md`
+- `docs/V3/PRD3.0.md`
+- `docs/V3/IA3.0.md`
+- `docs/V3/ROADMAP3.0.md`
+- `task/TASK_20260411_025.md`
+- `docs/V3/FRONTEND3.0.md`
+- `docs/V3/BACKEND3.0.md`
+- `docs/V3/DATA3.0.md`
+- `docs/V3/API3.0.md`
+- `docs/V3/ADMIN3.0.md`
+- `docs/V3/DEPLOY3.0.md`
+- `docs/V3/MIGRATION3.0.md`
+
+Current implementation and task execution still follow the V2 docs until the V3 migration lands.

@@ -1,6 +1,15 @@
 # Changelog
 
 # 2026-04-11
+- Marked Phase 0 in `docs/V3/ROADMAP3.0.md` as completed and added the first Phase 1 execution card `task/TASK_20260411_025.md`, which splits the shared AI contract layer before any backend stack choice or provider work.
+
+# 2026-04-11
+- Reworked the V3 next-step planning doc into `docs/V3/ROADMAP3.0.md` so the first post-PRD layer is a phase roadmap instead of premature task cards, and updated the V3 and handoff indexes to point at the roadmap.
+
+# 2026-04-11
+- Updated the assistant suggestion overflow rule so the first chip is always preserved even when it exceeds the available width, while trailing chips are still dropped instead of wrapping or squeezing into a second row.
+
+# 2026-04-11
 - Added an explicit full-width anchor to the assistant suggestion rail so the single-line overflow cutoff now receives a finite width in live layout and drops trailing chips again instead of squeezing all three into one row.
 
 # 2026-04-11
