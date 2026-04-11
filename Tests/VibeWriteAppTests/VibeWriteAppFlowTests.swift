@@ -192,6 +192,22 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(line.height, 32)
     }
 
+    func testSingleLineOverflowHidingLayoutAlwaysKeepsFirstItemEvenWhenItExceedsWidth() {
+        let line = SingleLineOverflowHidingLayoutMetrics.line(
+            maxWidth: 278,
+            itemSpacing: 8,
+            sizes: [
+                CGSize(width: 320, height: 32),
+                CGSize(width: 104, height: 32),
+                CGSize(width: 96, height: 32)
+            ]
+        )
+
+        XCTAssertEqual(line.elements.map(\.index), [0])
+        XCTAssertEqual(line.width, 278)
+        XCTAssertEqual(line.height, 32)
+    }
+
     func testForceBlankStartupIgnoresPersistedProjectsAndResetsStore() throws {
         let storageURL = try makeTempStorageURL()
         defer {

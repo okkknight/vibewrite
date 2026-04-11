@@ -784,13 +784,15 @@ enum SingleLineOverflowHidingLayoutMetrics {
         var currentHeight: CGFloat = 0
 
         for (index, size) in sizes.enumerated() {
-            let proposedWidth = elements.isEmpty ? size.width : currentWidth + itemSpacing + size.width
-
-            if !elements.isEmpty && proposedWidth > maxWidth {
-                break
+            if elements.isEmpty {
+                elements.append(Element(index: index, size: size))
+                currentWidth = size.width
+                currentHeight = max(currentHeight, size.height)
+                continue
             }
 
-            if elements.isEmpty && size.width > maxWidth {
+            let proposedWidth = currentWidth + itemSpacing + size.width
+            if proposedWidth > maxWidth {
                 break
             }
 
@@ -799,6 +801,10 @@ enum SingleLineOverflowHidingLayoutMetrics {
             currentHeight = max(currentHeight, size.height)
         }
 
-        return Line(elements: elements, width: currentWidth, height: currentHeight)
+        return Line(
+            elements: elements,
+            width: elements.isEmpty ? 0 : min(currentWidth, maxWidth),
+            height: currentHeight
+        )
     }
 }
