@@ -5,6 +5,44 @@ import XCTest
 
 @MainActor
 final class SelectableTextEditorTests: XCTestCase {
+    func testViewportIntentResolvesFollowDocumentEndBeforeSelectionVisibility() {
+        XCTAssertEqual(
+            SelectableTextEditor.viewportIntent(
+                didMutateText: false,
+                shouldAutoScrollToDocumentEnd: true
+            ),
+            .followDocumentEnd
+        )
+
+        XCTAssertEqual(
+            SelectableTextEditor.viewportIntent(
+                didMutateText: true,
+                shouldAutoScrollToDocumentEnd: true
+            ),
+            .followDocumentEnd
+        )
+    }
+
+    func testViewportIntentPreservesSelectionOnlyAfterTextMutation() {
+        XCTAssertEqual(
+            SelectableTextEditor.viewportIntent(
+                didMutateText: true,
+                shouldAutoScrollToDocumentEnd: false
+            ),
+            .preserveSelectionVisibilityAfterTextMutation
+        )
+    }
+
+    func testViewportIntentDefaultsToIdleOtherwise() {
+        XCTAssertEqual(
+            SelectableTextEditor.viewportIntent(
+                didMutateText: false,
+                shouldAutoScrollToDocumentEnd: false
+            ),
+            .idle
+        )
+    }
+
     func testLiveUserTextPreservationRequiresPendingUserTextChange() {
         let editor = SelectableTextEditor(
             text: .constant("loaded body"),

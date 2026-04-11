@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-11
+- Split the正文 editor viewport behavior into explicit intents for document-end follow, selection visibility after real text mutation, and local-edit viewport lock. Normal scroll-bound updates no longer force the current selection back into view, which removes the selected-paragraph scroll jitter while preserving prose-tail follow and local-edit anchoring.
+
+# 2026-04-11
 - Tightened the prose-completion anchor so `startDraft` / `continueWriting` now pin the underlying NSTextView caret to the document end as well as the SwiftUI selection state during the short follow window. That keeps the viewport from jumping back to the older caret position when playback finishes without touching the metadata or submit-state flows.
 
 # 2026-04-11

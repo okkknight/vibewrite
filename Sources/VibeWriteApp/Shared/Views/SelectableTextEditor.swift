@@ -55,6 +55,38 @@ struct SelectableTextEditor: NSViewRepresentable {
         )
     }
 
+    enum ViewportIntent: Equatable {
+        case idle
+        case preserveSelectionVisibilityAfterTextMutation
+        case followDocumentEnd
+
+        var logLabel: String {
+            switch self {
+            case .idle:
+                return "idle"
+            case .preserveSelectionVisibilityAfterTextMutation:
+                return "selection"
+            case .followDocumentEnd:
+                return "documentEnd"
+            }
+        }
+    }
+
+    static func viewportIntent(
+        didMutateText: Bool,
+        shouldAutoScrollToDocumentEnd: Bool
+    ) -> ViewportIntent {
+        if shouldAutoScrollToDocumentEnd {
+            return .followDocumentEnd
+        }
+
+        if didMutateText {
+            return .preserveSelectionVisibilityAfterTextMutation
+        }
+
+        return .idle
+    }
+
     func makeNSView(context: Context) -> NSScrollView {
         context.coordinator.logTextEvent(
             "make nsview start initialBindingCount=\(text.utf16.count) editable=\(isEditable) autoScrollToEnd=\(shouldAutoScrollToDocumentEnd)"
@@ -167,10 +199,14 @@ struct SelectableTextEditor: NSViewRepresentable {
             "update nsview resolved bindingCount=\(text.utf16.count) textViewCount=\(textView.string.utf16.count) didMutateText=\(didMutateText)"
         )
         context.coordinator.syncAccessibilityValue(in: textView)
+        let viewportIntent = Self.viewportIntent(
+            didMutateText: didMutateText,
+            shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd
+        )
         context.coordinator.syncLayout(
             in: textView,
             scrollView: scrollView,
-            prefersSelectionVisibility: didMutateText == false,
+            viewportIntent: viewportIntent,
             shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd,
             isViewportLockedDuringLocalEdit: isViewportLockedDuringLocalEdit
         )
@@ -287,7 +323,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             syncLayout(
                 in: textView,
                 scrollView: scrollView,
-                prefersSelectionVisibility: false,
+                viewportIntent: .idle,
                 shouldAutoScrollToDocumentEnd: false,
                 isViewportLockedDuringLocalEdit: false
             )
@@ -535,7 +571,7 @@ struct SelectableTextEditor: NSViewRepresentable {
         func syncLayout(
             in textView: NSTextView,
             scrollView: NSScrollView,
-            prefersSelectionVisibility: Bool,
+            viewportIntent: SelectableTextEditor.ViewportIntent,
             shouldAutoScrollToDocumentEnd: Bool,
             isViewportLockedDuringLocalEdit: Bool
         ) {
@@ -599,7 +635,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             } else if shouldAutoScrollToDocumentEnd {
                 let endRange = NSRange(location: textView.string.utf16.count, length: 0)
                 textView.scrollRangeToVisible(endRange)
-            } else if prefersSelectionVisibility {
+            } else if viewportIntent == .preserveSelectionVisibilityAfterTextMutation {
                 let selection = textView.selectedRange()
                 if selection.location <= textView.string.utf16.count {
                     textView.scrollRangeToVisible(selection)
@@ -615,9 +651,9 @@ struct SelectableTextEditor: NSViewRepresentable {
                 visibleHeight: visibleHeight,
                 contentHeight: contentHeight,
                 usedHeight: usedHeight,
+                viewportIntent: viewportIntent,
                 shouldAutoScrollToDocumentEnd: shouldAutoScrollToDocumentEnd,
-                isViewportLockedDuringLocalEdit: isViewportLockedDuringLocalEdit,
-                prefersSelectionVisibility: prefersSelectionVisibility
+                isViewportLockedDuringLocalEdit: isViewportLockedDuringLocalEdit
             )
         }
 
@@ -1085,9 +1121,9 @@ struct SelectableTextEditor: NSViewRepresentable {
             visibleHeight: CGFloat,
             contentHeight: CGFloat,
             usedHeight: CGFloat,
+            viewportIntent: SelectableTextEditor.ViewportIntent,
             shouldAutoScrollToDocumentEnd: Bool,
-            isViewportLockedDuringLocalEdit: Bool,
-            prefersSelectionVisibility: Bool
+            isViewportLockedDuringLocalEdit: Bool
         ) {
             let contentBounds = scrollView.contentView.bounds
             let textLength = textView.string.utf16.count
@@ -1100,9 +1136,9 @@ struct SelectableTextEditor: NSViewRepresentable {
                 "bounds=\(safeDimensionString(contentBounds.origin.x)),\(safeDimensionString(contentBounds.origin.y)) \(safeDimensionString(contentBounds.width))x\(safeDimensionString(contentBounds.height))",
                 "used=\(safeDimensionString(usedHeight))",
                 "content=\(safeDimensionString(contentHeight))",
+                "viewport=\(viewportIntent.logLabel)",
                 "autoScroll=\(shouldAutoScrollToDocumentEnd)",
                 "viewportLock=\(isViewportLockedDuringLocalEdit)",
-                "prefersSelection=\(prefersSelectionVisibility)",
                 "selection=\(selection.location),\(selection.length)"
             ].joined(separator: " | ")
 
