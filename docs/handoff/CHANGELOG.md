@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-11
+- Tightened the prose-completion anchor so `startDraft` / `continueWriting` now pin the underlying NSTextView caret to the document end as well as the SwiftUI selection state during the short follow window. That keeps the viewport from jumping back to the older caret position when playback finishes without touching the metadata or submit-state flows.
+
+# 2026-04-11
 - Moved the selection preset rail out of the composer overlay so preset润色 chips now occupy their own in-flow row above the composer body, matching the assistant suggestion rail behavior and preventing正文 overlap.
 
 # 2026-04-11

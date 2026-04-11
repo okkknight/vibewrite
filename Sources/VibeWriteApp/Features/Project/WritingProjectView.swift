@@ -398,6 +398,10 @@ struct WritingProjectView: View {
     }
 
     private func scrollBodyEditorToBottom() {
+        anchorBodyEditorToDocumentEnd()
+    }
+
+    private func anchorBodyEditorToDocumentEnd() {
         guard let scrollView = bodyEditorScrollView,
               let textView = scrollView.documentView as? NSTextView else { return }
 
@@ -828,6 +832,9 @@ struct WritingProjectView: View {
                     if isDocumentEndFollowActive {
                         isDocumentEndFollowActive = false
                     }
+                }
+                DispatchQueue.main.async {
+                    anchorBodyEditorToDocumentEnd()
                 }
             }
 
