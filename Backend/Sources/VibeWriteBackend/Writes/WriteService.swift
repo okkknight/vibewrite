@@ -16,10 +16,20 @@ actor WriteService {
         try await handle(envelope, expectedAction: .continueWriting, routeLabel: "/v3/writes/continue")
     }
 
+    func edit(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+        try await handle(
+            envelope,
+            expectedAction: .edit,
+            routeLabel: "/v3/writes/edit",
+            requiresSelectionRange: true
+        )
+    }
+
     private func handle(
         _ envelope: WriteRequestEnvelope,
         expectedAction: WritingAIAction,
-        routeLabel: String
+        routeLabel: String,
+        requiresSelectionRange: Bool = false
     ) async throws -> WritingAIResponse {
         guard envelope.action == expectedAction else {
             throw Abort(.badRequest, reason: "Only \(expectedAction.rawValue) is supported in this task.")
@@ -30,6 +40,13 @@ actor WriteService {
             deviceToken: envelope.deviceToken
         ) else {
             throw Abort(.unauthorized, reason: "Device token does not match bootstrap registration.")
+        }
+
+        if requiresSelectionRange {
+            guard let selectionRange = envelope.selectionRange,
+                  selectionRange.range(in: envelope.project.documentText) != nil else {
+                throw Abort(.badRequest, reason: "A valid selectionRange is required for edit requests.")
+            }
         }
 
         return Self.makeStubResponse(from: envelope, routeLabel: routeLabel)

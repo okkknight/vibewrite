@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Implemented `POST /v3/writes/edit` in `Backend/` with the route-neutral backend-only write transport envelope, bootstrap token validation against the in-memory device registry, and selection-aware validation that requires a parseable `selectionRange`. Added focused tests for the success path, invalid selection handling, invalid token handling, and the start/continue regression checks, then verified the backend package with `swift test`.
+
+# 2026-04-12
 - Added `task/TASK_20260412_030.md` as the next Phase 1 execution card. It keeps the route-neutral backend transport envelope, adds `POST /v3/writes/edit`, and keeps selection-aware validation on the same bootstrap-token path without touching the shared DTO boundary or provider logic yet.
 
 # 2026-04-12

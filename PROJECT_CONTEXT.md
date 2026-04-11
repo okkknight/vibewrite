@@ -10,9 +10,9 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - not a multi-document content library
 
 ## Current state
-- The new `Backend/` SwiftPM package now exists as the V3 backend skeleton. It depends on the root `VibeWriteShared` package, serves `GET /v3/health`, serves `POST /v3/client/bootstrap`, serves `POST /v3/writes/start`, serves `POST /v3/writes/continue`, keeps `installationId -> deviceToken` in an in-memory registry, validates write requests against the bootstrap token, and returns a fixed `active` device status plus the default `dailyLimit=50` / `weeklyLimit=200` quota summary.
-- The backend write transport envelope is now route-neutral, so `start` and `continue` share the same backend-only request shape while the shared DTO boundary stays untouched.
-- The next V3 backend task is to add `POST /v3/writes/edit` on the same bootstrap-token path with selection-aware validation, while keeping the shared DTO boundary untouched.
+- The new `Backend/` SwiftPM package now exists as the V3 backend skeleton. It depends on the root `VibeWriteShared` package, serves `GET /v3/health`, serves `POST /v3/client/bootstrap`, serves `POST /v3/writes/start`, serves `POST /v3/writes/continue`, serves `POST /v3/writes/edit`, keeps `installationId -> deviceToken` in an in-memory registry, validates write requests against the bootstrap token, and returns a fixed `active` device status plus the default `dailyLimit=50` / `weeklyLimit=200` quota summary.
+- The backend write transport envelope is now route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
+- The backend edit route now keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.
 - The app's default launch window size is now 1024x700.
 - The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.
 - The wide Composer now keeps the zero-gap body-to-composer seam while preserving its shadow and internal padding.
