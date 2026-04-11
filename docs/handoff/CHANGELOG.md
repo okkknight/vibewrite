@@ -1,6 +1,15 @@
 # Changelog
 
 # 2026-04-11
+- Added an explicit full-width anchor to the assistant suggestion rail so the single-line overflow cutoff now receives a finite width in live layout and drops trailing chips again instead of squeezing all three into one row.
+
+# 2026-04-11
+- Added `docs/V3/TASKS3.0.md` as the next-step implementation task design so the confirmed V3 split can be handed to Codex with an explicit order, completion criteria, and no new scope.
+
+# 2026-04-11
+- Completed a terminology pass across the V3 docs so the backend/admin/API/data layers consistently describe the editable AI system prompt as a configuration, and filled in the config shape with template, action rules, and model context rules so agents do not treat it as a single freeform string.
+
+# 2026-04-11
 - Tightened the V3 planning docs so `project.prompt` is always distinguished from the backend AI system prompt template, and renamed the remaining ambiguous prompt sections in backend, frontend, deploy, admin, data, IA, API, migration, PRD, and AGENTS docs to keep agent readers from collapsing the two concepts.
 
 # 2026-04-11

@@ -34,6 +34,7 @@ This directory is the compact handoff layer for VibeWrite.
 29. `docs/V3/IA3.0.md`
 30. `docs/V3/API3.0.md`
 31. `docs/V3/ADMIN3.0.md`
+32. `docs/V3/TASKS3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -52,7 +53,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The正文 editor and bottom composer now share one outer content column, and the editor bridge no longer centers a separate readable-width block. The editor uses a fixed text inset while the visible vertical scroll indicator is rendered in a reserved far-right lane at the edge of the app, and the editor bridge keeps its internal text width aligned with that inset so the正文 does not clip on the right; the indicator fades in on scroll activity and fades back out after a short period of idle time, while still staying hidden when the正文 is not scrollable.
 - The Composer shell was redesigned into a single rounded input surface: the former fixed top-left capsule now lives in the submit button slot, the guidance rail now sits above the fixed 132pt composer body as a separate row, the visible actions read `开场` / `续写` / `润色`, and the selection edit flow now shows an inline rail above the composer instead of a popover while keeping the underlying state flow unchanged.
 - That guidance rail still animates its entry/exit lightly, so the composer expands and contracts more smoothly without changing the fixed body height.
-- The assistant suggestion rail now inherits the composer's finite width directly instead of wrapping itself in another infinite-width frame, which restores the single-line overflow cutoff so trailing chips are dropped again instead of squeezing all three into one row.
+- The assistant suggestion rail now gets an explicit full-width anchor inside the composer, so the single-line overflow cutoff receives a finite width and drops trailing chips again instead of squeezing all three into one row.
 - The composer placeholder display now strips trailing句号 from the opening and continuation hints as well as the other visible placeholder prompts.
 - The submit button's `开场中` / `续写中` / `润色中` display now uses a dedicated button-only in-flight flag that stays alive until正文 playback finishes, while `isBodyThinkingInFlight` keeps its earlier network-phase meaning for the subtitle chrome.
 - The正文 thinking state is now separated from the metadata loading state: the subtitle, assistant sidebar subtitle, and submit button thinking visuals use the正文 network/thinking flag only, while the composer keeps `建议生成中` gated behind正文 output settling so suggestions still appear after正文 completion.
