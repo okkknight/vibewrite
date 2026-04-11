@@ -1,6 +1,10 @@
 # Changelog
 
 # 2026-04-11
+- Independent review of `TASK_20260411_027.md` passed: the new `Backend/` Swift + Vapor package is present, it serves `GET /v3/health` and `POST /v3/client/bootstrap`, repeated bootstrap requests for the same `installationId` return the same `deviceToken`, and the root macOS app build still succeeds.
+- Verification passed with `swift test` in `Backend/`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and live HTTP checks against `GET /v3/health` plus repeated `POST /v3/client/bootstrap`.
+
+# 2026-04-11
 - Started the V3 backend skeleton in `Backend/` as a standalone SwiftPM package with Vapor 4, a local dependency on the root `VibeWriteShared` target, `GET /v3/health`, `POST /v3/client/bootstrap`, an in-memory installationId-to-deviceToken registry, and a fixed quota summary (`dailyLimit=50`, `weeklyLimit=200`). Verified with `swift test` inside `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-11
