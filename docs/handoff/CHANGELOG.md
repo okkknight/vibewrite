@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-11
+- Started the V3 backend skeleton in `Backend/` as a standalone SwiftPM package with Vapor 4, a local dependency on the root `VibeWriteShared` target, `GET /v3/health`, `POST /v3/client/bootstrap`, an in-memory installationId-to-deviceToken registry, and a fixed quota summary (`dailyLimit=50`, `weeklyLimit=200`). Verified with `swift test` inside `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-11
+- Confirmed the backend stack for V3 as Swift + Vapor and added `task/TASK_20260411_027.md` as the first backend-engineering card. The new task starts the backend skeleton with health/bootstrap only and keeps AI routing, provider integration, quota persistence, and admin UI out of scope for now.
+
+# 2026-04-11
 - Independent review of `TASK_20260411_026.md` passed: the native `VibeWriteShared` target is present, `VibeWriteApp` links it through the Xcode project, `Package.swift` still exports it for `swift test`, and the obsolete app-side `WritingAIContracts.swift` file has been removed.
 - Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, with no observable runtime regressions in the shared-model boundary change.
 

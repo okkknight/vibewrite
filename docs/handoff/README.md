@@ -30,13 +30,14 @@ This directory is the compact handoff layer for VibeWrite.
 25. `docs/V3/ROADMAP3.0.md`
 26. `task/TASK_20260411_025.md`
 27. `task/TASK_20260411_026.md`
-28. `docs/V3/FRONTEND3.0.md`
-29. `docs/V3/BACKEND3.0.md`
-30. `docs/V3/DATA3.0.md`
-31. `docs/V3/API3.0.md`
-32. `docs/V3/ADMIN3.0.md`
-33. `docs/V3/DEPLOY3.0.md`
-34. `docs/V3/MIGRATION3.0.md`
+28. `task/TASK_20260411_027.md`
+29. `docs/V3/FRONTEND3.0.md`
+30. `docs/V3/BACKEND3.0.md`
+31. `docs/V3/DATA3.0.md`
+32. `docs/V3/API3.0.md`
+33. `docs/V3/ADMIN3.0.md`
+34. `docs/V3/DEPLOY3.0.md`
+35. `docs/V3/MIGRATION3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -44,9 +45,11 @@ This directory is the compact handoff layer for VibeWrite.
 - avoid duplicating the same status across many notes
 
 ## Current state
+- `task/TASK_20260411_027.md` is now partially complete in the repo: `Backend/` exists as an independent SwiftPM package, it links the root `VibeWriteShared` package, and it exposes the `/v3/health` and `/v3/client/bootstrap` bootstrap-only backend skeleton with in-memory device-token reuse.
 - V2 docs under `docs/V2/` remain archival reference for the current runtime behavior; `docs/V1/` is archival only.
 - V3 planning docs define the frontend/backend split target, backend AI gateway, data model, deployment shape, roadmap order, and migration order, but the runtime implementation is still the current V2 client.
 - `task/TASK_20260411_025.md` is the first Phase 1 execution card; `task/TASK_20260411_026.md` is the shared-module card and now lands the pure shared model boundary in the native `VibeWriteShared` target.
+- `task/TASK_20260411_027.md` is the first backend-engineering card and starts the Swift + Vapor backend skeleton with health/bootstrap only.
 - `Sources/VibeWriteShared/Models/VibeWriteSharedModels.swift` and `Sources/VibeWriteShared/AI/WritingAIContracts.swift` now hold the pure shared model/AI contract types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
