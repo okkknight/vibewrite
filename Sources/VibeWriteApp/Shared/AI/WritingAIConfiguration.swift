@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 struct WritingAIConfiguration {
     enum Mode: String {

@@ -46,12 +46,12 @@ This directory is the compact handoff layer for VibeWrite.
 ## Current state
 - V2 docs under `docs/V2/` remain archival reference for the current runtime behavior; `docs/V1/` is archival only.
 - V3 planning docs define the frontend/backend split target, backend AI gateway, data model, deployment shape, roadmap order, and migration order, but the runtime implementation is still the current V2 client.
-- `task/TASK_20260411_025.md` is the first Phase 1 execution card; `task/TASK_20260411_026.md` is the next shared-module card and promotes the pure shared model boundary into `VibeWriteShared`.
-- `Sources/VibeWriteApp/Shared/AI/WritingAIContracts.swift` currently holds the contract/DTO types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
+- `task/TASK_20260411_025.md` is the first Phase 1 execution card; `task/TASK_20260411_026.md` is the shared-module card and now lands the pure shared model boundary in the native `VibeWriteShared` target.
+- `Sources/VibeWriteShared/Models/VibeWriteSharedModels.swift` and `Sources/VibeWriteShared/AI/WritingAIContracts.swift` now hold the pure shared model/AI contract types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
 - `startDraft` and `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request that starts as soon as the backend prose result is available; metadata updates `summary`, `nextFocus`, and `suggestionChips` only after the prose phase succeeds.
-- The app still needs the shared-module split work before any backend gateway lands, and the current handoff notes should be read together with the V3 roadmap rather than in isolation.
+- The shared-module split is now in place; the next V3 work is the backend gateway, and the current handoff notes should be read together with the V3 roadmap rather than in isolation.
 
 ## Notes
 - The durable historical log lives in `docs/handoff/CHANGELOG.md`.

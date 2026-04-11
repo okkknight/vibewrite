@@ -23,7 +23,6 @@
 		100000000000000000000036 /* VibeWriteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000026 /* VibeWriteModels.swift */; };
 		100000000000000000000037 /* MockWritingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000027 /* MockWritingEngine.swift */; };
 		100000000000000000000038 /* VibeWriteTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000028 /* VibeWriteTheme.swift */; };
-		10000000000000000000008A /* WritingAIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000008B /* WritingAIContracts.swift */; };
 		100000000000000000000051 /* WritingAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000052 /* WritingAIModels.swift */; };
 		100000000000000000000053 /* WritingAIPromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000054 /* WritingAIPromptBuilder.swift */; };
 		100000000000000000000055 /* WritingAIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000056 /* WritingAIConfiguration.swift */; };
@@ -39,6 +38,9 @@
 		100000000000000000000071 /* ProjectShellChrome.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000072 /* ProjectShellChrome.swift */; };
 		100000000000000000000039 /* VibeWriteUITests.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000029 /* VibeWriteUITests.swift */; };
 		10000000000000000000003A /* XCTest.framework in Frameworks */ = {isa = PBXBuildFile; fileRef = 10000000000000000000002A /* XCTest.framework */; };
+		100000000000000000000089 /* VibeWriteSharedModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000008D /* VibeWriteSharedModels.swift */; };
+		10000000000000000000008A /* WritingAIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000008E /* WritingAIContracts.swift */; };
+		10000000000000000000008B /* libVibeWriteShared.a in Frameworks */ = {isa = PBXBuildFile; fileRef = 10000000000000000000008C /* libVibeWriteShared.a */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXContainerItemProxy section */
@@ -49,11 +51,19 @@
 			remoteGlobalIDString = 10000000000000000000000E;
 			remoteInfo = VibeWriteApp;
 		};
+		100000000000000000000096 /* PBXContainerItemProxy */ = {
+			isa = PBXContainerItemProxy;
+			containerPortal = 100000000000000000000001 /* Project object */;
+			proxyType = 1;
+			remoteGlobalIDString = 100000000000000000000092 /* VibeWriteShared */;
+			remoteInfo = VibeWriteShared;
+		};
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
 		100000000000000000000010 /* VibeWrite.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = VibeWrite.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000011 /* VibeWriteUITests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = VibeWriteUITests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
+		10000000000000000000008C /* libVibeWriteShared.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = libVibeWriteShared.a; sourceTree = BUILT_PRODUCTS_DIR; };
 		100000000000000000000020 /* VibeWriteApp.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteApp.swift; sourceTree = "<group>"; };
 		100000000000000000000021 /* RootShellView.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RootShellView.swift; sourceTree = "<group>"; };
 		100000000000000000000022 /* VibeWriteAppFlow.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteAppFlow.swift; sourceTree = "<group>"; };
@@ -71,7 +81,6 @@
 		100000000000000000000027 /* MockWritingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWritingEngine.swift; sourceTree = "<group>"; };
 		100000000000000000000028 /* VibeWriteTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteTheme.swift; sourceTree = "<group>"; };
 		10000000000000000000004D /* VibeWrite.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = VibeWrite.xcconfig; sourceTree = "<group>"; };
-		10000000000000000000008B /* WritingAIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIContracts.swift; sourceTree = "<group>"; };
 		100000000000000000000052 /* WritingAIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIModels.swift; sourceTree = "<group>"; };
 		100000000000000000000054 /* WritingAIPromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIPromptBuilder.swift; sourceTree = "<group>"; };
 		100000000000000000000056 /* WritingAIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIConfiguration.swift; sourceTree = "<group>"; };
@@ -87,13 +96,23 @@
 		100000000000000000000072 /* ProjectShellChrome.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = ProjectShellChrome.swift; sourceTree = "<group>"; };
 		100000000000000000000029 /* VibeWriteUITests.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteUITests.swift; sourceTree = "<group>"; };
 		10000000000000000000002A /* XCTest.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = XCTest.framework; path = XCTest.framework; sourceTree = SDKROOT; };
+		10000000000000000000008D /* VibeWriteSharedModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteSharedModels.swift; sourceTree = "<group>"; };
+		10000000000000000000008E /* WritingAIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIContracts.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
 
 /* Begin PBXFrameworksBuildPhase section */
+		100000000000000000000094 /* Frameworks */ = {
+			isa = PBXFrameworksBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		10000000000000000000003E /* Frameworks */ = {
 			isa = PBXFrameworksBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				10000000000000000000008B /* libVibeWriteShared.a in Frameworks */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
 		};
@@ -123,13 +142,12 @@
 			);
 			mainGroup = 100000000000000000000002;
 			minimizedProjectReferenceProxies = 0;
-			packageReferences = (
-			);
 			preferredProjectObjectVersion = 77;
 			productRefGroup = 100000000000000000000003;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
+				100000000000000000000092 /* VibeWriteShared */,
 				10000000000000000000000E /* VibeWriteApp */,
 				10000000000000000000000F /* VibeWriteUITests */,
 			);
@@ -141,6 +159,7 @@
 				100000000000000000000050 /* Config */,
 				100000000000000000000063 /* Resources */,
 				100000000000000000000004 /* Sources */,
+				10000000000000000000008F /* VibeWriteShared */,
 				10000000000000000000000D /* UITests */,
 			);
 			sourceTree = "<group>";
@@ -150,8 +169,18 @@
 			children = (
 				100000000000000000000010 /* VibeWrite.app */,
 				100000000000000000000011 /* VibeWriteUITests.xctest */,
+				10000000000000000000008C /* libVibeWriteShared.a */,
 			);
 			name = Products;
+			sourceTree = "<group>";
+		};
+		10000000000000000000008F /* VibeWriteShared */ = {
+			isa = PBXGroup;
+			children = (
+				100000000000000000000090 /* Models */,
+				100000000000000000000091 /* AI */,
+			);
+			path = Sources/VibeWriteShared;
 			sourceTree = "<group>";
 		};
 		100000000000000000000004 = {
@@ -230,7 +259,6 @@
 		100000000000000000000060 /* AI */ = {
 			isa = PBXGroup;
 			children = (
-				10000000000000000000008B /* WritingAIContracts.swift */,
 				100000000000000000000052 /* WritingAIModels.swift */,
 				100000000000000000000054 /* WritingAIPromptBuilder.swift */,
 				100000000000000000000056 /* WritingAIConfiguration.swift */,
@@ -252,6 +280,22 @@
 				100000000000000000000027 /* MockWritingEngine.swift */,
 			);
 			path = Models;
+			sourceTree = "<group>";
+		};
+		100000000000000000000090 /* Models */ = {
+			isa = PBXGroup;
+			children = (
+				10000000000000000000008D /* VibeWriteSharedModels.swift */,
+			);
+			path = Models;
+			sourceTree = "<group>";
+		};
+		100000000000000000000091 /* AI */ = {
+			isa = PBXGroup;
+			children = (
+				10000000000000000000008E /* WritingAIContracts.swift */,
+			);
+			path = AI;
 			sourceTree = "<group>";
 		};
 		10000000000000000000000B = {
@@ -297,6 +341,22 @@
 /* End PBXGroup section */
 
 /* Begin PBXNativeTarget section */
+		100000000000000000000092 /* VibeWriteShared */ = {
+			isa = PBXNativeTarget;
+			buildConfigurationList = 100000000000000000000097 /* Build configuration list for PBXNativeTarget "VibeWriteShared" */;
+			buildPhases = (
+				100000000000000000000093 /* Sources */,
+				100000000000000000000094 /* Frameworks */,
+			);
+			buildRules = (
+			);
+			dependencies = (
+			);
+			name = VibeWriteShared;
+			productName = VibeWriteShared;
+			productReference = 10000000000000000000008C /* libVibeWriteShared.a */;
+			productType = "com.apple.product-type.library.static";
+		};
 		10000000000000000000000E /* VibeWriteApp */ = {
 			isa = PBXNativeTarget;
 			buildConfigurationList = 100000000000000000000044 /* Build configuration list for PBXNativeTarget "VibeWriteApp" */;
@@ -308,6 +368,7 @@
 			buildRules = (
 			);
 			dependencies = (
+				100000000000000000000095 /* PBXTargetDependency */,
 			);
 			name = VibeWriteApp;
 			productName = VibeWrite;
@@ -353,6 +414,15 @@
 /* End PBXResourcesBuildPhase section */
 
 /* Begin PBXSourcesBuildPhase section */
+		100000000000000000000093 /* Sources */ = {
+			isa = PBXSourcesBuildPhase;
+			buildActionMask = 2147483647;
+			files = (
+				100000000000000000000089 /* VibeWriteSharedModels.swift in Sources */,
+				10000000000000000000008A /* WritingAIContracts.swift in Sources */,
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+		};
 		10000000000000000000003D /* Sources */ = {
 			isa = PBXSourcesBuildPhase;
 			buildActionMask = 2147483647;
@@ -370,7 +440,6 @@
 				100000000000000000000036 /* VibeWriteModels.swift in Sources */,
 				100000000000000000000037 /* MockWritingEngine.swift in Sources */,
 				100000000000000000000038 /* VibeWriteTheme.swift in Sources */,
-				10000000000000000000008A /* WritingAIContracts.swift in Sources */,
 				100000000000000000000051 /* WritingAIModels.swift in Sources */,
 				100000000000000000000053 /* WritingAIPromptBuilder.swift in Sources */,
 				100000000000000000000055 /* WritingAIConfiguration.swift in Sources */,
@@ -400,6 +469,11 @@
 /* End PBXSourcesBuildPhase section */
 
 /* Begin PBXTargetDependency section */
+		100000000000000000000095 /* PBXTargetDependency */ = {
+			isa = PBXTargetDependency;
+			target = 100000000000000000000092 /* VibeWriteShared */;
+			targetProxy = 100000000000000000000096 /* PBXContainerItemProxy */;
+		};
 		10000000000000000000003C /* PBXTargetDependency */ = {
 			isa = PBXTargetDependency;
 			target = 10000000000000000000000E /* VibeWriteApp */;
@@ -469,6 +543,46 @@
 			};
 			name = Release;
 		};
+		100000000000000000000098 /* Debug */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10000000000000000000004D /* VibeWrite.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				DEFINES_MODULE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = VibeWriteShared;
+				SKIP_INSTALL = YES;
+				SWIFT_ACTIVE_COMPILATION_CONDITIONS = DEBUG;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
+				SWIFT_VERSION = 6.0;
+			};
+			name = Debug;
+		};
+		100000000000000000000099 /* Release */ = {
+			isa = XCBuildConfiguration;
+			baseConfigurationReference = 10000000000000000000004D /* VibeWrite.xcconfig */;
+			buildSettings = {
+				CLANG_ENABLE_MODULES = YES;
+				CLANG_ENABLE_OBJC_ARC = YES;
+				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = "";
+				DEFINES_MODULE = YES;
+				GENERATE_INFOPLIST_FILE = NO;
+				MACOSX_DEPLOYMENT_TARGET = 14.0;
+				MARKETING_VERSION = 1.0;
+				PRODUCT_NAME = VibeWriteShared;
+				SKIP_INSTALL = YES;
+				SWIFT_EMIT_LOC_STRINGS = YES;
+				SWIFT_VERSION = 6.0;
+			};
+			name = Release;
+		};
 		10000000000000000000004A /* Debug */ = {
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 10000000000000000000004D /* VibeWrite.xcconfig */;
@@ -533,6 +647,15 @@
 			buildConfigurations = (
 				100000000000000000000048 /* Debug */,
 				100000000000000000000049 /* Release */,
+			);
+			defaultConfigurationIsVisible = 0;
+			defaultConfigurationName = Debug;
+		};
+		100000000000000000000097 /* Build configuration list for PBXNativeTarget "VibeWriteShared" */ = {
+			isa = XCConfigurationList;
+			buildConfigurations = (
+				100000000000000000000098 /* Debug */,
+				100000000000000000000099 /* Release */,
 			);
 			defaultConfigurationIsVisible = 0;
 			defaultConfigurationName = Debug;

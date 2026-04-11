@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 final class RemoteWritingAIClient: WritingAIClient, @unchecked Sendable {
     private let configuration: WritingAIConfiguration

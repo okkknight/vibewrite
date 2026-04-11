@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 #if canImport(Darwin)
 import Darwin

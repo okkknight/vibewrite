@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 enum WritingAIResponseDecoder {
     static func decode(from rawContent: String) throws -> WritingAIResponse {

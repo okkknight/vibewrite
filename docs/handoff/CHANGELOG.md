@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-11
+- Promoted the pure shared model and AI contract boundary into a native `VibeWriteShared` static library target, updated the Xcode project so `VibeWriteApp` links that local target instead of consuming a SwiftPM package module slice, and kept `Package.swift` aligned for `swift test`.
+
+# 2026-04-11
 - Added `task/TASK_20260411_026.md` as the next Phase 1 execution card. It defines the `VibeWriteShared` boundary so the pure shared models and AI contract can move out of the app target before any backend gateway work starts.
 
 # 2026-04-11

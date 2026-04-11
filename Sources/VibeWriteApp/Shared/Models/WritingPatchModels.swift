@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 enum WritingEditPatchError: LocalizedError, Hashable {
     case missingSelection

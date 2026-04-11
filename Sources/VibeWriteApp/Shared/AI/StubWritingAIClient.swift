@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 struct StubWritingAIClient: WritingAIClient {
     func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {

@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 struct VibeWriteMarkdownDocument: Hashable {
     var identityMarker: VibeWriteDocumentIdentityMarker?

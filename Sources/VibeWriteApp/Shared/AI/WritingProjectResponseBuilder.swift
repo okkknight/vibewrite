@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 enum WritingProjectResponseBuilder {
     static func response(

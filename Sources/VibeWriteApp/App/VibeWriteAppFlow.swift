@@ -2,6 +2,7 @@ import Foundation
 import AppKit
 import UniformTypeIdentifiers
 import SwiftUI
+import VibeWriteShared
 
 @MainActor
 final class VibeWriteAppFlow: ObservableObject {

@@ -1,4 +1,5 @@
 import Foundation
+import VibeWriteShared
 
 enum MockWritingAction: Hashable {
     case startDraft

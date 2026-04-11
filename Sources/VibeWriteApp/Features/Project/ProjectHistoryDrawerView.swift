@@ -1,4 +1,6 @@
+import Foundation
 import SwiftUI
+import VibeWriteShared
 
 struct ProjectHistoryDrawerView: View {
     let project: WritingProject

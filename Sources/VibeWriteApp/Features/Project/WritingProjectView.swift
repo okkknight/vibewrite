@@ -1,6 +1,7 @@
 import AppKit
 import Foundation
 import SwiftUI
+import VibeWriteShared
 
 struct WritingProjectView: View {
     @ObservedObject var flow: VibeWriteAppFlow

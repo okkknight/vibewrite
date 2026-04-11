@@ -1,4 +1,5 @@
 import XCTest
+import VibeWriteShared
 @testable import VibeWriteApp
 
 @MainActor

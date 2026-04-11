@@ -1,5 +1,6 @@
 import AppKit
 import SwiftUI
+import VibeWriteShared
 
 struct WritingLocalEditFlash: Equatable, Hashable {
     let id: UUID
