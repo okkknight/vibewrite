@@ -1,7 +1,7 @@
 # VibeWrite Project Context
 
 ## What this project is
-VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-first drafting with a calm native shell: users start from a prompt, grow正文 with AI, and use AI/history rails only as auxiliary surfaces.
+VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-first drafting with a calm native shell: users start from a writing brief, grow正文 with AI, and use AI/history rails only as auxiliary surfaces.
 
 ## What this project is not
 - not a general chat app
@@ -14,7 +14,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.
 - The wide Composer now keeps the zero-gap body-to-composer seam while preserving its shadow and internal padding.
 - The wide Composer card still floats above the window edge so the panel keeps bottom breathing room.
-- V2 docs under `docs/V2/` are the source of truth.
+- V2 docs under `docs/V2/` remain archival reference for the current runtime behavior.
+- V3 planning docs under `docs/V3/` now define the front/back split target, backend AI gateway, data model, deployment shape, migration order, and simple admin console requirements; the runtime implementation still follows the current V2 client until migration starts.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` remains the persisted metadata/snapshot shell. `WritingProjectView` no longer writes正文 back through `projectDocumentTextBinding`; title and metadata updates still go through the project snapshot.
 - Saving now serializes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 state the editor is showing instead of depending on a last-second window flush.
 - Project-level updates that intentionally change正文, such as open, undo, and AI responses, now sync the live正文 back into the session snapshot through `replaceActiveProject`, which keeps the live buffer and persisted project aligned without rebuilding the old project-body writeback bridge.
@@ -190,7 +191,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection-flow UI test is temporarily skipped because the system open panel still steals focus on that path; the blank-start and compact-layout UI smoke tests remain the default verification baseline.
 
 ## Runtime notes
-- Clicking an assistant suggestion now clears the current first responder and re-requests composer focus on the next main-queue turn; the regression test now checks the focus handoff directly instead of trying to discover the SwiftUI chip button in the AppKit tree.
+- Assistant suggestion taps now advance a dedicated `composerFocusRequestID` in addition to the SwiftUI focus binding; `ComposerTextEditor` uses that request token to hard-set itself as first responder so Enter returns to composer submission instead of getting stuck on a soft focus handoff.
+- Clicking an assistant suggestion now clears the current first responder, advances `composerFocusRequestID`, and lets `ComposerTextEditor` hard-set itself as first responder on the next view update; the regression test now checks the focus handoff directly instead of trying to discover the SwiftUI chip button in the AppKit tree.
 - `VIBEWRITE_UI_TEST_RESET_STORAGE=1` resets the app's own container-local store for UI runs.
 - `--clean-launch` and `VIBEWRITE_FORCE_BLANK_STARTUP=1` still force a blank start for acceptance runs.
 - Keep local Xcode-generated files, `Config/VibeWrite.local.xcconfig`, and user workspace state out of commits; `.gitignore` now covers them, but double-check before staging if the repo status looks noisy.

@@ -2,17 +2,6 @@ import AppKit
 import Foundation
 import SwiftUI
 
-@MainActor
-func requestComposerFocusAfterSuggestionTap(
-    setMessageFieldFocused: @escaping (Bool) -> Void
-) {
-    setMessageFieldFocused(false)
-
-    DispatchQueue.main.async {
-        setMessageFieldFocused(true)
-    }
-}
-
 struct WritingProjectView: View {
     @ObservedObject var flow: VibeWriteAppFlow
     let shellLayoutMode: ProjectShellLayoutMode
@@ -31,6 +20,7 @@ struct WritingProjectView: View {
     @State private var showHistoryLayer = false
     @State private var isComposerLocked = false
     @State private var composerRequestSessionID = UUID()
+    @State private var composerFocusRequestID = UUID()
     @FocusState private var messageFieldFocused: Bool
 
     private var project: WritingProject { flow.activeEditingProject }
@@ -564,6 +554,7 @@ struct WritingProjectView: View {
             isPrimaryActionInFlight: flow.isPrimaryActionDisplayInFlight,
             isSuggestionGenerationInFlight: flow.isMetadataRequestInFlight,
             messageFieldFocused: $messageFieldFocused,
+            focusRequestID: composerFocusRequestID,
             isMessageFieldHighlighted: normalizedSelectedText != nil,
             accessibilityIdentifier: VibeWriteAutomationID.projectComposerBar,
             messageInputIdentifier: VibeWriteAutomationID.projectMessageInput,
@@ -722,27 +713,17 @@ struct WritingProjectView: View {
         )
 
         messageDraft = suggestion
+        messageFieldFocused = false
         NSApp.keyWindow?.makeFirstResponder(nil)
+        composerFocusRequestID = UUID()
         let clearedWindowFirstResponder = NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
-        requestComposerFocusAfterSuggestionTap(setMessageFieldFocused: { messageFieldFocused = $0 })
 
         VibeWriteDebugTrace.append(
-            "suggestion tap cleared composer focus before re-request suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused) windowFirstResponder=\(clearedWindowFirstResponder)"
+            "suggestion tap requested composer focus suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused) requestID=\(composerFocusRequestID.uuidString) windowFirstResponder=\(clearedWindowFirstResponder)"
         )
         VibeWriteLog.launch.info(
-            "suggestion tap cleared composer focus before re-request suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public) windowFirstResponder=\(clearedWindowFirstResponder, privacy: .public)"
+            "suggestion tap requested composer focus suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public) requestID=\(composerFocusRequestID.uuidString, privacy: .public) windowFirstResponder=\(clearedWindowFirstResponder, privacy: .public)"
         )
-
-        DispatchQueue.main.async { [draftPreview] in
-            guard !flow.isAIRequestInFlight else { return }
-            messageFieldFocused = true
-            VibeWriteDebugTrace.append(
-                "suggestion tap re-requested composer focus suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused)"
-            )
-            VibeWriteLog.launch.info(
-                "suggestion tap re-requested composer focus suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public)"
-            )
-        }
     }
 
     private struct ThinkingDots: View {

@@ -24,6 +24,16 @@ This directory is the compact handoff layer for VibeWrite.
 19. `task/TASK_20260402_022.md`
 20. `task/TASK_20260403_023.md`
 21. `task/TASK_20260403_024.md`
+22. `docs/V3/AGENTS.md`
+23. `docs/V3/FRONTEND3.0.md`
+24. `docs/V3/BACKEND3.0.md`
+25. `docs/V3/DATA3.0.md`
+26. `docs/V3/DEPLOY3.0.md`
+27. `docs/V3/MIGRATION3.0.md`
+28. `docs/V3/PRD3.0.md`
+29. `docs/V3/IA3.0.md`
+30. `docs/V3/API3.0.md`
+31. `docs/V3/ADMIN3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -31,7 +41,8 @@ This directory is the compact handoff layer for VibeWrite.
 - avoid duplicating the same status across many notes
 
 ## Current state
-- V2 docs remain the source of truth; `docs/V1/` is archival only.
+- V2 docs under `docs/V2/` remain archival reference for the current runtime behavior; `docs/V1/` is archival only.
+- V3 planning docs now define the frontend/backend split target, backend AI gateway, data model, deployment shape, and migration order, but the runtime implementation is still the current V2 client.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell. The old正文 project-body writeback bridge is gone, so title and metadata edits can stay on the project side without stealing正文 from the live editor.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
 - Project-level updates that intentionally change正文, such as open, undo, and AI responses, now sync the live正文 back into the session snapshot through `replaceActiveProject`, which keeps the live buffer and persisted project aligned.
@@ -114,7 +125,7 @@ This directory is the compact handoff layer for VibeWrite.
 - Remote AI now separates prose and metadata for `startDraft` / `continueWriting`:正文 streams first, then a second request fills `summary`, `nextFocus`, and `suggestionChips`; `.edit` keeps the legacy combined path.
 - The composer guidance row is now intentionally sparse in the blank/start-draft state: initial empty正文 only shows the primary `生成开场` pill, while assistant guidance chips stay on a single line and no longer wrap into a second row.
 - The composer's assistant suggestion rail now stays on one line only: chips keep their order, and any chip that would overflow is dropped instead of wrapping.
-- Clicking an assistant suggestion now clears the current first responder and re-requests composer focus on the next main-queue turn, so Enter returns to composer submission instead of staying trapped in the正文 editor.
+- Clicking an assistant suggestion now clears the current first responder, advances `composerFocusRequestID`, and lets `ComposerTextEditor` hard-set itself as first responder on the next view update, so Enter returns to composer submission instead of staying trapped in the正文 editor.
 - The window and project shell no longer impose hard minimum width/height constraints, so the app can now be resized freely for real-world layout testing.
 - Compact project layout now uses a full-window editor surface instead of the old nested rounded shell, so shrinking the window no longer falls back to a fake-looking big-frame/little-frame composition.
 - The AI and history sidebars have been flattened toward a Codex-style sliding panel treatment: softer shell, fewer nested section cards, and more list-like rows.

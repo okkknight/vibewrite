@@ -1,6 +1,15 @@
 # Changelog
 
 # 2026-04-11
+- Tightened the V3 planning docs so `project.prompt` is always distinguished from the backend AI system prompt template, and renamed the remaining ambiguous prompt sections in backend, frontend, deploy, admin, data, IA, API, migration, PRD, and AGENTS docs to keep agent readers from collapsing the two concepts.
+
+# 2026-04-11
+- Split the V3 planning docs further into frontend, backend, data, deployment, and migration files so the frontend/backend boundary can be implemented without guessing hidden defaults.
+
+# 2026-04-11
+- Added the new V3 planning doc set under `docs/V3/` to define the frontend/backend split, the backend AI gateway, and the simple single-admin console.
+
+# 2026-04-11
 - Added focused debug logging around assistant suggestion taps and composer focus binding changes so the next repro can confirm whether chip clicks actually hand first responder back to the composer or leave it in the正文 editor.
 
 # 2026-04-11
@@ -376,7 +385,7 @@
 - `swift test` 和 `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` 都已通过
 
 ## 2026-04-11
-- Suggestion taps now explicitly clear the current first responder and re-request composer focus on the next main-queue turn, so clicking an AI chip returns Enter handling to the composer instead of leaving the正文 editor active.
+- Suggestion taps now explicitly clear the current first responder, advance a dedicated `composerFocusRequestID`, and let `ComposerTextEditor` hard-set itself as first responder on the next view update, so clicking an AI chip returns Enter handling to the composer instead of leaving the正文 editor active.
 - The regression coverage for that path now tests the focus handoff directly instead of depending on SwiftUI chip button discovery in the AppKit tree.
 
 ## 2026-04-02

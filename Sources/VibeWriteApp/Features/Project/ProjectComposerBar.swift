@@ -14,6 +14,7 @@ struct ProjectComposerBar: View {
     let isPrimaryActionInFlight: Bool
     let isSuggestionGenerationInFlight: Bool
     let messageFieldFocused: FocusState<Bool>.Binding
+    let focusRequestID: UUID
     let isMessageFieldHighlighted: Bool
     let accessibilityIdentifier: String
     let messageInputIdentifier: String
@@ -74,6 +75,7 @@ struct ProjectComposerBar: View {
             ComposerTextEditor(
                 text: $messageDraft,
                 messageFieldFocused: messageFieldFocused,
+                focusRequestID: focusRequestID,
                 isEditable: !isComposerLocked,
                 textFont: .systemFont(ofSize: 14, weight: .medium),
                 textColor: composerTextNSColor,
@@ -349,6 +351,7 @@ struct ProjectComposerBar: View {
 private struct ComposerTextEditor: NSViewRepresentable {
     @Binding var text: String
     let messageFieldFocused: FocusState<Bool>.Binding
+    let focusRequestID: UUID
     let isEditable: Bool
     let textFont: NSFont
     let textColor: NSColor
@@ -442,6 +445,10 @@ private struct ComposerTextEditor: NSViewRepresentable {
             "composer text editor update start bindingCount=\(text.utf16.count, privacy: .public) textViewCount=\(textView.string.utf16.count, privacy: .public) focused=\(messageFieldFocused.wrappedValue, privacy: .public) firstResponder=\(firstResponderDescription, privacy: .public) isFirstResponder=\(isFirstResponder, privacy: .public) editable=\(isEditable, privacy: .public)"
         )
         context.coordinator.syncText(text, in: textView)
+        context.coordinator.requestFocusIfNeeded(
+            requestID: focusRequestID,
+            in: textView
+        )
 
         if messageFieldFocused.wrappedValue {
             if textView.window?.firstResponder !== textView {
@@ -473,6 +480,7 @@ private struct ComposerTextEditor: NSViewRepresentable {
         private let onFocusChanged: (Bool) -> Void
         weak var textView: NSTextView?
         private var programmaticChangeDepth = 0
+        private var lastHandledFocusRequestID: UUID?
 
         init(text: Binding<String>, onFocusChanged: @escaping (Bool) -> Void) {
             _text = text
@@ -484,6 +492,23 @@ private struct ComposerTextEditor: NSViewRepresentable {
             programmaticChangeDepth += 1
             textView.string = newText
             programmaticChangeDepth -= 1
+        }
+
+        func requestFocusIfNeeded(requestID: UUID, in textView: NSTextView) {
+            guard lastHandledFocusRequestID != requestID else { return }
+            guard let window = textView.window else { return }
+
+            lastHandledFocusRequestID = requestID
+            if window.firstResponder !== textView {
+                let firstResponderDescription = window.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+                VibeWriteDebugTrace.append(
+                    "composer text editor hard focus request requestID=\(requestID.uuidString) firstResponder=\(firstResponderDescription)"
+                )
+                VibeWriteLog.launch.info(
+                    "composer text editor hard focus request requestID=\(requestID.uuidString, privacy: .public) firstResponder=\(firstResponderDescription, privacy: .public)"
+                )
+                window.makeFirstResponder(textView)
+            }
         }
 
         func textDidBeginEditing(_ notification: Notification) {

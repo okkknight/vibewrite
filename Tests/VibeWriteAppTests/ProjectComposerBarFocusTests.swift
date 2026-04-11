@@ -49,22 +49,105 @@ final class ProjectComposerBarFocusTests: XCTestCase {
     func testComposerTakesFocusAfterAssistantSuggestionTapEvenWhenBodyEditorIsFocused() {
         _ = VibeWriteDebugTrace.drain()
 
-        var focusState = true
-        var transitions: [Bool] = []
+        let model = ComposerSuggestionFocusModel()
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 820, height: 680),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        window.contentView = NSView(frame: window.contentRect(forFrameRect: window.frame))
 
-        requestComposerFocusAfterSuggestionTap(setMessageFieldFocused: { newValue in
-            focusState = newValue
-            transitions.append(newValue)
-        })
-        XCTAssertEqual(transitions, [false])
+        let hostingView = NSHostingView(
+            rootView: ComposerSuggestionFocusHarnessView(model: model)
+        )
+        hostingView.frame = window.contentView?.bounds ?? .zero
+        window.contentView?.addSubview(hostingView)
+        window.makeKeyAndOrderFront(nil)
 
+        pumpRunLoop(for: 0.25)
+
+        guard let bodyTextView = findTextView(in: window.contentView, identifier: "body-editor") else {
+            let traces = VibeWriteDebugTrace.drain()
+            XCTFail("Could not find body editor text view. Traces:\n\(traces.joined(separator: "\n"))")
+            return
+        }
+
+        guard let composerTextView = findComposerTextView(in: window.contentView) else {
+            let traces = VibeWriteDebugTrace.drain()
+            XCTFail("Could not find composer text view. Traces:\n\(traces.joined(separator: "\n"))")
+            return
+        }
+
+        _ = window.makeFirstResponder(bodyTextView)
         pumpRunLoop(for: 0.1)
+
+        model.focusRequestID = UUID()
+        pumpRunLoop(for: 0.25)
 
         let traces = VibeWriteDebugTrace.drain()
         print(traces.joined(separator: "\n"))
 
-        XCTAssertEqual(transitions, [false, true], "Suggestion tap did not re-request composer focus. Traces:\n\(traces.joined(separator: "\n"))")
-        XCTAssertTrue(focusState, "Suggestion tap did not leave the composer focus requested. Traces:\n\(traces.joined(separator: "\n"))")
+        XCTAssertTrue(
+            window.firstResponder === composerTextView,
+            "Suggestion tap did not move focus back to composer. Traces:\n\(traces.joined(separator: "\n"))"
+        )
+    }
+}
+
+@MainActor
+private final class ComposerSuggestionFocusModel: ObservableObject {
+    @Published var bodyDraft = "正文第一段\n正文第二段\n正文第三段"
+    @Published var composerDraft = ""
+    @Published var focusRequestID = UUID()
+}
+
+@MainActor
+private struct ComposerSuggestionFocusHarnessView: View {
+    @ObservedObject var model: ComposerSuggestionFocusModel
+    @FocusState private var composerFocused: Bool
+
+    var body: some View {
+        VStack(spacing: 18) {
+            SelectableTextEditor(
+                text: $model.bodyDraft,
+                selectedText: .constant(nil),
+                selectedTextRange: .constant(nil),
+                selectionPopoverOrigin: .constant(nil),
+                isEditable: true,
+                accessibilityIdentifier: "body-editor",
+                shouldAutoScrollToDocumentEnd: false
+            )
+            .frame(height: 220)
+
+            ProjectComposerBar(
+                messageDraft: $model.composerDraft,
+                appearanceMode: .day,
+                primaryActionTitle: "续写",
+                messageFieldPlaceholder: "先补一个起稿需求",
+                showsAssistantSuggestions: true,
+                assistantSuggestionChips: [
+                    "手机备忘录",
+                    "口袋本",
+                    "语音备忘"
+                ],
+                isComposerLocked: false,
+                isRequestInFlight: false,
+                isPrimaryOutputInFlight: false,
+                isPrimaryActionInFlight: false,
+                isSuggestionGenerationInFlight: false,
+                messageFieldFocused: $composerFocused,
+                focusRequestID: model.focusRequestID,
+                isMessageFieldHighlighted: composerFocused,
+                accessibilityIdentifier: "composer-bar",
+                messageInputIdentifier: "composer-input",
+                sendButtonIdentifier: "composer-submit",
+                onSubmit: {},
+                onAssistantSuggestionTap: { _ in }
+            )
+            .frame(width: 720)
+        }
+        .frame(width: 820, height: 680)
     }
 }
 
@@ -72,6 +155,7 @@ final class ProjectComposerBarFocusTests: XCTestCase {
 private struct ComposerFocusHarnessView: View {
     @State private var draft = ""
     @FocusState private var focused: Bool
+    @State private var focusRequestID = UUID()
 
     var body: some View {
         ProjectComposerBar(
@@ -91,6 +175,7 @@ private struct ComposerFocusHarnessView: View {
             isPrimaryActionInFlight: false,
             isSuggestionGenerationInFlight: false,
             messageFieldFocused: $focused,
+            focusRequestID: focusRequestID,
             isMessageFieldHighlighted: focused,
             accessibilityIdentifier: "composer-bar",
             messageInputIdentifier: "composer-input",
