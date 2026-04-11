@@ -16,6 +16,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The wide Composer card still floats above the window edge so the panel keeps bottom breathing room.
 - V2 docs under `docs/V2/` remain archival reference for the current runtime behavior.
 - V3 planning docs under `docs/V3/` now define the front/back split target, backend AI gateway, data model, deployment shape, migration order, and simple admin console requirements; the runtime implementation still follows the current V2 client until migration starts.
+- The shared AI contract layer is now split out into `Sources/VibeWriteApp/Shared/AI/WritingAIContracts.swift`, while `WritingAIModels.swift` keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` remains the persisted metadata/snapshot shell. `WritingProjectView` no longer writes正文 back through `projectDocumentTextBinding`; title and metadata updates still go through the project snapshot.
 - Saving now serializes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 state the editor is showing instead of depending on a last-second window flush.
 - Project-level updates that intentionally change正文, such as open, undo, and AI responses, now sync the live正文 back into the session snapshot through `replaceActiveProject`, which keeps the live buffer and persisted project aligned without rebuilding the old project-body writeback bridge.

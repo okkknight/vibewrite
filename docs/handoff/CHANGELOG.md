@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-11
+- Split the shared AI contract layer out of `Sources/VibeWriteApp/Shared/AI/WritingAIModels.swift` into `Sources/VibeWriteApp/Shared/AI/WritingAIContracts.swift`, leaving the decoder, helper, and default implementation logic in the original file and keeping the existing client behavior unchanged.
+
+# 2026-04-11
 - Marked Phase 0 in `docs/V3/ROADMAP3.0.md` as completed and added the first Phase 1 execution card `task/TASK_20260411_025.md`, which splits the shared AI contract layer before any backend stack choice or provider work.
 
 # 2026-04-11

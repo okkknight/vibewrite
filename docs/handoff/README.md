@@ -46,6 +46,7 @@ This directory is the compact handoff layer for VibeWrite.
 - V2 docs under `docs/V2/` remain archival reference for the current runtime behavior; `docs/V1/` is archival only.
 - V3 planning docs now define the frontend/backend split target, backend AI gateway, data model, deployment shape, roadmap order, and migration order, but the runtime implementation is still the current V2 client.
 - The first Phase 1 execution card now lives in `task/TASK_20260411_025.md`; future task cards should follow the roadmap order instead of skipping directly into implementation details.
+- The shared AI contract layer now lives in `Sources/VibeWriteApp/Shared/AI/WritingAIContracts.swift`, while `WritingAIModels.swift` keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell. The old正文 project-body writeback bridge is gone, so title and metadata edits can stay on the project side without stealing正文 from the live editor.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
 - Project-level updates that intentionally change正文, such as open, undo, and AI responses, now sync the live正文 back into the session snapshot through `replaceActiveProject`, which keeps the live buffer and persisted project aligned.

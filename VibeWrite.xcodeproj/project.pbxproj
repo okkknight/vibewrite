@@ -23,6 +23,7 @@
 		100000000000000000000036 /* VibeWriteModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000026 /* VibeWriteModels.swift */; };
 		100000000000000000000037 /* MockWritingEngine.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000027 /* MockWritingEngine.swift */; };
 		100000000000000000000038 /* VibeWriteTheme.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000028 /* VibeWriteTheme.swift */; };
+		10000000000000000000008A /* WritingAIContracts.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000008B /* WritingAIContracts.swift */; };
 		100000000000000000000051 /* WritingAIModels.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000052 /* WritingAIModels.swift */; };
 		100000000000000000000053 /* WritingAIPromptBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000054 /* WritingAIPromptBuilder.swift */; };
 		100000000000000000000055 /* WritingAIConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000056 /* WritingAIConfiguration.swift */; };
@@ -70,6 +71,7 @@
 		100000000000000000000027 /* MockWritingEngine.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = MockWritingEngine.swift; sourceTree = "<group>"; };
 		100000000000000000000028 /* VibeWriteTheme.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteTheme.swift; sourceTree = "<group>"; };
 		10000000000000000000004D /* VibeWrite.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = VibeWrite.xcconfig; sourceTree = "<group>"; };
+		10000000000000000000008B /* WritingAIContracts.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIContracts.swift; sourceTree = "<group>"; };
 		100000000000000000000052 /* WritingAIModels.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIModels.swift; sourceTree = "<group>"; };
 		100000000000000000000054 /* WritingAIPromptBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIPromptBuilder.swift; sourceTree = "<group>"; };
 		100000000000000000000056 /* WritingAIConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingAIConfiguration.swift; sourceTree = "<group>"; };
@@ -228,6 +230,7 @@
 		100000000000000000000060 /* AI */ = {
 			isa = PBXGroup;
 			children = (
+				10000000000000000000008B /* WritingAIContracts.swift */,
 				100000000000000000000052 /* WritingAIModels.swift */,
 				100000000000000000000054 /* WritingAIPromptBuilder.swift */,
 				100000000000000000000056 /* WritingAIConfiguration.swift */,
@@ -367,6 +370,7 @@
 				100000000000000000000036 /* VibeWriteModels.swift in Sources */,
 				100000000000000000000037 /* MockWritingEngine.swift in Sources */,
 				100000000000000000000038 /* VibeWriteTheme.swift in Sources */,
+				10000000000000000000008A /* WritingAIContracts.swift in Sources */,
 				100000000000000000000051 /* WritingAIModels.swift in Sources */,
 				100000000000000000000053 /* WritingAIPromptBuilder.swift in Sources */,
 				100000000000000000000055 /* WritingAIConfiguration.swift in Sources */,
