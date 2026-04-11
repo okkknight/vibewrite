@@ -2,6 +2,17 @@ import AppKit
 import Foundation
 import SwiftUI
 
+@MainActor
+func requestComposerFocusAfterSuggestionTap(
+    setMessageFieldFocused: @escaping (Bool) -> Void
+) {
+    setMessageFieldFocused(false)
+
+    DispatchQueue.main.async {
+        setMessageFieldFocused(true)
+    }
+}
+
 struct WritingProjectView: View {
     @ObservedObject var flow: VibeWriteAppFlow
     let shellLayoutMode: ProjectShellLayoutMode
@@ -711,14 +722,27 @@ struct WritingProjectView: View {
         )
 
         messageDraft = suggestion
-        messageFieldFocused = true
+        NSApp.keyWindow?.makeFirstResponder(nil)
+        let clearedWindowFirstResponder = NSApp.keyWindow?.firstResponder.map { String(describing: type(of: $0)) } ?? "nil"
+        requestComposerFocusAfterSuggestionTap(setMessageFieldFocused: { messageFieldFocused = $0 })
 
         VibeWriteDebugTrace.append(
-            "suggestion tap requested composer focus suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused)"
+            "suggestion tap cleared composer focus before re-request suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused) windowFirstResponder=\(clearedWindowFirstResponder)"
         )
         VibeWriteLog.launch.info(
-            "suggestion tap requested composer focus suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public)"
+            "suggestion tap cleared composer focus before re-request suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public) windowFirstResponder=\(clearedWindowFirstResponder, privacy: .public)"
         )
+
+        DispatchQueue.main.async { [draftPreview] in
+            guard !flow.isAIRequestInFlight else { return }
+            messageFieldFocused = true
+            VibeWriteDebugTrace.append(
+                "suggestion tap re-requested composer focus suggestion=\(draftPreview) requestedFocus=\(messageFieldFocused)"
+            )
+            VibeWriteLog.launch.info(
+                "suggestion tap re-requested composer focus suggestion=\(draftPreview, privacy: .public) requestedFocus=\(messageFieldFocused, privacy: .public)"
+            )
+        }
     }
 
     private struct ThinkingDots: View {

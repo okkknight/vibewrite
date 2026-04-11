@@ -190,6 +190,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The selection-flow UI test is temporarily skipped because the system open panel still steals focus on that path; the blank-start and compact-layout UI smoke tests remain the default verification baseline.
 
 ## Runtime notes
+- Clicking an assistant suggestion now clears the current first responder and re-requests composer focus on the next main-queue turn; the regression test now checks the focus handoff directly instead of trying to discover the SwiftUI chip button in the AppKit tree.
 - `VIBEWRITE_UI_TEST_RESET_STORAGE=1` resets the app's own container-local store for UI runs.
 - `--clean-launch` and `VIBEWRITE_FORCE_BLANK_STARTUP=1` still force a blank start for acceptance runs.
 - Keep local Xcode-generated files, `Config/VibeWrite.local.xcconfig`, and user workspace state out of commits; `.gitignore` now covers them, but double-check before staging if the repo status looks noisy.

@@ -375,6 +375,10 @@
 - `startDraft` 的 prompt 组装被修回来了：用户输入现在会进入真实 LLM payload，而不是只留在项目记录里；同时正文桥接字体和颜色也改成了更清晰的 AppKit 原生正文样式
 - `swift test` 和 `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` 都已通过
 
+## 2026-04-11
+- Suggestion taps now explicitly clear the current first responder and re-request composer focus on the next main-queue turn, so clicking an AI chip returns Enter handling to the composer instead of leaving the正文 editor active.
+- The regression coverage for that path now tests the focus handoff directly instead of depending on SwiftUI chip button discovery in the AppKit tree.
+
 ## 2026-04-02
 - 完成了正文中心 shell 的严格对齐重构：AI sidebar、history drawer、composer 和 selection actions 都回到各自的辅助层职责，不再像工作台式中间卡片。
 - `task/TASK_20260402_021.md` 把 composer 挪成了独立底部协作入口。
