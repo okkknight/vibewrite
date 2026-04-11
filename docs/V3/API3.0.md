@@ -24,6 +24,21 @@ V3 API 的目标很简单：
 - 返回后端签发的 `deviceToken`
 - 返回当前限额摘要
 
+响应字段固定为：
+
+- `deviceToken`
+- `deviceStatus`
+- `quotaSummary`
+
+其中 `deviceStatus` 在当前阶段固定返回 `active`。
+
+其中 `quotaSummary` 只包含当前默认限额，不包含历史用量：
+
+- `dailyLimit`
+- `weeklyLimit`
+
+`bootstrap` 对同一 `installationId` 在进程生命周期内必须保持幂等，重复请求返回同一个 `deviceToken`。
+
 请求字段：
 
 - `installationId`
@@ -46,6 +61,12 @@ V3 API 的目标很简单：
 ### 2.5 心跳 / 健康检查
 
 `GET /v3/health`
+
+响应固定为：
+
+```json
+{ "status": "ok" }
+```
 
 ---
 

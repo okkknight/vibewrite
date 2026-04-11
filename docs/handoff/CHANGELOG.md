@@ -1,6 +1,13 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_029.md` as the next Phase 1 execution card. It generalizes the backend write transport envelope and keeps the same bootstrap-token gate so `POST /v3/writes/continue` can land without touching the shared DTO boundary or jumping to provider logic yet.
+
+# 2026-04-12
+- Independent review of `TASK_20260411_028.md` passed: the backend-only write transport envelope is present, `POST /v3/writes/start` validates bootstrap-issued tokens, returns a deterministic stub `WritingAIResponse`, mirrors the requested project state, and rejects invalid tokens with 401.
+- Verification passed with `swift test` in `Backend/`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and live HTTP checks against `GET /v3/health`, `POST /v3/client/bootstrap`, and `POST /v3/writes/start`.
+
+# 2026-04-12
 - Implemented `POST /v3/writes/start` in `Backend/` with a backend-only write transport envelope, bootstrap token validation against the in-memory device registry, and a deterministic stub `WritingAIResponse` that mirrors the current project state. Added focused tests for the success path and the unauthorized path, and verified the backend package with `swift test`.
 
 # 2026-04-11
