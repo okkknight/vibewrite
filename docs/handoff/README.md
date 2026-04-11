@@ -33,13 +33,14 @@ This directory is the compact handoff layer for VibeWrite.
 28. `task/TASK_20260411_027.md`
 29. `task/TASK_20260411_028.md`
 30. `task/TASK_20260412_029.md`
-31. `docs/V3/FRONTEND3.0.md`
-32. `docs/V3/BACKEND3.0.md`
-33. `docs/V3/DATA3.0.md`
-34. `docs/V3/API3.0.md`
-35. `docs/V3/ADMIN3.0.md`
-36. `docs/V3/DEPLOY3.0.md`
-37. `docs/V3/MIGRATION3.0.md`
+31. `task/TASK_20260412_030.md`
+32. `docs/V3/FRONTEND3.0.md`
+33. `docs/V3/BACKEND3.0.md`
+34. `docs/V3/DATA3.0.md`
+35. `docs/V3/API3.0.md`
+36. `docs/V3/ADMIN3.0.md`
+37. `docs/V3/DEPLOY3.0.md`
+38. `docs/V3/MIGRATION3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -54,6 +55,7 @@ This directory is the compact handoff layer for VibeWrite.
 - `task/TASK_20260411_027.md` is the first backend-engineering card and starts the Swift + Vapor backend skeleton with health/bootstrap only.
 - `task/TASK_20260411_028.md` is the first backend AI request-route card and connects the shared request envelope to `POST /v3/writes/start` with a backend-only transport envelope and placeholder completion result.
 - `task/TASK_20260412_029.md` is the backend AI request-route card and generalizes the write transport envelope so `POST /v3/writes/continue` can reuse the same bootstrap-token path.
+- `task/TASK_20260412_030.md` is the next backend AI request-route card and adds `POST /v3/writes/edit` on the same bootstrap-token path with selection-aware validation.
 - `Sources/VibeWriteShared/Models/VibeWriteSharedModels.swift` and `Sources/VibeWriteShared/AI/WritingAIContracts.swift` now hold the pure shared model/AI contract types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.

@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_030.md` as the next Phase 1 execution card. It keeps the route-neutral backend transport envelope, adds `POST /v3/writes/edit`, and keeps selection-aware validation on the same bootstrap-token path without touching the shared DTO boundary or provider logic yet.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_029.md` passed: the backend write transport envelope is now route-neutral, `POST /v3/writes/start` and `POST /v3/writes/continue` share the same bootstrap-token validation chain, and both routes return deterministic stub `WritingAIResponse` payloads for valid requests while rejecting invalid tokens. Verification passed with `swift test` in `Backend/`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and the backend test coverage for start/continue success and unauthorized paths.
 
 # 2026-04-12

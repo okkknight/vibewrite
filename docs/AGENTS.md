@@ -37,5 +37,6 @@ For V3 planning and split-architecture work, use:
 - `task/TASK_20260411_027.md`
 - `task/TASK_20260411_028.md`
 - `task/TASK_20260412_029.md`
+- `task/TASK_20260412_030.md`
 
 Current implementation and task execution still follow the V2 docs until the V3 migration lands.
