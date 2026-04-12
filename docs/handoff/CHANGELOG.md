@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Independent review of `TASK_20260412_038.md` passed: the app now defaults to the backend gateway runtime, persists a local installation identity plus cached device token, keeps stub mode and legacy provider-direct paths available, and uses the backend gateway's single integrated write response for metadata without adding an extra metadata request. Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
 - Implemented `task/TASK_20260412_038.md`: the app default runtime now switches to the backend gateway, persists local installation identity plus device token, keeps stub mode and the legacy provider-direct path available for tests and compatibility, and routes integrated backend metadata through the single backend write response path. Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12
