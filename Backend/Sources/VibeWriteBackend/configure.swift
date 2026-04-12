@@ -5,20 +5,25 @@ func configure(
     quotaLedger: InMemoryQuotaLedger? = nil,
     requestLogStore: InMemoryRequestLogStore = InMemoryRequestLogStore(),
     clock: any VibeWriteClock = SystemVibeWriteClock(),
+    providerApiKey: String? = nil,
     adminUsername: String? = nil,
     adminPassword: String? = nil
 ) throws {
     let deviceRegistry = InMemoryDeviceRegistry()
     let resolvedQuotaLedger = quotaLedger ?? InMemoryQuotaLedger(clock: clock)
-    let resolvedAdminCredentials = try resolveAdminCredentials(
+    let resolvedAdminSecrets = try resolveAdminSecrets(
         app: app,
+        providerApiKey: providerApiKey,
         adminUsername: adminUsername,
         adminPassword: adminPassword
     )
-    let adminSessionStore = AdminSessionStore(
-        username: resolvedAdminCredentials.username,
-        password: resolvedAdminCredentials.password
+    let adminSecretStore = AdminSecretStore(
+        providerApiKey: resolvedAdminSecrets.providerApiKey,
+        adminUsername: resolvedAdminSecrets.adminUsername,
+        adminPassword: resolvedAdminSecrets.adminPassword,
+        clock: clock
     )
+    let adminSessionStore = AdminSessionStore()
     let writeService = WriteService(
         deviceRegistry: deviceRegistry,
         quotaLedger: resolvedQuotaLedger,
@@ -30,15 +35,18 @@ func configure(
         deviceRegistry: deviceRegistry,
         writeService: writeService,
         requestLogStore: requestLogStore,
+        secretStore: adminSecretStore,
         adminSessionStore: adminSessionStore
     )
 }
 
-private func resolveAdminCredentials(
+private func resolveAdminSecrets(
     app: Application,
+    providerApiKey: String?,
     adminUsername: String?,
     adminPassword: String?
-) throws -> (username: String, password: String) {
+) throws -> (providerApiKey: String?, adminUsername: String, adminPassword: String) {
+    let resolvedProviderApiKey = providerApiKey ?? Environment.get("MINIMAX_API_KEY")
     let resolvedUsername = adminUsername
         ?? Environment.get("ADMIN_USERNAME")
         ?? (app.environment == .testing ? "admin" : nil)
@@ -50,5 +58,5 @@ private func resolveAdminCredentials(
         throw Abort(.internalServerError, reason: "Missing ADMIN_USERNAME or ADMIN_PASSWORD.")
     }
 
-    return (resolvedUsername, resolvedPassword)
+    return (resolvedProviderApiKey, resolvedUsername, resolvedPassword)
 }

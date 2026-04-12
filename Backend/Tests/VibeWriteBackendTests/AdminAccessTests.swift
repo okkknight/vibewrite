@@ -91,7 +91,7 @@ final class AdminAccessTests: XCTestCase {
             requestId: "request-admin-edit"
         )
 
-        let cookieHeader = try adminSessionCookieHeader(in: app)
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
 
         try app.test(.GET, queryPath(
             "v3/admin/requests",
@@ -155,13 +155,104 @@ final class AdminAccessTests: XCTestCase {
         })
     }
 
+    func testLoggedInAdminCanReadRedactedSecretsSnapshot() throws {
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(
+            app,
+            adminUsername: "admin",
+            adminPassword: "password"
+        )
+
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
+
+        try app.test(.GET, "v3/admin/secrets", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminSecretsResponse.self, response) { body in
+                XCTAssertEqual(body.providerApiKeyConfigured, false)
+                XCTAssertEqual(body.adminUsername, "admin")
+                XCTAssertEqual(body.adminPasswordConfigured, true)
+                XCTAssertFalse(body.updatedAt.isEmpty)
+            }
+        })
+    }
+
+    func testAdminSecretsUpdateTakesEffectImmediatelyAndPreservesExistingSession() throws {
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(
+            app,
+            adminUsername: "admin",
+            adminPassword: "password"
+        )
+
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
+
+        try app.test(.PUT, "v3/admin/secrets", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+            try request.content.encode(AdminSecretsUpdateRequest(
+                providerApiKey: "minimax-test-key",
+                adminUsername: "superadmin",
+                adminPassword: "supersecret"
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminSecretsResponse.self, response) { body in
+                XCTAssertEqual(body.providerApiKeyConfigured, true)
+                XCTAssertEqual(body.adminUsername, "superadmin")
+                XCTAssertEqual(body.adminPasswordConfigured, true)
+                XCTAssertFalse(body.updatedAt.isEmpty)
+            }
+        })
+
+        try app.test(.GET, "v3/admin/secrets", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+        })
+
+        try app.test(.POST, "v3/admin/login", beforeRequest: { request in
+            try request.content.encode(AdminLoginRequest(username: "admin", password: "password"))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .unauthorized)
+        })
+
+        var updatedSessionCookieHeader: String?
+        try app.test(.POST, "v3/admin/login", beforeRequest: { request in
+            try request.content.encode(AdminLoginRequest(username: "superadmin", password: "supersecret"))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            updatedSessionCookieHeader = response.headers.first(name: .setCookie)
+        })
+
+        guard let updatedSessionCookieHeader else {
+            XCTFail("Expected updated admin credentials to log in.")
+            return
+        }
+
+        guard let updatedSessionToken = AdminSessionCookie.sessionToken(fromSetCookieHeader: updatedSessionCookieHeader) else {
+            XCTFail("Expected updated admin session cookie to be set.")
+            return
+        }
+
+        try app.test(.GET, "v3/admin/requests", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: "\(AdminSessionCookie.name)=\(updatedSessionToken)")
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+        })
+    }
+
     func testLogoutInvalidatesAdminSession() throws {
         let app = Application(.testing)
         defer { app.shutdown() }
 
         try configure(app, adminUsername: "admin", adminPassword: "password")
 
-        let cookieHeader = try adminSessionCookieHeader(in: app)
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
 
         try app.test(.POST, "v3/admin/logout", beforeRequest: { request in
             request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
@@ -179,10 +270,10 @@ final class AdminAccessTests: XCTestCase {
         })
     }
 
-    private func adminSessionCookieHeader(in app: Application) throws -> String {
+    private func adminSessionCookieHeader(in app: Application, username: String, password: String) throws -> String {
         var setCookieHeader: String?
         try app.test(.POST, "v3/admin/login", beforeRequest: { request in
-            try request.content.encode(AdminLoginRequest(username: "admin", password: "password"))
+            try request.content.encode(AdminLoginRequest(username: username, password: password))
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             setCookieHeader = response.headers.first(name: .setCookie)

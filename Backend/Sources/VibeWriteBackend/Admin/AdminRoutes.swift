@@ -3,20 +3,18 @@ import Vapor
 func registerAdminRoutes(
     _ app: Application,
     requestLogStore: InMemoryRequestLogStore,
+    secretStore: AdminSecretStore,
     adminSessionStore: AdminSessionStore
 ) throws {
     app.post("v3", "admin", "login") { req async throws -> Response in
         let request = try req.content.decode(AdminLoginRequest.self)
-        guard let sessionToken = await adminSessionStore.login(
-            username: request.username,
-            password: request.password
-        ) else {
+        guard await secretStore.authenticate(username: request.username, password: request.password) else {
             throw Abort(.unauthorized, reason: "Invalid admin credentials.")
         }
 
         return try makeJSONResponse(
             AdminStatusResponse(status: "ok"),
-            setCookieHeader: AdminSessionCookie.loginHeader(for: sessionToken)
+            setCookieHeader: AdminSessionCookie.loginHeader(for: await adminSessionStore.issueSession())
         )
     }
 
@@ -37,6 +35,28 @@ func registerAdminRoutes(
         let query = try req.query.decode(AdminRequestQuery.self)
         let requestLogQuery = try makeRequestLogQuery(from: query)
         return try makeJSONResponse(requestLogStore.query(requestLogQuery))
+    }
+
+    app.get("v3", "admin", "secrets") { req async throws -> Response in
+        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+            throw Abort(.unauthorized, reason: "Admin session required.")
+        }
+
+        return try makeJSONResponse(await secretStore.snapshotResponse())
+    }
+
+    app.put("v3", "admin", "secrets") { req async throws -> Response in
+        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+            throw Abort(.unauthorized, reason: "Admin session required.")
+        }
+
+        let request = try req.content.decode(AdminSecretsUpdateRequest.self)
+        await secretStore.update(
+            providerApiKey: request.providerApiKey,
+            adminUsername: request.adminUsername,
+            adminPassword: request.adminPassword
+        )
+        return try makeJSONResponse(await secretStore.snapshotResponse())
     }
 }
 

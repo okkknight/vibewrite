@@ -6,6 +6,7 @@ func routes(
     deviceRegistry: InMemoryDeviceRegistry,
     writeService: WriteService,
     requestLogStore: InMemoryRequestLogStore,
+    secretStore: AdminSecretStore,
     adminSessionStore: AdminSessionStore
 ) throws {
     app.get("v3", "health") { _ in
@@ -41,6 +42,7 @@ func routes(
     try registerAdminRoutes(
         app,
         requestLogStore: requestLogStore,
+        secretStore: secretStore,
         adminSessionStore: adminSessionStore
     )
 }

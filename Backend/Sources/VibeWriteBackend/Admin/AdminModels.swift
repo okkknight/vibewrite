@@ -11,6 +11,19 @@ struct AdminStatusResponse: Content {
     let status: String
 }
 
+struct AdminSecretsUpdateRequest: Content {
+    let providerApiKey: String?
+    let adminUsername: String?
+    let adminPassword: String?
+}
+
+struct AdminSecretsResponse: Content {
+    let providerApiKeyConfigured: Bool
+    let adminUsername: String
+    let adminPasswordConfigured: Bool
+    let updatedAt: String
+}
+
 struct AdminRequestQuery: Content {
     let installationId: String?
     let action: WritingAIAction?
@@ -39,6 +52,75 @@ enum AdminDateCodec {
 
     static func string(from date: Date) -> String {
         makeFractionalFormatter().string(from: date)
+    }
+}
+
+actor AdminSecretStore {
+    struct Snapshot: Sendable, Equatable {
+        let providerApiKey: String?
+        let adminUsername: String
+        let adminPassword: String
+        let updatedAt: Date
+
+        var providerApiKeyConfigured: Bool {
+            guard let providerApiKey else {
+                return false
+            }
+
+            return !providerApiKey.isEmpty
+        }
+
+        var adminPasswordConfigured: Bool {
+            !adminPassword.isEmpty
+        }
+    }
+
+    private let clock: any VibeWriteClock
+    private var snapshot: Snapshot
+
+    init(
+        providerApiKey: String?,
+        adminUsername: String,
+        adminPassword: String,
+        clock: any VibeWriteClock = SystemVibeWriteClock()
+    ) {
+        self.clock = clock
+        self.snapshot = Snapshot(
+            providerApiKey: providerApiKey,
+            adminUsername: adminUsername,
+            adminPassword: adminPassword,
+            updatedAt: clock.now()
+        )
+    }
+
+    func authenticate(username: String, password: String) -> Bool {
+        snapshot.adminUsername == username && snapshot.adminPassword == password
+    }
+
+    func snapshotResponse() -> AdminSecretsResponse {
+        AdminSecretsResponse(
+            providerApiKeyConfigured: snapshot.providerApiKeyConfigured,
+            adminUsername: snapshot.adminUsername,
+            adminPasswordConfigured: snapshot.adminPasswordConfigured,
+            updatedAt: AdminDateCodec.string(from: snapshot.updatedAt)
+        )
+    }
+
+    func update(
+        providerApiKey: String? = nil,
+        adminUsername: String? = nil,
+        adminPassword: String? = nil
+    ) {
+        guard providerApiKey != nil || adminUsername != nil || adminPassword != nil else {
+            return
+        }
+
+        snapshot = Snapshot(
+            providerApiKey: providerApiKey ?? snapshot.providerApiKey,
+            adminUsername: adminUsername ?? snapshot.adminUsername,
+            adminPassword: adminPassword ?? snapshot.adminPassword,
+            updatedAt: clock.now()
+        )
     }
 }
 

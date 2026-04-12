@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Implemented `task/TASK_20260412_035.md`: the backend now keeps provider API key and admin credentials in a shared in-memory secret config store, login reads from that same source of truth, and protected `GET /v3/admin/secrets` / `PUT /v3/admin/secrets` expose only redacted secret state. Verified with `swift test` in `Backend/`.
+
+# 2026-04-12
 - Added `task/TASK_20260412_035.md` as the next Phase 1 execution card. It introduces a shared secret config store for provider API key and admin credentials, with login still reading from the same source and `GET/PUT /v3/admin/secrets` exposing only redacted state.
 
 # 2026-04-12

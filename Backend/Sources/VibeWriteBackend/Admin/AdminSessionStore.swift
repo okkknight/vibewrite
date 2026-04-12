@@ -1,20 +1,9 @@
 import Foundation
 
 actor AdminSessionStore {
-    private let username: String
-    private let password: String
     private var activeSessionTokens: Set<String> = []
 
-    init(username: String, password: String) {
-        self.username = username
-        self.password = password
-    }
-
-    func login(username: String, password: String) -> String? {
-        guard username == self.username, password == self.password else {
-            return nil
-        }
-
+    func issueSession() -> String {
         let sessionToken = UUID().uuidString.lowercased()
         activeSessionTokens.insert(sessionToken)
         return sessionToken
