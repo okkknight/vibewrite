@@ -219,9 +219,18 @@ V3 不做账号体系，但仍然必须保护接口。
 
 `POST /v3/admin/login`
 
+请求字段固定为：
+
+- `username`
+- `password`
+
+成功后返回 `status: ok`，并设置名为 `vibewrite_admin_session` 的 session cookie。这个 cookie 只用于后台登录态，不承载客户端身份。
+
 ### 7.2 登出
 
 `POST /v3/admin/logout`
+
+成功后清除 `vibewrite_admin_session` cookie，并返回 `status: ok`。
 
 ### 7.3 请求查询
 
@@ -229,11 +238,25 @@ V3 不做账号体系，但仍然必须保护接口。
 
 支持按以下条件查询：
 
-- 时间范围
-- 设备 ID
-- action
-- 状态
-- 错误码
+- `installationId`
+- `action`
+- `status`
+- `errorCode`
+- `createdAtStart`
+- `createdAtEnd`
+
+其中 `installationId` 对应设备 ID，也就是客户端 bootstrap 使用的 installation ID。
+
+返回结果固定包含：
+
+- `entries`
+- `summary`
+
+其中 `summary` 至少包含：
+
+- `totalCount`
+- `acceptedCount`
+- `rejectedCount`
 
 ### 7.4 密钥管理
 

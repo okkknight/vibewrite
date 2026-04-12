@@ -14,6 +14,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `task/TASK_20260412_031.md` is now in place in the repo: the backend write chain has an in-memory quota gate across `start` / `continue` / `edit` without introducing persistence, admin UI, or bootstrap shape changes.
 - `task/TASK_20260412_032.md` is now implemented in the repo: the backend request chain has an in-memory request log store across `start` / `continue` / `edit` without introducing persistence or admin query surfaces yet.
 - `task/TASK_20260412_033.md` is now implemented in the repo: it turns the in-memory request log store into a queryable read model for later admin query work, still without persistence or HTTP admin routes.
+- `task/TASK_20260412_034.md` is the next Phase 1 execution card: it adds simple admin login/logout plus `GET /v3/admin/requests` on top of the request-log read model, still without secrets, quota, device management, or dashboard routes.
 - The backend write transport envelope is route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
 - The backend edit route keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.
 - The app's default launch window size is now 1024x700.
