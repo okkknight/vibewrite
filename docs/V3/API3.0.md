@@ -264,6 +264,28 @@ V3 不做账号体系，但仍然必须保护接口。
 
 `PUT /v3/admin/secrets`
 
+这两个接口都必须受现有后台 session cookie 保护。
+
+这一组接口管理同一份后台 secret config，包含：
+
+- provider API key
+- admin 登录凭证
+
+`GET /v3/admin/secrets` 返回的是脱敏后的当前配置状态，不返回 raw secret value。固定字段为：
+
+- `providerApiKeyConfigured`
+- `adminUsername`
+- `adminPasswordConfigured`
+- `updatedAt`
+
+`PUT /v3/admin/secrets` 接受的字段固定为：
+
+- `providerApiKey`
+- `adminUsername`
+- `adminPassword`
+
+三个字段都可以单独更新；未传入的字段保持原值不变。后台登录校验必须读取同一份 secret config，因此更新 admin 登录凭证后，后续登录必须立即使用新值。
+
 ### 7.5 AI system prompt 管理
 
 这里的 AI system prompt 配置指后端当前生效配置，不是 `project.prompt`。

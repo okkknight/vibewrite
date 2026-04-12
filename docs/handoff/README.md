@@ -38,13 +38,14 @@ This directory is the compact handoff layer for VibeWrite.
 33. `task/TASK_20260412_032.md`
 34. `task/TASK_20260412_033.md`
 35. `task/TASK_20260412_034.md`
-36. `docs/V3/FRONTEND3.0.md`
-37. `docs/V3/BACKEND3.0.md`
-38. `docs/V3/DATA3.0.md`
-39. `docs/V3/API3.0.md`
-40. `docs/V3/ADMIN3.0.md`
-41. `docs/V3/DEPLOY3.0.md`
-42. `docs/V3/MIGRATION3.0.md`
+36. `task/TASK_20260412_035.md`
+37. `docs/V3/FRONTEND3.0.md`
+38. `docs/V3/BACKEND3.0.md`
+39. `docs/V3/DATA3.0.md`
+40. `docs/V3/API3.0.md`
+41. `docs/V3/ADMIN3.0.md`
+42. `docs/V3/DEPLOY3.0.md`
+43. `docs/V3/MIGRATION3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -52,7 +53,7 @@ This directory is the compact handoff layer for VibeWrite.
 - avoid duplicating the same status across many notes
 
 ## Current state
-- `task/TASK_20260411_027.md`, `task/TASK_20260411_028.md`, `task/TASK_20260412_029.md`, `task/TASK_20260412_030.md`, `task/TASK_20260412_031.md`, `task/TASK_20260412_032.md`, and `task/TASK_20260412_033.md` are now in place in the repo: `Backend/` exists as an independent SwiftPM package, it links the root `VibeWriteShared` package, it exposes the `/v3/health` and `/v3/client/bootstrap` bootstrap-only backend skeleton with in-memory device-token reuse, and it now also wires `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit` through a route-neutral backend-only transport envelope with bootstrap token validation plus deterministic stub `WritingAIResponse` responses, plus an in-memory quota gate and an in-memory request log store/queryable read model across all three write routes. `task/TASK_20260412_034.md` is the next admin-access card and adds simple login/logout plus `GET /v3/admin/requests` on top of that read model.
+- `task/TASK_20260411_027.md`, `task/TASK_20260411_028.md`, `task/TASK_20260412_029.md`, `task/TASK_20260412_030.md`, `task/TASK_20260412_031.md`, `task/TASK_20260412_032.md`, and `task/TASK_20260412_033.md` are now in place in the repo: `Backend/` exists as an independent SwiftPM package, it links the root `VibeWriteShared` package, it exposes the `/v3/health` and `/v3/client/bootstrap` bootstrap-only backend skeleton with in-memory device-token reuse, and it now also wires `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit` through a route-neutral backend-only transport envelope with bootstrap token validation plus deterministic stub `WritingAIResponse` responses, plus an in-memory quota gate and an in-memory request log store/queryable read model across all three write routes. `task/TASK_20260412_034.md` is the admin-access card and adds simple login/logout plus `GET /v3/admin/requests` on top of that read model. `task/TASK_20260412_035.md` is the next secret-config card and adds a shared in-memory secret config store for provider API key and admin credentials.
 - V2 docs under `docs/V2/` remain archival reference for the current runtime behavior; `docs/V1/` is archival only.
 - V3 planning docs define the frontend/backend split target, backend AI gateway, data model, deployment shape, roadmap order, and migration order, but the runtime implementation is still the current V2 client.
 - `task/TASK_20260411_025.md` is the first Phase 1 execution card; `task/TASK_20260411_026.md` is the shared-module card and now lands the pure shared model boundary in the native `VibeWriteShared` target.
@@ -64,6 +65,7 @@ This directory is the compact handoff layer for VibeWrite.
 - `task/TASK_20260412_032.md` is the backend request-log card and now adds an in-memory log store across all three write routes, still without persistence or admin query surfaces.
 - `task/TASK_20260412_033.md` is the backend request-log-read-model card and now adds query and summary access on top of the in-memory log store, still without HTTP admin routes or persistence.
 - `task/TASK_20260412_034.md` is the backend admin-access card and is now implemented: it adds simple login/logout plus `GET /v3/admin/requests` on top of the request-log read model, still without secrets/quota/device management routes.
+- `task/TASK_20260412_035.md` is the backend secret-config card and will add shared in-memory secret config access for provider API key and admin credentials, still without system-prompt/quota/device management routes.
 - `Sources/VibeWriteShared/Models/VibeWriteSharedModels.swift` and `Sources/VibeWriteShared/AI/WritingAIContracts.swift` now hold the pure shared model/AI contract types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.

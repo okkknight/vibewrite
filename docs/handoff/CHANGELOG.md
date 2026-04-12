@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_035.md` as the next Phase 1 execution card. It introduces a shared secret config store for provider API key and admin credentials, with login still reading from the same source and `GET/PUT /v3/admin/secrets` exposing only redacted state.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_034.md` passed: the backend now exposes minimal admin login/logout plus protected request-list access with `vibewrite_admin_session` session cookies, reuses the existing request-log query read model for filtered results and summary counts, and keeps the response limited to metadata without adding persistence or extra admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12
