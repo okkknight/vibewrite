@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-12
+- Implemented an in-memory request log store in `Backend/` across `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit`. The store records only request metadata, keeps accepted and rejected outcomes with normalized error codes, exposes a synchronous snapshot for tests, and stays fully in-memory with no persistence or admin query surfaces. Verified with `swift test` in `Backend/`.
+
+# 2026-04-12
+- Added `task/TASK_20260412_032.md` as the next Phase 1 execution card. It keeps the existing route-neutral backend write envelope, layers on an in-memory request log store across `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit`, and keeps persistence, admin query surfaces, and provider work out of scope.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_031.md` passed: the backend now enforces an in-memory, device-scoped quota gate across `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit`, counts only accepted requests, returns `429 quota_exceeded` on overage, and keeps the bootstrap response shape unchanged. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12

@@ -11,6 +11,8 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - The new `Backend/` SwiftPM package now exists as the V3 backend skeleton. It depends on the root `VibeWriteShared` package, serves `GET /v3/health`, serves `POST /v3/client/bootstrap`, serves `POST /v3/writes/start`, serves `POST /v3/writes/continue`, serves `POST /v3/writes/edit`, keeps `installationId -> deviceToken` in an in-memory registry, validates write requests against the bootstrap token, returns a fixed `active` device status plus the default `dailyLimit=50` / `weeklyLimit=200` quota summary, and now enforces an in-memory quota gate across `start` / `continue` / `edit`.
+- `task/TASK_20260412_031.md` is now in place in the repo: the backend write chain has an in-memory quota gate across `start` / `continue` / `edit` without introducing persistence, admin UI, or bootstrap shape changes.
+- `task/TASK_20260412_032.md` is now implemented in the repo: the backend request chain has an in-memory request log store across `start` / `continue` / `edit` without introducing persistence or admin query surfaces yet.
 - The backend write transport envelope is route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
 - The backend edit route keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.
 - The app's default launch window size is now 1024x700.
