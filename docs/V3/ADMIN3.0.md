@@ -72,11 +72,14 @@
 
 用于：
 
-- 查看当前 AI system prompt 配置
-- 更新 AI system prompt 配置
-- 保存当前生效值
+- 查看当前 `templateBody`
+- 查看当前 `actionRulesJson`
+- 查看当前 `modelContextRulesJson`
+- 更新当前 `templateBody`
+- 更新当前 `actionRulesJson`
+- 更新当前 `modelContextRulesJson`
 
-不做多版本发布。
+第一版只做当前生效值查看和更新，不做多版本发布、草稿、回滚或历史比较。
 
 ### 3.5 限额页
 

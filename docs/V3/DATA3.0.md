@@ -142,6 +142,8 @@ V3 的数据原则非常明确：
 
 这里的 AI system prompt 配置指后端当前生效配置，不是 `project.prompt`。
 
+当前 V3 实现阶段先用内存版 system prompt config store 承载这份数据，启动时从当前客户端 prompt builder seed，更新后只在当前进程内生效；下面的表字段是后续持久化阶段的目标形态，不是本轮必须落库的内容。
+
 必备字段：
 
 - `config_key`

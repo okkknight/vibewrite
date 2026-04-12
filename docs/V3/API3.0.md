@@ -294,6 +294,25 @@ V3 不做账号体系，但仍然必须保护接口。
 
 `PUT /v3/admin/system-prompt`
 
+这两个接口都必须受现有后台 session cookie 保护。
+
+这一组接口管理同一份后台 AI system prompt config 的当前值，不做多版本管理，不做草稿 / 发布流，也不做历史回滚。当前实现阶段只维护一份名为 `current` 的内存配置记录。
+
+`GET /v3/admin/system-prompt` 返回当前配置的完整可读内容，固定字段为：
+
+- `templateBody`
+- `actionRulesJson`
+- `modelContextRulesJson`
+- `updatedAt`
+
+`PUT /v3/admin/system-prompt` 接受的字段固定为：
+
+- `templateBody`
+- `actionRulesJson`
+- `modelContextRulesJson`
+
+三个字段都可以单独更新；未传入的字段保持原值不变。初始值必须从当前客户端的 `Sources/VibeWriteApp/Shared/AI/WritingAIPromptBuilder.swift` seed，尽量保留当前行为中的共享基础提示词、按 action 的规则和 provider/model 相关规则。
+
 ### 7.6 限额管理
 
 `GET /v3/admin/quota`
