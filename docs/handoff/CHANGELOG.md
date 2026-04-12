@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Independent review of `TASK_20260412_030.md` passed: `POST /v3/writes/edit` now shares the route-neutral backend write envelope, validates bootstrap-issued tokens on the same in-memory device registry path, rejects missing or out-of-bounds `selectionRange` values with 400, and returns deterministic stub `WritingAIResponse` payloads for valid local-edit requests. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, while `start` and `continue` regression tests remained green.
+
+# 2026-04-12
 - Implemented `POST /v3/writes/edit` in `Backend/` with the route-neutral backend-only write transport envelope, bootstrap token validation against the in-memory device registry, and selection-aware validation that requires a parseable `selectionRange`. Added focused tests for the success path, invalid selection handling, invalid token handling, and the start/continue regression checks, then verified the backend package with `swift test`.
 
 # 2026-04-12
