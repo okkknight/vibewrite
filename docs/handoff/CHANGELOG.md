@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_037.md` as the next Phase 1 execution card. It will replace the remaining stub write responses with a real backend AI execution path using the current secret and system-prompt stores, while keeping the current request/response DTOs and admin surfaces intact.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_036.md` passed: the backend now exposes a shared in-memory AI system prompt config store with protected `GET /v3/admin/system-prompt` and `PUT /v3/admin/system-prompt`, validates JSON rule updates, seeds from the current prompt builder shape, and keeps client prompt-builder/runtime behavior unchanged. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12

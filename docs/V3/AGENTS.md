@@ -39,6 +39,8 @@ V3 规划与实现优先阅读：
 - `task/TASK_20260412_033.md`
 - `task/TASK_20260412_034.md`
 - `task/TASK_20260412_035.md`
+- `task/TASK_20260412_036.md`
+- `task/TASK_20260412_037.md`
 
 如果和 V1 / V2 文档冲突，V3 规划优先于旧版本的产品设计，但当前已上线实现仍以现有代码状态为准。
 
@@ -154,7 +156,7 @@ V2 里的以下内容，在 V3 中都必须从客户端移出：
 
 1. 先读 `PRD3.0.md` 和 `IA3.0.md`，把产品边界和信息架构钉住
 2. 再读 `ROADMAP3.0.md`，把推进顺序、依赖和阶段门槛钉住
-3. 再读 `task/TASK_20260411_025.md`、`task/TASK_20260411_026.md`、`task/TASK_20260411_027.md`、`task/TASK_20260411_028.md`、`task/TASK_20260412_029.md`、`task/TASK_20260412_030.md`、`task/TASK_20260412_031.md`、`task/TASK_20260412_032.md`、`task/TASK_20260412_033.md`、`task/TASK_20260412_034.md` 和 `task/TASK_20260412_035.md`，把 Phase 1 的前几张执行卡钉住
+3. 再读 `task/TASK_20260411_025.md`、`task/TASK_20260411_026.md`、`task/TASK_20260411_027.md`、`task/TASK_20260411_028.md`、`task/TASK_20260412_029.md`、`task/TASK_20260412_030.md`、`task/TASK_20260412_031.md`、`task/TASK_20260412_032.md`、`task/TASK_20260412_033.md`、`task/TASK_20260412_034.md`、`task/TASK_20260412_035.md`、`task/TASK_20260412_036.md` 和 `task/TASK_20260412_037.md`，把 Phase 1 的前几张执行卡钉住
 4. 再读 `FRONTEND3.0.md`、`BACKEND3.0.md`、`DATA3.0.md`、`API3.0.md`、`ADMIN3.0.md` 和 `DEPLOY3.0.md`，把实现边界钉住
 5. 最后按 `MIGRATION3.0.md` 的顺序落地
 
