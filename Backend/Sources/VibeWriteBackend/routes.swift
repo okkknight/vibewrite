@@ -4,7 +4,9 @@ import VibeWriteShared
 func routes(
     _ app: Application,
     deviceRegistry: InMemoryDeviceRegistry,
-    writeService: WriteService
+    writeService: WriteService,
+    requestLogStore: InMemoryRequestLogStore,
+    adminSessionStore: AdminSessionStore
 ) throws {
     app.get("v3", "health") { _ in
         HealthResponse(status: "ok")
@@ -35,4 +37,10 @@ func routes(
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
         return try await writeService.edit(envelope)
     }
+
+    try registerAdminRoutes(
+        app,
+        requestLogStore: requestLogStore,
+        adminSessionStore: adminSessionStore
+    )
 }

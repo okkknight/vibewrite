@@ -63,7 +63,7 @@ This directory is the compact handoff layer for VibeWrite.
 - `task/TASK_20260412_031.md` is the backend quota card and adds an in-memory quota gate across all three write routes, still without persistence or admin exposure.
 - `task/TASK_20260412_032.md` is the backend request-log card and now adds an in-memory log store across all three write routes, still without persistence or admin query surfaces.
 - `task/TASK_20260412_033.md` is the backend request-log-read-model card and now adds query and summary access on top of the in-memory log store, still without HTTP admin routes or persistence.
-- `task/TASK_20260412_034.md` is the backend admin-access card and now adds simple login/logout plus `GET /v3/admin/requests` on top of the request-log read model, still without secrets/quota/device management routes.
+- `task/TASK_20260412_034.md` is the backend admin-access card and is now implemented: it adds simple login/logout plus `GET /v3/admin/requests` on top of the request-log read model, still without secrets/quota/device management routes.
 - `Sources/VibeWriteShared/Models/VibeWriteSharedModels.swift` and `Sources/VibeWriteShared/AI/WritingAIContracts.swift` now hold the pure shared model/AI contract types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.

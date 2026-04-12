@@ -1,4 +1,4 @@
-import Vapor
 import VibeWriteShared
+import Vapor
 
-extension WritingAIResponse: Content {}
+extension WritingAIResponse: @retroactive Content {}

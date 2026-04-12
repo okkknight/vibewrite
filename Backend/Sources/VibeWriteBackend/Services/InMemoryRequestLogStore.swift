@@ -1,12 +1,12 @@
 import Foundation
 import VibeWriteShared
 
-enum RequestLogStatus: String, Sendable, Equatable {
+enum RequestLogStatus: String, Codable, Sendable, Equatable {
     case accepted
     case rejected
 }
 
-struct RequestLogEntry: Sendable, Equatable {
+struct RequestLogEntry: Codable, Sendable, Equatable {
     let requestId: String
     let installationId: String
     let action: WritingAIAction
@@ -20,7 +20,7 @@ struct RequestLogEntry: Sendable, Equatable {
     let createdAt: Date
 }
 
-struct RequestLogQuery: Sendable, Equatable {
+struct RequestLogQuery: Codable, Sendable, Equatable {
     let installationId: String?
     let action: WritingAIAction?
     let status: RequestLogStatus?
@@ -36,13 +36,13 @@ struct RequestLogQuery: Sendable, Equatable {
     )
 }
 
-struct RequestLogSummary: Sendable, Equatable {
+struct RequestLogSummary: Codable, Sendable, Equatable {
     let totalCount: Int
     let acceptedCount: Int
     let rejectedCount: Int
 }
 
-struct RequestLogQueryResult: Sendable, Equatable {
+struct RequestLogQueryResult: Codable, Sendable, Equatable {
     let entries: [RequestLogEntry]
     let summary: RequestLogSummary
 }

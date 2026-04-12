@@ -1,7 +1,7 @@
 # Changelog
 
 # 2026-04-12
-- Added `task/TASK_20260412_034.md` as the next Phase 1 execution card. It adds simple admin login/logout plus `GET /v3/admin/requests` on top of the existing queryable request log read model, while keeping secrets, quota, device management, and dashboard work out of scope.
+- Implemented `task/TASK_20260412_034.md`: the backend now has the minimal admin access surface on top of the queryable request log read model, with in-memory login/logout plus protected `GET /v3/admin/requests`, session-cookie auth, filtered request querying, and summary counts. Verification passed with `swift test` in `Backend/`.
 
 # 2026-04-12
 - Independent review of `TASK_20260412_033.md` passed: the in-memory request log store now exposes a queryable read model with installation/action/status/error-code/time-range filters, returns entries in created-at descending order, and provides total / accepted / rejected summary counts without adding persistence or admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
