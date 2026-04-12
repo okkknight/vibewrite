@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_033.md` as the next Phase 1 execution card. It turns the existing in-memory request log store into a queryable read model with filters and summary counts, while keeping persistence, pagination, HTTP admin routes, and dashboard work out of scope.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_032.md` passed: the in-memory request log store is wired into `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit`, records only request metadata with accepted/rejected outcomes, keeps `token_in` and `token_out` fixed at `0`, and does not change quota behavior or introduce persistence/admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12
