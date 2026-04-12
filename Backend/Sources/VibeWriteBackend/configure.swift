@@ -23,6 +23,10 @@ func configure(
         adminPassword: resolvedAdminSecrets.adminPassword,
         clock: clock
     )
+    let adminSystemPromptStore = AdminSystemPromptStore(
+        snapshot: AdminSystemPromptSeed.makeSnapshot(clock: clock),
+        clock: clock
+    )
     let adminSessionStore = AdminSessionStore()
     let writeService = WriteService(
         deviceRegistry: deviceRegistry,
@@ -36,6 +40,7 @@ func configure(
         writeService: writeService,
         requestLogStore: requestLogStore,
         secretStore: adminSecretStore,
+        systemPromptStore: adminSystemPromptStore,
         adminSessionStore: adminSessionStore
     )
 }

@@ -7,6 +7,7 @@ func routes(
     writeService: WriteService,
     requestLogStore: InMemoryRequestLogStore,
     secretStore: AdminSecretStore,
+    systemPromptStore: AdminSystemPromptStore,
     adminSessionStore: AdminSessionStore
 ) throws {
     app.get("v3", "health") { _ in
@@ -43,6 +44,7 @@ func routes(
         app,
         requestLogStore: requestLogStore,
         secretStore: secretStore,
+        systemPromptStore: systemPromptStore,
         adminSessionStore: adminSessionStore
     )
 }

@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Implemented `task/TASK_20260412_036.md`: the backend now keeps a shared in-memory AI system prompt config store seeded from the current client prompt builder, and protected `GET /v3/admin/system-prompt` / `PUT /v3/admin/system-prompt` expose the current prompt configuration with JSON validation. Verified with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_035.md` passed: the backend now seeds and serves a shared in-memory secret config store for provider API key plus admin credentials, login reads from the same source of truth, `/v3/admin/secrets` is session-protected and redacted, and existing admin session and request-query behavior remains intact. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12

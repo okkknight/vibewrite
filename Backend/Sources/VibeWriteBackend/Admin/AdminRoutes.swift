@@ -4,6 +4,7 @@ func registerAdminRoutes(
     _ app: Application,
     requestLogStore: InMemoryRequestLogStore,
     secretStore: AdminSecretStore,
+    systemPromptStore: AdminSystemPromptStore,
     adminSessionStore: AdminSessionStore
 ) throws {
     app.post("v3", "admin", "login") { req async throws -> Response in
@@ -57,6 +58,29 @@ func registerAdminRoutes(
             adminPassword: request.adminPassword
         )
         return try makeJSONResponse(await secretStore.snapshotResponse())
+    }
+
+    app.get("v3", "admin", "system-prompt") { req async throws -> Response in
+        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+            throw Abort(.unauthorized, reason: "Admin session required.")
+        }
+
+        return try makeJSONResponse(await systemPromptStore.snapshotResponse())
+    }
+
+    app.put("v3", "admin", "system-prompt") { req async throws -> Response in
+        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+            throw Abort(.unauthorized, reason: "Admin session required.")
+        }
+
+        let request = try req.content.decode(AdminSystemPromptUpdateRequest.self)
+        try await systemPromptStore.update(
+            templateBody: request.templateBody,
+            actionRulesJson: request.actionRulesJson,
+            modelContextRulesJson: request.modelContextRulesJson
+        )
+
+        return try makeJSONResponse(await systemPromptStore.snapshotResponse())
     }
 }
 

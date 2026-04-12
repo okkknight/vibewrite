@@ -39,13 +39,14 @@ This directory is the compact handoff layer for VibeWrite.
 34. `task/TASK_20260412_033.md`
 35. `task/TASK_20260412_034.md`
 36. `task/TASK_20260412_035.md`
-37. `docs/V3/FRONTEND3.0.md`
-38. `docs/V3/BACKEND3.0.md`
-39. `docs/V3/DATA3.0.md`
-40. `docs/V3/API3.0.md`
-41. `docs/V3/ADMIN3.0.md`
-42. `docs/V3/DEPLOY3.0.md`
-43. `docs/V3/MIGRATION3.0.md`
+37. `task/TASK_20260412_036.md`
+38. `docs/V3/FRONTEND3.0.md`
+39. `docs/V3/BACKEND3.0.md`
+40. `docs/V3/DATA3.0.md`
+41. `docs/V3/API3.0.md`
+42. `docs/V3/ADMIN3.0.md`
+43. `docs/V3/DEPLOY3.0.md`
+44. `docs/V3/MIGRATION3.0.md`
 
 ## Purpose
 - keep the project easy to resume
@@ -66,6 +67,7 @@ This directory is the compact handoff layer for VibeWrite.
 - `task/TASK_20260412_033.md` is the backend request-log-read-model card and now adds query and summary access on top of the in-memory log store, still without HTTP admin routes or persistence.
 - `task/TASK_20260412_034.md` is the backend admin-access card and is now implemented: it adds simple login/logout plus `GET /v3/admin/requests` on top of the request-log read model, still without secrets/quota/device management routes.
 - `task/TASK_20260412_035.md` is the backend secret-config card and is now implemented: it adds a shared in-memory secret config store for provider API key and admin credentials, routes login through that same source of truth, and exposes redacted `GET /v3/admin/secrets` / `PUT /v3/admin/secrets` access, still without system-prompt/quota/device management routes.
+- `task/TASK_20260412_036.md` is the backend system-prompt card and is now implemented: it adds a shared in-memory AI system prompt config store seeded from the current client prompt builder and exposes protected `GET /v3/admin/system-prompt` / `PUT /v3/admin/system-prompt` access, still without quota/device management routes.
 - `Sources/VibeWriteShared/Models/VibeWriteSharedModels.swift` and `Sources/VibeWriteShared/AI/WritingAIContracts.swift` now hold the pure shared model/AI contract types, while `WritingAIModels.swift` still keeps the decoder, helper, and default implementation logic.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
