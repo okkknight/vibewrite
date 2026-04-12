@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_039.md` as the next Phase 3 execution card. It will expand the backend admin management surface to cover overview, quota, and device controls on top of the current in-memory stores, without adding persistence or a UI yet.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_038.md` passed: the app now defaults to the backend gateway runtime, persists a local installation identity plus cached device token, keeps stub mode and legacy provider-direct paths available, and uses the backend gateway's single integrated write response for metadata without adding an extra metadata request. Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12

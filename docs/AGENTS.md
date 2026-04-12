@@ -46,5 +46,6 @@ For V3 planning and split-architecture work, use:
 - `task/TASK_20260412_036.md`
 - `task/TASK_20260412_037.md`
 - `task/TASK_20260412_038.md`
+- `task/TASK_20260412_039.md`
 
-Current implementation and task execution still follow the V2 docs until the V3 migration lands.
+Current implementation now defaults to the backend gateway runtime for normal launches; the V2 docs remain archival reference for the previous client path.
