@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Independent review of `TASK_20260412_034.md` passed: the backend now exposes minimal admin login/logout plus protected request-list access with `vibewrite_admin_session` session cookies, reuses the existing request-log query read model for filtered results and summary counts, and keeps the response limited to metadata without adding persistence or extra admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
 - Implemented `task/TASK_20260412_034.md`: the backend now has the minimal admin access surface on top of the queryable request log read model, with in-memory login/logout plus protected `GET /v3/admin/requests`, session-cookie auth, filtered request querying, and summary counts. Verification passed with `swift test` in `Backend/`.
 
 # 2026-04-12
