@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-12
+- Independent review of `TASK_20260412_037.md` passed: the backend write routes now run through the real backend AI execution path, with backend-native prompt composition, current secret / system-prompt store reads, and preserved request/response DTOs, quota, request log, and admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
+- Implemented `task/TASK_20260412_037.md`: the backend write routes now run through a real backend AI execution path that reads the current secret and system-prompt config stores, composes backend-native prompts, uses a fake provider in tests, and keeps the current request/response DTOs and admin config surfaces intact. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
 - Added `task/TASK_20260412_037.md` as the next Phase 1 execution card. It will replace the remaining stub write responses with a real backend AI execution path using the current secret and system-prompt stores, while keeping the current request/response DTOs and admin surfaces intact.
 
 # 2026-04-12
