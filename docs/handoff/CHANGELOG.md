@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Independent review of `TASK_20260412_033.md` passed: the in-memory request log store now exposes a queryable read model with installation/action/status/error-code/time-range filters, returns entries in created-at descending order, and provides total / accepted / rejected summary counts without adding persistence or admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
 - Implemented a queryable in-memory request log read model on top of the existing `Backend/` request log store. The store can now filter by installation, action, status, error code, and created-at range, returns entries in created-at descending order, and exposes lightweight summary counts for total / accepted / rejected logs. Verified with `swift test` in `Backend/`.
 
 # 2026-04-12
