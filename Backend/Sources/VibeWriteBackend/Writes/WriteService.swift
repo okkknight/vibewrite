@@ -3,9 +3,14 @@ import VibeWriteShared
 
 actor WriteService {
     private let deviceRegistry: InMemoryDeviceRegistry
+    private let quotaLedger: InMemoryQuotaLedger
 
-    init(deviceRegistry: InMemoryDeviceRegistry) {
+    init(
+        deviceRegistry: InMemoryDeviceRegistry,
+        quotaLedger: InMemoryQuotaLedger
+    ) {
         self.deviceRegistry = deviceRegistry
+        self.quotaLedger = quotaLedger
     }
 
     func startDraft(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
@@ -47,6 +52,10 @@ actor WriteService {
                   selectionRange.range(in: envelope.project.documentText) != nil else {
                 throw Abort(.badRequest, reason: "A valid selectionRange is required for edit requests.")
             }
+        }
+
+        guard await quotaLedger.evaluateAndConsumeIfAllowed(installationId: envelope.installationId) == .allowed else {
+            throw Abort(.tooManyRequests, reason: "quota_exceeded")
         }
 
         return Self.makeStubResponse(from: envelope, routeLabel: routeLabel)

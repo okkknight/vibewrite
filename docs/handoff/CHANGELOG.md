@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-12
+- Implemented an in-memory quota gate in `Backend/` across `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit`. The gate is device-scoped, counts accepted requests only, uses `Asia/Shanghai` day/week buckets, and returns `429 quota_exceeded` when the limit is hit. Added focused tests for in-quota, daily-over, weekly-over, and rejected-request-does-not-consume cases, then verified with `swift test`.
+
+# 2026-04-12
+- Added `task/TASK_20260412_031.md` as the next Phase 1 execution card. It keeps the existing route-neutral backend write envelope, adds an in-memory quota gate across `POST /v3/writes/start`, `POST /v3/writes/continue`, and `POST /v3/writes/edit`, and explicitly keeps persistence, admin UI, provider work, and bootstrap response shape changes out of scope.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_030.md` passed: `POST /v3/writes/edit` now shares the route-neutral backend write envelope, validates bootstrap-issued tokens on the same in-memory device registry path, rejects missing or out-of-bounds `selectionRange` values with 400, and returns deterministic stub `WritingAIResponse` payloads for valid local-edit requests. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, while `start` and `continue` regression tests remained green.
 
 # 2026-04-12
