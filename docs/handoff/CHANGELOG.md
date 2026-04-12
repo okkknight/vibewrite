@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Added `task/TASK_20260412_038.md` as the next Phase 2 execution card. It will switch the app default runtime to the backend gateway, persist installation identity locally, and keep normal runtime on a single backend write request path without adding SSE, database, Redis, or admin UI work.
+
+# 2026-04-12
 - Independent review of `TASK_20260412_037.md` passed: the backend write routes now run through the real backend AI execution path, with backend-native prompt composition, current secret / system-prompt store reads, and preserved request/response DTOs, quota, request log, and admin surfaces. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12
