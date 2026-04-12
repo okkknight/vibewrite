@@ -90,6 +90,289 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(fallbackClient is StubWritingAIClient)
     }
 
+    func testBackendGatewayConfigurationUsesBundleValuesAndFactorySelectsBackendClientByDefault() async throws {
+        let configuration = BackendGatewayConfiguration.configuration(
+            from: [
+                "VIBEWRITE_BACKEND_DEFAULT_MODE": "real",
+                "VIBEWRITE_BACKEND_BASE_URL": "http://127.0.0.1:8080",
+                "CFBundleShortVersionString": "3.2.1",
+                "CFBundleVersion": "321"
+            ]
+        )
+
+        XCTAssertEqual(configuration.mode, .real)
+        XCTAssertEqual(configuration.baseURL.absoluteString, "http://127.0.0.1:8080")
+        XCTAssertEqual(configuration.appVersion, "3.2.1 321")
+        XCTAssertEqual(configuration.platform, "macOS")
+        XCTAssertFalse(configuration.deviceName.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+
+        let tempStoreURL = try makeBackendGatewayTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: tempStoreURL.deletingLastPathComponent())
+        }
+
+        let backendClient = BackendGatewayClientFactory.makeDefaultClient(
+            configuration: configuration,
+            identityStore: BackendGatewayIdentityStore(storageURL: tempStoreURL)
+        )
+        XCTAssertTrue(backendClient is BackendWritingAIClient)
+
+        let stubConfiguration = BackendGatewayConfiguration.configuration(
+            from: [:],
+            environment: ["VIBEWRITE_BACKEND_MODE": "stub"]
+        )
+        let stubClient = BackendGatewayClientFactory.makeDefaultClient(configuration: stubConfiguration)
+        XCTAssertTrue(stubClient is StubWritingAIClient)
+    }
+
+    func testBackendGatewayIdentityStorePersistsInstallationIdAndDeviceToken() async throws {
+        let storageURL = try makeBackendGatewayTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let store = BackendGatewayIdentityStore(storageURL: storageURL)
+        let initialSnapshot = await store.snapshotValue()
+
+        XCTAssertEqual(initialSnapshot.schemaVersion, 1)
+        XCTAssertFalse(initialSnapshot.installationId.isEmpty)
+        XCTAssertNil(initialSnapshot.deviceToken)
+
+        await store.updateDeviceToken("device-token-123")
+
+        let updatedSnapshot = await store.snapshotValue()
+        XCTAssertEqual(updatedSnapshot.installationId, initialSnapshot.installationId)
+        XCTAssertEqual(updatedSnapshot.deviceToken, "device-token-123")
+
+        let reopenedStore = BackendGatewayIdentityStore(storageURL: storageURL)
+        let reopenedSnapshot = await reopenedStore.snapshotValue()
+        XCTAssertEqual(reopenedSnapshot.installationId, initialSnapshot.installationId)
+        XCTAssertEqual(reopenedSnapshot.deviceToken, "device-token-123")
+    }
+
+    func testBackendGatewayClientBootstrapsAndCachesDeviceToken() async throws {
+        let storageURL = try makeBackendGatewayTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let identityStore = BackendGatewayIdentityStore(storageURL: storageURL)
+        let requestsLock = NSLock()
+        var recordedPaths: [String] = []
+        var bootstrapCount = 0
+        var writeCount = 0
+        let prompt = "写一篇关于成年人孤独感的公众号文章"
+        let project = WritingProject.quickStart(
+            prompt: prompt,
+            mode: .collaboration,
+            automationKey: "gateway.cache.demo"
+        )
+        let request = WritingAIRequest(
+            action: .startDraft,
+            project: project.aiSnapshot,
+            userMessage: prompt,
+            selectionText: nil
+        )
+
+        let session = makeAnthropicMockSession { request in
+            requestsLock.lock()
+            defer { requestsLock.unlock() }
+
+            recordedPaths.append(request.url?.path ?? "")
+
+            switch request.url?.path {
+            case "/v3/client/bootstrap":
+                bootstrapCount += 1
+                let token = bootstrapCount == 1 ? "device-token-1" : "device-token-2"
+                let body = try JSONEncoder().encode(
+                    BackendGatewayBootstrapResponseEnvelope(
+                        deviceToken: token,
+                        deviceStatus: "active",
+                        quotaSummary: .init(dailyLimit: 50, weeklyLimit: 200)
+                    )
+                )
+                return (self.makeHTTPResponse(statusCode: 200), body)
+
+            case "/v3/writes/start":
+                writeCount += 1
+                let envelope = try self.decodeBackendGatewayWriteEnvelope(from: request)
+                XCTAssertEqual(envelope.deviceToken, "device-token-1")
+                let backendRequest = self.makeBackendGatewayWritingRequest(from: envelope)
+                let response = WritingProjectResponseBuilder.response(
+                    for: backendRequest,
+                    documentText: MockWritingEngine.streamedDocumentText(for: backendRequest),
+                    metadata: MockWritingEngine.completionMetadata(for: backendRequest)
+                )
+                let body = try JSONEncoder().encode(response)
+                return (self.makeHTTPResponse(statusCode: 200), body)
+
+            default:
+                XCTFail("Unexpected backend gateway request path \(request.url?.path ?? "nil")")
+                return (self.makeHTTPResponse(statusCode: 500), Data())
+            }
+        }
+
+        let client = BackendWritingAIClient(
+            configuration: BackendGatewayConfiguration.configuration(
+                from: [
+                    "VIBEWRITE_BACKEND_DEFAULT_MODE": "real",
+                    "VIBEWRITE_BACKEND_BASE_URL": "http://127.0.0.1:8080"
+                ]
+            ),
+            identityStore: identityStore,
+            session: session
+        )
+
+        let firstResponse = try await client.generateResponse(for: request)
+        XCTAssertFalse(firstResponse.documentText.isEmpty)
+
+        let secondResponse = try await client.generateResponse(for: request)
+        XCTAssertFalse(secondResponse.documentText.isEmpty)
+        XCTAssertEqual(firstResponse.documentText, secondResponse.documentText)
+
+        let snapshot = await identityStore.snapshotValue()
+        XCTAssertEqual(snapshot.deviceToken, "device-token-1")
+        XCTAssertEqual(bootstrapCount, 1)
+        XCTAssertEqual(writeCount, 2)
+        XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/start", "/v3/writes/start"])
+    }
+
+    func testBackendGatewayClientRetriesBootstrapAfterUnauthorized() async throws {
+        let storageURL = try makeBackendGatewayTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let identityStore = BackendGatewayIdentityStore(storageURL: storageURL)
+        let requestsLock = NSLock()
+        var recordedPaths: [String] = []
+        var bootstrapCount = 0
+        var writeCount = 0
+        let prompt = "写一篇关于成年人孤独感的公众号文章"
+        let project = WritingProject.quickStart(
+            prompt: prompt,
+            mode: .collaboration,
+            automationKey: "gateway.retry.demo"
+        )
+        let request = WritingAIRequest(
+            action: .startDraft,
+            project: project.aiSnapshot,
+            userMessage: prompt,
+            selectionText: nil
+        )
+
+        let session = makeAnthropicMockSession { request in
+            requestsLock.lock()
+            defer { requestsLock.unlock() }
+
+            recordedPaths.append(request.url?.path ?? "")
+
+            switch request.url?.path {
+            case "/v3/client/bootstrap":
+                bootstrapCount += 1
+                let token = bootstrapCount == 1 ? "device-token-1" : "device-token-2"
+                let body = try JSONEncoder().encode(
+                    BackendGatewayBootstrapResponseEnvelope(
+                        deviceToken: token,
+                        deviceStatus: "active",
+                        quotaSummary: .init(dailyLimit: 50, weeklyLimit: 200)
+                    )
+                )
+                return (self.makeHTTPResponse(statusCode: 200), body)
+
+            case "/v3/writes/start":
+                writeCount += 1
+                let envelope = try self.decodeBackendGatewayWriteEnvelope(from: request)
+                if writeCount == 1 {
+                    XCTAssertEqual(envelope.deviceToken, "device-token-1")
+                    return (self.makeHTTPResponse(statusCode: 401), Data())
+                }
+
+                XCTAssertEqual(envelope.deviceToken, "device-token-2")
+                let backendRequest = self.makeBackendGatewayWritingRequest(from: envelope)
+                let response = WritingProjectResponseBuilder.response(
+                    for: backendRequest,
+                    documentText: MockWritingEngine.streamedDocumentText(for: backendRequest),
+                    metadata: MockWritingEngine.completionMetadata(for: backendRequest)
+                )
+                let body = try JSONEncoder().encode(response)
+                return (self.makeHTTPResponse(statusCode: 200), body)
+
+            default:
+                XCTFail("Unexpected backend gateway request path \(request.url?.path ?? "nil")")
+                return (self.makeHTTPResponse(statusCode: 500), Data())
+            }
+        }
+
+        let client = BackendWritingAIClient(
+            configuration: BackendGatewayConfiguration.configuration(
+                from: [
+                    "VIBEWRITE_BACKEND_DEFAULT_MODE": "real",
+                    "VIBEWRITE_BACKEND_BASE_URL": "http://127.0.0.1:8080"
+                ]
+            ),
+            identityStore: identityStore,
+            session: session
+        )
+
+        let response = try await client.generateResponse(for: request)
+        XCTAssertFalse(response.documentText.isEmpty)
+
+        let snapshot = await identityStore.snapshotValue()
+        XCTAssertEqual(snapshot.deviceToken, "device-token-2")
+        XCTAssertEqual(bootstrapCount, 2)
+        XCTAssertEqual(writeCount, 2)
+        XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/start", "/v3/client/bootstrap", "/v3/writes/start"])
+    }
+
+    func testBackendGatewayClientMapsNetworkUnavailableErrors() async throws {
+        let storageURL = try makeBackendGatewayTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let identityStore = BackendGatewayIdentityStore(storageURL: storageURL)
+        let session = makeAnthropicMockSession { _ in
+            throw URLError(.notConnectedToInternet)
+        }
+
+        let client = BackendWritingAIClient(
+            configuration: BackendGatewayConfiguration.configuration(
+                from: [
+                    "VIBEWRITE_BACKEND_DEFAULT_MODE": "real",
+                    "VIBEWRITE_BACKEND_BASE_URL": "http://127.0.0.1:8080"
+                ]
+            ),
+            identityStore: identityStore,
+            session: session
+        )
+
+        let prompt = "写一篇关于成年人孤独感的公众号文章"
+        let project = WritingProject.quickStart(
+            prompt: prompt,
+            mode: .collaboration,
+            automationKey: "gateway.offline.demo"
+        )
+        let request = WritingAIRequest(
+            action: .startDraft,
+            project: project.aiSnapshot,
+            userMessage: prompt,
+            selectionText: nil
+        )
+
+        do {
+            _ = try await client.generateResponse(for: request)
+            XCTFail("Expected the backend gateway client to map the network failure")
+        } catch let error as WritingAIClientError {
+            switch error {
+            case .networkUnavailable(let message):
+                XCTAssertTrue(message.contains("后端"))
+            default:
+                XCTFail("Unexpected error: \(error)")
+            }
+        }
+    }
+
     func testStreamingConfigurationUsesBundleValuesAndEnvironmentOverrides() {
         let configuration = WritingStreamingConfiguration.configuration(from: [
             "VIBEWRITE_STREAMING_FRAME_INTERVAL_MS": "20",
@@ -1092,6 +1375,53 @@ final class WritingAITests: XCTestCase {
 
         return data
     }
+
+    private func makeBackendGatewayTempStorageURL() throws -> URL {
+        let directory = FileManager.default.temporaryDirectory.appendingPathComponent(UUID().uuidString, isDirectory: true)
+        try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+        return directory.appendingPathComponent("backend-gateway-identity.json")
+    }
+
+    private func decodeBackendGatewayWriteEnvelope(from request: URLRequest) throws -> BackendGatewayWriteEnvelopeSnapshot {
+        let body = try XCTUnwrap(requestBodyData(from: request))
+        let decoder = JSONDecoder()
+        decoder.dateDecodingStrategy = .iso8601
+        return try decoder.decode(BackendGatewayWriteEnvelopeSnapshot.self, from: body)
+    }
+
+    private func makeBackendGatewayWritingRequest(from envelope: BackendGatewayWriteEnvelopeSnapshot) -> WritingAIRequest {
+        WritingAIRequest(
+            action: envelope.action,
+            project: envelope.project,
+            userMessage: envelope.userMessage,
+            selectionText: envelope.selectionText,
+            selectionRange: envelope.selectionRange,
+            kind: envelope.kind
+        )
+    }
+}
+
+private struct BackendGatewayWriteEnvelopeSnapshot: Decodable {
+    let installationId: String
+    let deviceToken: String
+    let requestId: String
+    let action: WritingAIAction
+    let kind: WritingAIRequestKind
+    let project: WritingProjectSnapshot
+    let userMessage: String?
+    let selectionText: String?
+    let selectionRange: WritingTextSelectionRange?
+}
+
+private struct BackendGatewayBootstrapResponseEnvelope: Codable {
+    let deviceToken: String
+    let deviceStatus: String
+    let quotaSummary: BackendGatewayQuotaSummaryEnvelope
+}
+
+private struct BackendGatewayQuotaSummaryEnvelope: Codable {
+    let dailyLimit: Int
+    let weeklyLimit: Int
 }
 
 private struct MiniMaxTextRequestEnvelope: Decodable {

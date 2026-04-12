@@ -11,6 +11,7 @@ func configure(
 ) throws {
     let deviceRegistry = InMemoryDeviceRegistry()
     let resolvedQuotaLedger = quotaLedger ?? InMemoryQuotaLedger(clock: clock)
+    let backendAIConfiguration = BackendAIConfiguration.current(isTesting: app.environment == .testing)
     let resolvedAdminSecrets = try resolveAdminSecrets(
         app: app,
         providerApiKey: providerApiKey,
@@ -28,10 +29,19 @@ func configure(
         clock: clock
     )
     let adminSessionStore = AdminSessionStore()
+    let providerClient = BackendAIProviderClientFactory.make(configuration: backendAIConfiguration)
+    let aiExecutor = BackendAIExecutor(
+        configuration: backendAIConfiguration,
+        providerClient: providerClient,
+        secretStore: adminSecretStore,
+        systemPromptStore: adminSystemPromptStore
+    )
     let writeService = WriteService(
         deviceRegistry: deviceRegistry,
         quotaLedger: resolvedQuotaLedger,
         requestLogStore: requestLogStore,
+        aiConfiguration: backendAIConfiguration,
+        aiExecutor: aiExecutor,
         clock: clock
     )
     try routes(

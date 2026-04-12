@@ -39,6 +39,10 @@ actor AdminSystemPromptStore {
         )
     }
 
+    func currentSnapshot() -> Snapshot {
+        snapshot
+    }
+
     func update(
         templateBody: String? = nil,
         actionRulesJson: String? = nil,

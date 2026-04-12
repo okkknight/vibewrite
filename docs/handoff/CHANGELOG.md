@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Implemented `task/TASK_20260412_038.md`: the app default runtime now switches to the backend gateway, persists local installation identity plus device token, keeps stub mode and the legacy provider-direct path available for tests and compatibility, and routes integrated backend metadata through the single backend write response path. Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-12
 - Added `task/TASK_20260412_038.md` as the next Phase 2 execution card. It will switch the app default runtime to the backend gateway, persist installation identity locally, and keep normal runtime on a single backend write request path without adding SSE, database, Redis, or admin UI work.
 
 # 2026-04-12

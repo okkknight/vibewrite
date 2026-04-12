@@ -76,6 +76,7 @@ enum WritingAIClientError: LocalizedError {
     case invalidConfiguration(String)
     case requestFailed(String)
     case invalidResponse(String)
+    case networkUnavailable(String)
 
     var errorDescription: String? {
         switch self {
@@ -86,6 +87,8 @@ enum WritingAIClientError: LocalizedError {
         case .requestFailed(let message):
             return message
         case .invalidResponse(let message):
+            return message
+        case .networkUnavailable(let message):
             return message
         }
     }

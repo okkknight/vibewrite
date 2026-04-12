@@ -20,7 +20,7 @@ struct VibeWriteApp: App {
         )
         _flow = StateObject(
             wrappedValue: VibeWriteAppFlow(
-                aiConfiguration: WritingAIConfiguration.current(
+                backendGatewayConfiguration: BackendGatewayConfiguration.current(
                     ignoreEnvironmentOverrides: resolvedCleanLaunch
                 ),
                 streamingConfiguration: WritingStreamingConfiguration.current(

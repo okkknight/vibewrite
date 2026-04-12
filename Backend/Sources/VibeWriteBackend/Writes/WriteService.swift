@@ -5,36 +5,38 @@ actor WriteService {
     private let deviceRegistry: InMemoryDeviceRegistry
     private let quotaLedger: InMemoryQuotaLedger
     private let requestLogStore: InMemoryRequestLogStore
+    private let aiConfiguration: BackendAIConfiguration
+    private let aiExecutor: BackendAIExecutor
     private let clock: any VibeWriteClock
-
-    private static let logProvider = "stub-provider"
-    private static let logModel = "stub-model"
 
     init(
         deviceRegistry: InMemoryDeviceRegistry,
         quotaLedger: InMemoryQuotaLedger,
         requestLogStore: InMemoryRequestLogStore,
+        aiConfiguration: BackendAIConfiguration,
+        aiExecutor: BackendAIExecutor,
         clock: any VibeWriteClock = SystemVibeWriteClock()
     ) {
         self.deviceRegistry = deviceRegistry
         self.quotaLedger = quotaLedger
         self.requestLogStore = requestLogStore
+        self.aiConfiguration = aiConfiguration
+        self.aiExecutor = aiExecutor
         self.clock = clock
     }
 
     func startDraft(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
-        try await handle(envelope, expectedAction: .startDraft, routeLabel: "/v3/writes/start")
+        try await handle(envelope, expectedAction: .startDraft)
     }
 
     func continueWriting(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
-        try await handle(envelope, expectedAction: .continueWriting, routeLabel: "/v3/writes/continue")
+        try await handle(envelope, expectedAction: .continueWriting)
     }
 
     func edit(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
         try await handle(
             envelope,
             expectedAction: .edit,
-            routeLabel: "/v3/writes/edit",
             requiresSelectionRange: true
         )
     }
@@ -42,7 +44,6 @@ actor WriteService {
     private func handle(
         _ envelope: WriteRequestEnvelope,
         expectedAction: WritingAIAction,
-        routeLabel: String,
         requiresSelectionRange: Bool = false
     ) async throws -> WritingAIResponse {
         let startedAt = clock.now()
@@ -89,26 +90,25 @@ actor WriteService {
             throw Abort(.tooManyRequests, reason: "quota_exceeded")
         }
 
-        let response = Self.makeStubResponse(from: envelope, routeLabel: routeLabel)
-        recordAcceptedLog(envelope: envelope, startedAt: startedAt)
-        return response
-    }
-
-    private static func makeStubResponse(from envelope: WriteRequestEnvelope, routeLabel: String) -> WritingAIResponse {
-        WritingAIResponse(
-            assistantMessage: "[stub] \(routeLabel) accepted",
-            documentText: envelope.project.documentText,
-            localSummary: envelope.project.localSummary,
-            globalSynopsis: envelope.project.globalSynopsis,
-            intentSummary: envelope.project.context.intentSummary,
-            styleConstraints: envelope.project.context.styleConstraints,
-            currentGoal: envelope.project.context.currentGoal,
-            recentDecisions: envelope.project.context.recentDecisions,
-            workingMemory: envelope.project.context.workingMemory,
-            nextFocus: envelope.project.context.nextFocus,
-            suggestionChips: envelope.project.suggestionChips,
-            mode: envelope.project.mode
-        )
+        do {
+            let response = try await aiExecutor.execute(for: envelope)
+            recordAcceptedLog(envelope: envelope, startedAt: startedAt)
+            return response
+        } catch let error as BackendAIError {
+            recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: error.requestLogCode
+            )
+            throw Abort(error.abortStatus, reason: error.errorDescription ?? "AI request failed.")
+        } catch {
+            recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "backend_error"
+            )
+            throw Abort(.internalServerError, reason: error.localizedDescription)
+        }
     }
 
     private func recordAcceptedLog(
@@ -125,8 +125,8 @@ actor WriteService {
                 action: envelope.action,
                 status: RequestLogStatus.accepted,
                 errorCode: nil,
-                provider: Self.logProvider,
-                model: Self.logModel,
+                provider: aiConfiguration.provider,
+                model: aiConfiguration.model,
                 durationMs: durationMs,
                 tokenIn: 0,
                 tokenOut: 0,
@@ -150,8 +150,8 @@ actor WriteService {
                 action: envelope.action,
                 status: RequestLogStatus.rejected,
                 errorCode: errorCode,
-                provider: Self.logProvider,
-                model: Self.logModel,
+                provider: aiConfiguration.provider,
+                model: aiConfiguration.model,
                 durationMs: durationMs,
                 tokenIn: 0,
                 tokenOut: 0,

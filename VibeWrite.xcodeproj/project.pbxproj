@@ -29,6 +29,9 @@
 		100000000000000000000057 /* WritingProjectResponseBuilder.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000058 /* WritingProjectResponseBuilder.swift */; };
 		100000000000000000000079 /* WritingStreamingConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000007A /* WritingStreamingConfiguration.swift */; };
 		10000000000000000000007B /* WritingStreamingPreviewRenderer.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000007C /* WritingStreamingPreviewRenderer.swift */; };
+		1000000000000000000000A4 /* BackendGatewayConfiguration.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1000000000000000000000A0 /* BackendGatewayConfiguration.swift */; };
+		1000000000000000000000A5 /* BackendGatewayIdentityStore.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1000000000000000000000A1 /* BackendGatewayIdentityStore.swift */; };
+		1000000000000000000000A6 /* BackendWritingAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 1000000000000000000000A2 /* BackendWritingAIClient.swift */; };
 		100000000000000000000059 /* StubWritingAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000005A /* StubWritingAIClient.swift */; };
 		10000000000000000000005D /* RemoteWritingAIClient.swift in Sources */ = {isa = PBXBuildFile; fileRef = 10000000000000000000005E /* RemoteWritingAIClient.swift */; };
 		100000000000000000000069 /* VibeWriteDiagnostics.swift in Sources */ = {isa = PBXBuildFile; fileRef = 100000000000000000000070 /* VibeWriteDiagnostics.swift */; };
@@ -87,6 +90,9 @@
 		100000000000000000000058 /* WritingProjectResponseBuilder.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingProjectResponseBuilder.swift; sourceTree = "<group>"; };
 		10000000000000000000007A /* WritingStreamingConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingStreamingConfiguration.swift; sourceTree = "<group>"; };
 		10000000000000000000007C /* WritingStreamingPreviewRenderer.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WritingStreamingPreviewRenderer.swift; sourceTree = "<group>"; };
+		1000000000000000000000A0 /* BackendGatewayConfiguration.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendGatewayConfiguration.swift; sourceTree = "<group>"; };
+		1000000000000000000000A1 /* BackendGatewayIdentityStore.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendGatewayIdentityStore.swift; sourceTree = "<group>"; };
+		1000000000000000000000A2 /* BackendWritingAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = BackendWritingAIClient.swift; sourceTree = "<group>"; };
 		10000000000000000000005A /* StubWritingAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = StubWritingAIClient.swift; sourceTree = "<group>"; };
 		10000000000000000000005E /* RemoteWritingAIClient.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = RemoteWritingAIClient.swift; sourceTree = "<group>"; };
 		100000000000000000000070 /* VibeWriteDiagnostics.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = VibeWriteDiagnostics.swift; sourceTree = "<group>"; };
@@ -265,6 +271,9 @@
 				100000000000000000000058 /* WritingProjectResponseBuilder.swift */,
 				10000000000000000000007A /* WritingStreamingConfiguration.swift */,
 				10000000000000000000007C /* WritingStreamingPreviewRenderer.swift */,
+				1000000000000000000000A0 /* BackendGatewayConfiguration.swift */,
+				1000000000000000000000A1 /* BackendGatewayIdentityStore.swift */,
+				1000000000000000000000A2 /* BackendWritingAIClient.swift */,
 				10000000000000000000005A /* StubWritingAIClient.swift */,
 				10000000000000000000005E /* RemoteWritingAIClient.swift */,
 				100000000000000000000070 /* VibeWriteDiagnostics.swift */,
@@ -446,6 +455,9 @@
 				100000000000000000000057 /* WritingProjectResponseBuilder.swift in Sources */,
 				100000000000000000000079 /* WritingStreamingConfiguration.swift in Sources */,
 				10000000000000000000007B /* WritingStreamingPreviewRenderer.swift in Sources */,
+				1000000000000000000000A4 /* BackendGatewayConfiguration.swift in Sources */,
+				1000000000000000000000A5 /* BackendGatewayIdentityStore.swift in Sources */,
+				1000000000000000000000A6 /* BackendWritingAIClient.swift in Sources */,
 				100000000000000000000059 /* StubWritingAIClient.swift in Sources */,
 				10000000000000000000005D /* RemoteWritingAIClient.swift in Sources */,
 				100000000000000000000069 /* VibeWriteDiagnostics.swift in Sources */,

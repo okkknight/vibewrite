@@ -459,6 +459,38 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(flow.activeProject.suggestionChips, ["继续写建议"])
     }
 
+    func testIntegratedBackendMetadataPhaseUsesSingleWriteResponse() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let client = IntegratedBackendMetadataWritingAIClient()
+        let flow = VibeWriteAppFlow(
+            storageURL: storageURL,
+            aiClient: client
+        )
+        flow.openProject(
+            WritingProject.entryShell(
+                prompt: "写一篇关于成年人孤独感的公众号文章",
+                mode: .collaboration,
+                automationKey: "project.backend.integrated"
+            )
+        )
+
+        try await flow.performWritingAction(
+            .startDraft,
+            userMessage: "写一篇关于成年人孤独感的公众号文章",
+            selectionText: nil
+        )
+
+        let snapshot = await client.snapshot()
+        XCTAssertEqual(snapshot.streamKinds, [.prose])
+        XCTAssertTrue(snapshot.generateKinds.isEmpty)
+        XCTAssertFalse(flow.activeProject.suggestionChips.isEmpty)
+        XCTAssertFalse(flow.isMetadataRequestInFlight)
+    }
+
     func testEditAppliesPatchAtCompletionWhilePreservingPatchBoundaries() async throws {
         let storageURL = try makeTempStorageURL()
         defer {
@@ -1133,6 +1165,59 @@ private actor RequestRecorder {
 
     func allRequests() -> [WritingAIRequest] {
         requests
+    }
+}
+
+private actor IntegratedBackendMetadataRequestRecorder {
+    private var streamKinds: [WritingAIRequestKind] = []
+    private var generateKinds: [WritingAIRequestKind] = []
+
+    func recordStream(_ request: WritingAIRequest) {
+        streamKinds.append(request.kind)
+    }
+
+    func recordGenerate(_ request: WritingAIRequest) {
+        generateKinds.append(request.kind)
+    }
+
+    func snapshot() -> (streamKinds: [WritingAIRequestKind], generateKinds: [WritingAIRequestKind]) {
+        (streamKinds, generateKinds)
+    }
+}
+
+private struct IntegratedBackendMetadataWritingAIClient: WritingAIClient {
+    let recorder = IntegratedBackendMetadataRequestRecorder()
+
+    var usesIntegratedBackendMetadataPhase: Bool { true }
+
+    func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                await recorder.recordStream(request)
+                let response = response(for: request)
+                continuation.yield(.textDelta(response.documentText))
+                continuation.yield(.completed(response))
+                continuation.finish()
+            }
+        }
+    }
+
+    func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
+        await recorder.recordGenerate(request)
+        return response(for: request)
+    }
+
+    func snapshot() async -> (streamKinds: [WritingAIRequestKind], generateKinds: [WritingAIRequestKind]) {
+        await recorder.snapshot()
+    }
+
+    private func response(for request: WritingAIRequest) -> WritingAIResponse {
+        let documentText = MockWritingEngine.streamedDocumentText(for: request)
+        return WritingProjectResponseBuilder.response(
+            for: request,
+            documentText: documentText,
+            metadata: MockWritingEngine.completionMetadata(for: request)
+        )
     }
 }
 

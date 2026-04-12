@@ -46,17 +46,23 @@ final class WriteEditTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
-                XCTAssertEqual(writeResponse.assistantMessage, "[stub] /v3/writes/edit accepted")
-                XCTAssertEqual(writeResponse.documentText, editRequest.project.documentText)
-                XCTAssertEqual(writeResponse.localSummary, editRequest.project.localSummary)
-                XCTAssertEqual(writeResponse.globalSynopsis, editRequest.project.globalSynopsis)
-                XCTAssertEqual(writeResponse.intentSummary, editRequest.project.context.intentSummary)
-                XCTAssertEqual(writeResponse.styleConstraints, editRequest.project.context.styleConstraints)
-                XCTAssertEqual(writeResponse.currentGoal, editRequest.project.context.currentGoal)
-                XCTAssertEqual(writeResponse.recentDecisions, editRequest.project.context.recentDecisions)
-                XCTAssertEqual(writeResponse.workingMemory, editRequest.project.context.workingMemory)
-                XCTAssertEqual(writeResponse.nextFocus, editRequest.project.context.nextFocus)
-                XCTAssertEqual(writeResponse.suggestionChips, editRequest.project.suggestionChips)
+                XCTAssertEqual(writeResponse.assistantMessage, "我按你选中的那段改了一版。")
+                XCTAssertEqual(
+                    writeResponse.documentText,
+                    "前文正文这里不用说得太满，留白会更好。后文正文"
+                )
+                XCTAssertEqual(writeResponse.localSummary, "已完成局部修改")
+                XCTAssertEqual(writeResponse.globalSynopsis, "已完成局部修改总览")
+                XCTAssertEqual(
+                    writeResponse.intentSummary,
+                    "围绕当前选中文段局部协作，优先保持整体语气和节奏一致。"
+                )
+                XCTAssertEqual(writeResponse.styleConstraints, ["克制", "平静"])
+                XCTAssertEqual(writeResponse.currentGoal, "修改选中文段")
+                XCTAssertEqual(writeResponse.recentDecisions, ["选区带入对话", "局部修改优先"])
+                XCTAssertEqual(writeResponse.workingMemory, ["当前在改选中文段", "先局部处理，再回到整体"])
+                XCTAssertEqual(writeResponse.nextFocus, "检查选中文段是否还需要继续调整")
+                XCTAssertEqual(writeResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
                 XCTAssertEqual(writeResponse.mode, editRequest.project.mode)
             }
         })

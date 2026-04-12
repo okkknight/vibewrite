@@ -1229,10 +1229,6 @@ private enum WritingProjectPreviewFactory {
         let flow = VibeWriteAppFlow(
             storageURL: previewStorageURL,
             aiClient: StubWritingAIClient(),
-            aiConfiguration: .configuration(
-                from: [:],
-                environment: ["VIBEWRITE_AI_DEFAULT_MODE": "stub"]
-            ),
             forceBlankStartup: true
         )
 

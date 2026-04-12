@@ -1,8 +1,13 @@
 import Foundation
 
 public protocol WritingAIClient: Sendable {
+    var usesIntegratedBackendMetadataPhase: Bool { get }
     func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse
     func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error>
+}
+
+public extension WritingAIClient {
+    var usesIntegratedBackendMetadataPhase: Bool { false }
 }
 
 public enum WritingAIStreamEvent: Sendable, Hashable {

@@ -97,6 +97,14 @@ actor AdminSecretStore {
         snapshot.adminUsername == username && snapshot.adminPassword == password
     }
 
+    func providerApiKey() -> String? {
+        snapshot.providerApiKey
+    }
+
+    func currentSnapshot() -> Snapshot {
+        snapshot
+    }
+
     func snapshotResponse() -> AdminSecretsResponse {
         AdminSecretsResponse(
             providerApiKeyConfigured: snapshot.providerApiKeyConfigured,

@@ -44,8 +44,14 @@ final class WriteContinueTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
-                XCTAssertEqual(writeResponse.assistantMessage, "[stub] /v3/writes/start accepted")
-                XCTAssertEqual(writeResponse.documentText, startRequest.project.documentText)
+                XCTAssertEqual(writeResponse.assistantMessage, "我已经根据你的方向起了一版第一稿。")
+                XCTAssertEqual(
+                    writeResponse.documentText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    """
+                    在你给出的方向里，最重要的不是把情绪讲满，而是先把它停在一个合适的位置。
+                    这篇文字先不急着给结论，而是从一个更具体的开头进入，让内容慢慢往前走。
+                    """
+                )
             }
         })
 
@@ -66,17 +72,26 @@ final class WriteContinueTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
-                XCTAssertEqual(writeResponse.assistantMessage, "[stub] /v3/writes/continue accepted")
-                XCTAssertEqual(writeResponse.documentText, continueRequest.project.documentText)
-                XCTAssertEqual(writeResponse.localSummary, continueRequest.project.localSummary)
-                XCTAssertEqual(writeResponse.globalSynopsis, continueRequest.project.globalSynopsis)
-                XCTAssertEqual(writeResponse.intentSummary, continueRequest.project.context.intentSummary)
-                XCTAssertEqual(writeResponse.styleConstraints, continueRequest.project.context.styleConstraints)
-                XCTAssertEqual(writeResponse.currentGoal, continueRequest.project.context.currentGoal)
-                XCTAssertEqual(writeResponse.recentDecisions, continueRequest.project.context.recentDecisions)
-                XCTAssertEqual(writeResponse.workingMemory, continueRequest.project.context.workingMemory)
-                XCTAssertEqual(writeResponse.nextFocus, continueRequest.project.context.nextFocus)
-                XCTAssertEqual(writeResponse.suggestionChips, continueRequest.project.suggestionChips)
+                XCTAssertEqual(writeResponse.assistantMessage, "我接着往下写了一段，让主线继续往前走。")
+                XCTAssertEqual(
+                    writeResponse.documentText,
+                    """
+                    开头正文
+                    接下来可以顺着这个主线，再补一段更自然的推进。
+                    """
+                )
+                XCTAssertEqual(writeResponse.localSummary, "已续写一段")
+                XCTAssertEqual(writeResponse.globalSynopsis, "已续写一段总览")
+                XCTAssertEqual(
+                    writeResponse.intentSummary,
+                    "围绕当前正文继续往下写一段，让主线自然往前推进。"
+                )
+                XCTAssertEqual(writeResponse.styleConstraints, ["克制", "平静"])
+                XCTAssertEqual(writeResponse.currentGoal, "继续写")
+                XCTAssertEqual(writeResponse.recentDecisions, ["继续沿当前主线", "保持节奏稳定"])
+                XCTAssertEqual(writeResponse.workingMemory, ["继续沿当前正文推进", "优先保持节奏稳定"])
+                XCTAssertEqual(writeResponse.nextFocus, "继续顺着当前主线往下写")
+                XCTAssertEqual(writeResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
                 XCTAssertEqual(writeResponse.mode, continueRequest.project.mode)
             }
         })

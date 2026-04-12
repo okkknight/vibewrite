@@ -44,18 +44,27 @@ final class WriteStartTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
-                XCTAssertEqual(writeResponse.assistantMessage, "[stub] /v3/writes/start accepted")
-                XCTAssertEqual(writeResponse.documentText, writeRequest.project.documentText)
-                XCTAssertEqual(writeResponse.localSummary, writeRequest.project.localSummary)
-                XCTAssertEqual(writeResponse.globalSynopsis, writeRequest.project.globalSynopsis)
-                XCTAssertEqual(writeResponse.intentSummary, writeRequest.project.context.intentSummary)
-                XCTAssertEqual(writeResponse.styleConstraints, writeRequest.project.context.styleConstraints)
-                XCTAssertEqual(writeResponse.currentGoal, writeRequest.project.context.currentGoal)
-                XCTAssertEqual(writeResponse.recentDecisions, writeRequest.project.context.recentDecisions)
-                XCTAssertEqual(writeResponse.workingMemory, writeRequest.project.context.workingMemory)
-                XCTAssertEqual(writeResponse.nextFocus, writeRequest.project.context.nextFocus)
-                XCTAssertEqual(writeResponse.suggestionChips, writeRequest.project.suggestionChips)
-                XCTAssertEqual(writeResponse.mode, writeRequest.project.mode)
+                XCTAssertEqual(writeResponse.assistantMessage, "我已经根据你的方向起了一版第一稿。")
+                XCTAssertEqual(
+                    writeResponse.documentText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    """
+                    在你给出的方向里，最重要的不是把情绪讲满，而是先把它停在一个合适的位置。
+                    这篇文字先不急着给结论，而是从一个更具体的开头进入，让内容慢慢往前走。
+                    """
+                )
+                XCTAssertEqual(writeResponse.localSummary, "已生成开头")
+                XCTAssertEqual(writeResponse.globalSynopsis, "已生成总览")
+                XCTAssertEqual(
+                    writeResponse.intentSummary,
+                    "围绕“先写一个开头”持续协作，正文会直接写入文档而不是停留在聊天里。"
+                )
+                XCTAssertEqual(writeResponse.styleConstraints, ["克制", "平静", "非鸡汤", "避免说教"])
+                XCTAssertEqual(writeResponse.currentGoal, "收紧开头")
+                XCTAssertEqual(writeResponse.recentDecisions, ["先生成第一稿", "开头保持克制"])
+                XCTAssertEqual(writeResponse.workingMemory, ["正文已经进入协作阶段", "后续修改优先围绕主线推进"])
+                XCTAssertEqual(writeResponse.nextFocus, "继续推进第一段")
+                XCTAssertEqual(writeResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
+                XCTAssertEqual(writeResponse.mode, .collaboration)
             }
         })
     }
