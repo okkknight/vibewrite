@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-12
+- Implemented a queryable in-memory request log read model on top of the existing `Backend/` request log store. The store can now filter by installation, action, status, error code, and created-at range, returns entries in created-at descending order, and exposes lightweight summary counts for total / accepted / rejected logs. Verified with `swift test` in `Backend/`.
+
+# 2026-04-12
 - Added `task/TASK_20260412_033.md` as the next Phase 1 execution card. It turns the existing in-memory request log store into a queryable read model with filters and summary counts, while keeping persistence, pagination, HTTP admin routes, and dashboard work out of scope.
 
 # 2026-04-12
