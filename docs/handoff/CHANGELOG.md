@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-13
+- Independent review of `TASK_20260412_039.md` passed: the backend admin surface now exposes overview, quota, and device management APIs on top of the in-memory stores, quota updates take effect immediately for bootstrap and write requests, blocked devices are rejected with `device_blocked`, and the admin surface remains session-protected without adding persistence, Redis, UI, or RBAC. Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-13
 - Implemented `task/TASK_20260412_039.md`: the backend admin surface now includes overview, quota, and device management APIs on top of the in-memory stores. Admins can view live overview metrics, inspect and update quota limits, and block or unblock devices, with changes immediately affecting bootstrap, quota checks, and write validation. Verified with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-12
