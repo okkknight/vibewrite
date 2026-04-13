@@ -4,6 +4,68 @@ import XCTVapor
 import VibeWriteShared
 
 final class AdminAccessTests: XCTestCase {
+    func testAdminPageShowsLoginFormWhenAnonymous() throws {
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(app, adminUsername: "admin", adminPassword: "password")
+
+        try app.test(.GET, "v3/admin", afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertTrue(response.headers.first(name: .contentType)?.contains("text/html") == true)
+
+            let body = response.body.string
+            XCTAssertTrue(body.contains("data-authenticated=\"false\""))
+            XCTAssertTrue(body.contains("id=\"login-panel\""))
+            XCTAssertTrue(body.contains("id=\"dashboard-panel\" class=\"hidden\""))
+            XCTAssertTrue(body.contains("管理员登录"))
+        })
+    }
+
+    func testAdminPageShowsDashboardWhenAuthenticatedAndReturnsToLoginAfterLogout() throws {
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(app, adminUsername: "admin", adminPassword: "password")
+
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
+
+        try app.test(.GET, "v3/admin", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertTrue(response.headers.first(name: .contentType)?.contains("text/html") == true)
+
+            let body = response.body.string
+            XCTAssertTrue(body.contains("data-authenticated=\"true\""))
+            XCTAssertTrue(body.contains("id=\"dashboard-panel\""))
+            XCTAssertTrue(body.contains("总览"))
+            XCTAssertTrue(body.contains("请求列表"))
+            XCTAssertTrue(body.contains("密钥"))
+            XCTAssertTrue(body.contains("AI System Prompt"))
+            XCTAssertTrue(body.contains("Quota"))
+            XCTAssertTrue(body.contains("Devices"))
+            XCTAssertTrue(body.contains("id=\"login-panel\" class=\"panel login hidden\""))
+        })
+
+        try app.test(.POST, "v3/admin/logout", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+        })
+
+        try app.test(.GET, "v3/admin", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+
+            let body = response.body.string
+            XCTAssertTrue(body.contains("data-authenticated=\"false\""))
+            XCTAssertTrue(body.contains("管理员登录"))
+            XCTAssertTrue(body.contains("id=\"dashboard-panel\" class=\"hidden\""))
+        })
+    }
+
     func testLoginSuccessSetsAdminSessionCookie() throws {
         let app = Application(.testing)
         defer { app.shutdown() }

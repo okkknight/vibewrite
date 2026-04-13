@@ -12,6 +12,13 @@ func registerAdminRoutes(
     aiConfiguration: BackendAIConfiguration,
     clock: any VibeWriteClock
 ) throws {
+    app.get("v3", "admin") { req async throws -> Response in
+        let isAuthenticated = await adminSessionStore.isAuthenticated(
+            sessionToken: AdminSessionCookie.sessionToken(from: req)
+        )
+        return makeAdminPageResponse(authenticated: isAuthenticated)
+    }
+
     app.post("v3", "admin", "login") { req async throws -> Response in
         let request = try req.content.decode(AdminLoginRequest.self)
         guard await secretStore.authenticate(username: request.username, password: request.password) else {
