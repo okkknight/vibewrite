@@ -327,6 +327,16 @@ V3 不做账号体系，但仍然必须保护接口。
 
 `PUT /v3/admin/devices/:id/unblock`
 
+### 7.8 管理后台页面
+
+`GET /v3/admin`
+
+这是浏览器入口，不是 JSON API。
+
+- 未登录时显示登录表单
+- 已登录时显示单页 dashboard
+- 页面通过现有后台 session cookie 访问同一组管理 API
+
 ---
 
 ## 8. 请求日志原则
