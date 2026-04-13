@@ -19,6 +19,7 @@ struct BootstrapResponse: Content {
 
 enum DeviceStatus: String, Content {
     case active
+    case blocked
 }
 
 struct QuotaSummary: Content {

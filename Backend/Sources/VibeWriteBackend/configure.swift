@@ -9,7 +9,7 @@ func configure(
     adminUsername: String? = nil,
     adminPassword: String? = nil
 ) throws {
-    let deviceRegistry = InMemoryDeviceRegistry()
+    let deviceRegistry = InMemoryDeviceRegistry(clock: clock)
     let resolvedQuotaLedger = quotaLedger ?? InMemoryQuotaLedger(clock: clock)
     let backendAIConfiguration = BackendAIConfiguration.current(isTesting: app.environment == .testing)
     let resolvedAdminSecrets = try resolveAdminSecrets(
@@ -47,11 +47,14 @@ func configure(
     try routes(
         app,
         deviceRegistry: deviceRegistry,
+        quotaLedger: resolvedQuotaLedger,
         writeService: writeService,
         requestLogStore: requestLogStore,
         secretStore: adminSecretStore,
         systemPromptStore: adminSystemPromptStore,
-        adminSessionStore: adminSessionStore
+        adminSessionStore: adminSessionStore,
+        aiConfiguration: backendAIConfiguration,
+        clock: clock
     )
 }
 

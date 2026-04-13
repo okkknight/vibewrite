@@ -270,6 +270,321 @@ final class AdminAccessTests: XCTestCase {
         })
     }
 
+    func testAdminOverviewReflectsTodayCountsAndBackendConfiguration() throws {
+        let clock = TestClock(date: shanghaiDate(year: 2026, month: 4, day: 13, hour: 9))
+        let quotaLedger = InMemoryQuotaLedger(
+            limit: QuotaLimit(dailyLimit: 1, weeklyLimit: 1),
+            clock: clock
+        )
+        let requestLogStore = InMemoryRequestLogStore()
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(
+            app,
+            quotaLedger: quotaLedger,
+            requestLogStore: requestLogStore,
+            clock: clock,
+            adminUsername: "admin",
+            adminPassword: "password"
+        )
+
+        let bootstrap = try bootstrapDevice(in: app, installationId: "installation-overview-001")
+        let project = sampleProjectSnapshot(documentText: "prefix middle suffix")
+
+        try sendStart(
+            in: app,
+            installationId: bootstrap.installationId,
+            deviceToken: bootstrap.deviceToken,
+            project: project,
+            requestId: "request-overview-accepted"
+        )
+
+        try app.test(.POST, "v3/writes/continue", beforeRequest: { request in
+            try request.content.encode(WriteRequestEnvelope(
+                installationId: bootstrap.installationId,
+                deviceToken: bootstrap.deviceToken,
+                requestId: "request-overview-quota",
+                action: .continueWriting,
+                kind: .prose,
+                project: project,
+                userMessage: "继续写",
+                selectionText: nil,
+                selectionRange: nil
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .tooManyRequests)
+        })
+
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
+
+        try app.test(.GET, "v3/admin/overview", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminOverviewResponse.self, response) { body in
+                XCTAssertEqual(body.todayRequestCount, 2)
+                XCTAssertEqual(body.todaySuccessRate, 0.5, accuracy: 0.0001)
+                XCTAssertEqual(body.todayQuotaExceededCount, 1)
+                XCTAssertEqual(body.activeDeviceCount, 1)
+                XCTAssertEqual(body.provider, "minimax")
+                XCTAssertEqual(body.model, "MiniMax-M2.5-highspeed")
+                XCTAssertEqual(body.dailyLimit, 1)
+                XCTAssertEqual(body.weeklyLimit, 1)
+            }
+        })
+    }
+
+    func testAdminQuotaUpdateChangesBootstrapAndWriteLimitsImmediately() throws {
+        let clock = TestClock(date: shanghaiDate(year: 2026, month: 4, day: 13, hour: 9))
+        let requestLogStore = InMemoryRequestLogStore()
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(
+            app,
+            requestLogStore: requestLogStore,
+            clock: clock,
+            adminUsername: "admin",
+            adminPassword: "password"
+        )
+
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
+
+        try app.test(.GET, "v3/admin/quota", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminQuotaResponse.self, response) { body in
+                XCTAssertEqual(body.dailyLimit, 50)
+                XCTAssertEqual(body.weeklyLimit, 200)
+                XCTAssertEqual(body.dailyUsed, 0)
+                XCTAssertEqual(body.weeklyUsed, 0)
+                XCTAssertFalse(body.updatedAt.isEmpty)
+            }
+        })
+
+        try app.test(.PUT, "v3/admin/quota", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+            try request.content.encode(AdminQuotaUpdateRequest(dailyLimit: 1, weeklyLimit: 2))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminQuotaResponse.self, response) { body in
+                XCTAssertEqual(body.dailyLimit, 1)
+                XCTAssertEqual(body.weeklyLimit, 2)
+                XCTAssertEqual(body.dailyUsed, 0)
+                XCTAssertEqual(body.weeklyUsed, 0)
+                XCTAssertFalse(body.updatedAt.isEmpty)
+            }
+        })
+
+        let bootstrap = try bootstrapDevice(in: app, installationId: "installation-quota-admin-001")
+        XCTAssertEqual(bootstrap.deviceToken.isEmpty, false)
+
+        try app.test(.POST, "v3/writes/start", beforeRequest: { request in
+            try request.content.encode(WriteRequestEnvelope(
+                installationId: bootstrap.installationId,
+                deviceToken: bootstrap.deviceToken,
+                requestId: "request-quota-admin-start",
+                action: .startDraft,
+                kind: .prose,
+                project: sampleProjectSnapshot(documentText: "prefix middle suffix"),
+                userMessage: "先写开头",
+                selectionText: nil,
+                selectionRange: nil
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+        })
+
+        try app.test(.POST, "v3/writes/continue", beforeRequest: { request in
+            try request.content.encode(WriteRequestEnvelope(
+                installationId: bootstrap.installationId,
+                deviceToken: bootstrap.deviceToken,
+                requestId: "request-quota-admin-continue",
+                action: .continueWriting,
+                kind: .prose,
+                project: sampleProjectSnapshot(documentText: "prefix middle suffix"),
+                userMessage: "继续写",
+                selectionText: nil,
+                selectionRange: nil
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .tooManyRequests)
+        })
+
+        try app.test(.GET, "v3/admin/quota", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminQuotaResponse.self, response) { body in
+                XCTAssertEqual(body.dailyLimit, 1)
+                XCTAssertEqual(body.weeklyLimit, 2)
+                XCTAssertEqual(body.dailyUsed, 1)
+                XCTAssertEqual(body.weeklyUsed, 1)
+            }
+        })
+
+        try app.test(.POST, "v3/client/bootstrap", beforeRequest: { request in
+            try request.content.encode(BootstrapRequest(
+                installationId: bootstrap.installationId,
+                appVersion: "3.0.0",
+                platform: "macOS",
+                deviceName: "QA Mac"
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(BootstrapResponse.self, response) { bootstrapResponse in
+                XCTAssertEqual(bootstrapResponse.quotaSummary.dailyLimit, 1)
+                XCTAssertEqual(bootstrapResponse.quotaSummary.weeklyLimit, 2)
+            }
+        })
+    }
+
+    func testAdminDeviceBlockAndUnblockAffectBootstrapAndWrites() throws {
+        let requestLogStore = InMemoryRequestLogStore()
+        let clock = TestClock(date: shanghaiDate(year: 2026, month: 4, day: 13, hour: 9))
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(
+            app,
+            requestLogStore: requestLogStore,
+            clock: clock,
+            adminUsername: "admin",
+            adminPassword: "password"
+        )
+
+        let bootstrap = try bootstrapDevice(in: app, installationId: "installation-device-001")
+        let project = sampleProjectSnapshot(documentText: "prefix middle suffix")
+
+        try sendStart(
+            in: app,
+            installationId: bootstrap.installationId,
+            deviceToken: bootstrap.deviceToken,
+            project: project,
+            requestId: "request-device-accepted"
+        )
+
+        let cookieHeader = try adminSessionCookieHeader(in: app, username: "admin", password: "password")
+
+        try app.test(.POST, "v3/admin/devices/\(bootstrap.installationId)/block", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+            try request.content.encode(AdminDeviceBlockRequest(blockReason: "manual maintenance"))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminDeviceResponse.self, response) { body in
+                XCTAssertEqual(body.installationId, bootstrap.installationId)
+                XCTAssertEqual(body.status, .blocked)
+                XCTAssertEqual(body.blockReason, "manual maintenance")
+                XCTAssertFalse(body.blockedAt == nil)
+            }
+        })
+
+        try app.test(.GET, "v3/admin/devices", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminDeviceListResponse.self, response) { body in
+                XCTAssertEqual(body.devices.count, 1)
+                XCTAssertEqual(body.devices[0].installationId, bootstrap.installationId)
+                XCTAssertEqual(body.devices[0].status, .blocked)
+                XCTAssertEqual(body.devices[0].todayUsed, 1)
+                XCTAssertEqual(body.devices[0].weeklyUsed, 1)
+                XCTAssertEqual(body.devices[0].blockReason, "manual maintenance")
+                XCTAssertFalse(body.devices[0].blockedAt == nil)
+            }
+        })
+
+        try app.test(.POST, "v3/client/bootstrap", beforeRequest: { request in
+            try request.content.encode(BootstrapRequest(
+                installationId: bootstrap.installationId,
+                appVersion: "3.0.0",
+                platform: "macOS",
+                deviceName: "QA Mac"
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(BootstrapResponse.self, response) { bootstrapResponse in
+                XCTAssertEqual(bootstrapResponse.deviceStatus, .blocked)
+                XCTAssertEqual(bootstrapResponse.deviceToken, bootstrap.deviceToken)
+            }
+        })
+
+        try app.test(.POST, "v3/writes/start", beforeRequest: { request in
+            try request.content.encode(WriteRequestEnvelope(
+                installationId: bootstrap.installationId,
+                deviceToken: bootstrap.deviceToken,
+                requestId: "request-device-blocked",
+                action: .startDraft,
+                kind: .prose,
+                project: project,
+                userMessage: "先写开头",
+                selectionText: nil,
+                selectionRange: nil
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .forbidden)
+        })
+
+        let rejectedLogs = requestLogStore.snapshot().filter { $0.requestId == "request-device-blocked" }
+        XCTAssertEqual(rejectedLogs.count, 1)
+        XCTAssertEqual(rejectedLogs[0].status, .rejected)
+        XCTAssertEqual(rejectedLogs[0].errorCode, "device_blocked")
+
+        try app.test(.GET, "v3/admin/quota", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminQuotaResponse.self, response) { body in
+                XCTAssertEqual(body.dailyUsed, 1)
+                XCTAssertEqual(body.weeklyUsed, 1)
+            }
+        })
+
+        try app.test(.POST, "v3/admin/devices/\(bootstrap.installationId)/unblock", beforeRequest: { request in
+            request.headers.replaceOrAdd(name: .cookie, value: cookieHeader)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(AdminDeviceResponse.self, response) { body in
+                XCTAssertEqual(body.installationId, bootstrap.installationId)
+                XCTAssertEqual(body.status, .active)
+                XCTAssertNil(body.blockedAt)
+                XCTAssertNil(body.blockReason)
+            }
+        })
+
+        try app.test(.POST, "v3/client/bootstrap", beforeRequest: { request in
+            try request.content.encode(BootstrapRequest(
+                installationId: bootstrap.installationId,
+                appVersion: "3.0.0",
+                platform: "macOS",
+                deviceName: "QA Mac"
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(BootstrapResponse.self, response) { bootstrapResponse in
+                XCTAssertEqual(bootstrapResponse.deviceStatus, .active)
+            }
+        })
+
+        try app.test(.POST, "v3/writes/start", beforeRequest: { request in
+            try request.content.encode(WriteRequestEnvelope(
+                installationId: bootstrap.installationId,
+                deviceToken: bootstrap.deviceToken,
+                requestId: "request-device-unblocked",
+                action: .startDraft,
+                kind: .prose,
+                project: project,
+                userMessage: "先写开头",
+                selectionText: nil,
+                selectionRange: nil
+            ))
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+        })
+    }
+
     private func adminSessionCookieHeader(in app: Application, username: String, password: String) throws -> String {
         var setCookieHeader: String?
         try app.test(.POST, "v3/admin/login", beforeRequest: { request in

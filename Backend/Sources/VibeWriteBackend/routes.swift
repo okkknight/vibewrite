@@ -4,11 +4,14 @@ import VibeWriteShared
 func routes(
     _ app: Application,
     deviceRegistry: InMemoryDeviceRegistry,
+    quotaLedger: InMemoryQuotaLedger,
     writeService: WriteService,
     requestLogStore: InMemoryRequestLogStore,
     secretStore: AdminSecretStore,
     systemPromptStore: AdminSystemPromptStore,
-    adminSessionStore: AdminSessionStore
+    adminSessionStore: AdminSessionStore,
+    aiConfiguration: BackendAIConfiguration,
+    clock: any VibeWriteClock
 ) throws {
     app.get("v3", "health") { _ in
         HealthResponse(status: "ok")
@@ -16,12 +19,16 @@ func routes(
 
     app.post("v3", "client", "bootstrap") { req async throws -> BootstrapResponse in
         let request = try req.content.decode(BootstrapRequest.self)
-        let deviceToken = await deviceRegistry.deviceToken(for: request.installationId)
+        let bootstrap = await deviceRegistry.bootstrap(installationId: request.installationId)
+        let currentLimit = await quotaLedger.currentLimit()
 
         return BootstrapResponse(
-            deviceToken: deviceToken,
-            deviceStatus: .active,
-            quotaSummary: .default
+            deviceToken: bootstrap.deviceToken,
+            deviceStatus: bootstrap.deviceStatus,
+            quotaSummary: QuotaSummary(
+                dailyLimit: currentLimit.dailyLimit,
+                weeklyLimit: currentLimit.weeklyLimit
+            )
         )
     }
 
@@ -42,9 +49,13 @@ func routes(
 
     try registerAdminRoutes(
         app,
+        deviceRegistry: deviceRegistry,
+        quotaLedger: quotaLedger,
         requestLogStore: requestLogStore,
         secretStore: secretStore,
         systemPromptStore: systemPromptStore,
-        adminSessionStore: adminSessionStore
+        adminSessionStore: adminSessionStore,
+        aiConfiguration: aiConfiguration,
+        clock: clock
     )
 }

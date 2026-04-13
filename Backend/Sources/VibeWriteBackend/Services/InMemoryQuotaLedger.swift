@@ -7,6 +7,20 @@ struct QuotaLimit: Sendable, Equatable {
     static let `default` = QuotaLimit(dailyLimit: 50, weeklyLimit: 200)
 }
 
+struct QuotaUsageSnapshot: Sendable, Equatable {
+    let installationId: String
+    let dailyUsed: Int
+    let weeklyUsed: Int
+}
+
+struct QuotaLedgerSnapshot: Sendable, Equatable {
+    let limit: QuotaLimit
+    let limitUpdatedAt: Date
+    let totalDailyUsed: Int
+    let totalWeeklyUsed: Int
+    let usageByInstallationId: [QuotaUsageSnapshot]
+}
+
 enum QuotaLedgerDecision: Sendable, Equatable {
     case allowed
     case quotaExceeded
@@ -32,7 +46,8 @@ actor InMemoryQuotaLedger {
 
     private let clock: any VibeWriteClock
     private let timeZone: TimeZone
-    private let limit: QuotaLimit
+    private var limit: QuotaLimit
+    private var limitUpdatedAt: Date
     private var usageByInstallationId: [String: Usage] = [:]
 
     init(
@@ -43,10 +58,76 @@ actor InMemoryQuotaLedger {
         self.limit = limit
         self.clock = clock
         self.timeZone = timeZone
+        self.limitUpdatedAt = clock.now()
     }
 
     func evaluateAndConsumeIfAllowed(installationId: String) -> QuotaLedgerDecision {
         let now = clock.now()
+        let usage = normalizedUsage(for: installationId, now: now)
+
+        guard usage.dailyCount < limit.dailyLimit,
+              usage.weeklyCount < limit.weeklyLimit else {
+            return .quotaExceeded
+        }
+
+        var updatedUsage = usage
+        updatedUsage.dailyCount += 1
+        updatedUsage.weeklyCount += 1
+        usageByInstallationId[installationId] = updatedUsage
+        return .allowed
+    }
+
+    func currentLimit() -> QuotaLimit {
+        limit
+    }
+
+    func updateLimit(dailyLimit: Int? = nil, weeklyLimit: Int? = nil) {
+        guard dailyLimit != nil || weeklyLimit != nil else {
+            return
+        }
+
+        limit = QuotaLimit(
+            dailyLimit: dailyLimit ?? limit.dailyLimit,
+            weeklyLimit: weeklyLimit ?? limit.weeklyLimit
+        )
+        limitUpdatedAt = clock.now()
+    }
+
+    func currentUsageSnapshot() -> QuotaLedgerSnapshot {
+        let usageSnapshots = snapshotUsage()
+        return QuotaLedgerSnapshot(
+            limit: limit,
+            limitUpdatedAt: limitUpdatedAt,
+            totalDailyUsed: usageSnapshots.reduce(into: 0) { $0 += $1.dailyUsed },
+            totalWeeklyUsed: usageSnapshots.reduce(into: 0) { $0 += $1.weeklyUsed },
+            usageByInstallationId: usageSnapshots
+        )
+    }
+
+    func usageSnapshot(for installationId: String) -> QuotaUsageSnapshot {
+        let usage = normalizedUsage(for: installationId, now: clock.now())
+        return QuotaUsageSnapshot(
+            installationId: installationId,
+            dailyUsed: usage.dailyCount,
+            weeklyUsed: usage.weeklyCount
+        )
+    }
+
+    func snapshotUsage() -> [QuotaUsageSnapshot] {
+        let now = clock.now()
+        return usageByInstallationId.keys
+            .sorted()
+            .map { installationId in
+                let usage = normalizedUsage(for: installationId, now: now)
+                return QuotaUsageSnapshot(
+                    installationId: installationId,
+                    dailyUsed: usage.dailyCount,
+                    weeklyUsed: usage.weeklyCount
+                )
+            }
+    }
+
+    private func normalizedUsage(for installationId: String, now: Date) -> Usage {
         let dailyKey = Self.dailyKey(for: now, timeZone: timeZone)
         let weeklyKey = Self.weeklyKey(for: now, timeZone: timeZone)
 
@@ -67,16 +148,8 @@ actor InMemoryQuotaLedger {
             usage.weeklyCount = 0
         }
 
-        guard usage.dailyCount < limit.dailyLimit,
-              usage.weeklyCount < limit.weeklyLimit else {
-            usageByInstallationId[installationId] = usage
-            return .quotaExceeded
-        }
-
-        usage.dailyCount += 1
-        usage.weeklyCount += 1
         usageByInstallationId[installationId] = usage
-        return .allowed
+        return usage
     }
 
     private static func dailyKey(for date: Date, timeZone: TimeZone) -> String {

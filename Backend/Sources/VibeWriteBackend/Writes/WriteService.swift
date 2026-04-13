@@ -57,10 +57,20 @@ actor WriteService {
             throw Abort(.badRequest, reason: "Only \(expectedAction.rawValue) is supported in this task.")
         }
 
-        guard await deviceRegistry.isValidDevice(
+        switch await deviceRegistry.validateDevice(
             installationId: envelope.installationId,
             deviceToken: envelope.deviceToken
-        ) else {
+        ) {
+        case .valid:
+            break
+        case .blocked:
+            recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "device_blocked"
+            )
+            throw Abort(.forbidden, reason: "device_blocked")
+        case .unauthorized:
             recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,

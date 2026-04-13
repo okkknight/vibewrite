@@ -33,6 +33,50 @@ struct AdminRequestQuery: Content {
     let createdAtEnd: String?
 }
 
+struct AdminOverviewResponse: Content {
+    let todayRequestCount: Int
+    let todaySuccessRate: Double
+    let todayQuotaExceededCount: Int
+    let activeDeviceCount: Int
+    let provider: String
+    let model: String
+    let dailyLimit: Int
+    let weeklyLimit: Int
+}
+
+struct AdminQuotaResponse: Content {
+    let dailyLimit: Int
+    let weeklyLimit: Int
+    let dailyUsed: Int
+    let weeklyUsed: Int
+    let updatedAt: String
+}
+
+struct AdminQuotaUpdateRequest: Content {
+    let dailyLimit: Int?
+    let weeklyLimit: Int?
+}
+
+struct AdminDeviceBlockRequest: Content {
+    let blockReason: String?
+}
+
+struct AdminDeviceResponse: Content {
+    let installationId: String
+    let status: DeviceStatus
+    let firstSeenAt: String
+    let lastSeenAt: String
+    let tokenIssuedAt: String
+    let todayUsed: Int
+    let weeklyUsed: Int
+    let blockedAt: String?
+    let blockReason: String?
+}
+
+struct AdminDeviceListResponse: Content {
+    let devices: [AdminDeviceResponse]
+}
+
 enum AdminDateCodec {
     private static func makeFractionalFormatter() -> ISO8601DateFormatter {
         let formatter = ISO8601DateFormatter()
