@@ -156,6 +156,8 @@ V3 的推进顺序固定为 5 个阶段。
 
 目标：
 
+- 把当前内存态 device / quota / request / secret / system prompt / session 存储切到 PostgreSQL 持久化
+- 把 secret config 以加密 ciphertext 落库
 - 固定数据库表结构和保留策略
 - 固定请求日志只留元数据
 - 固定正文和摘要不入库、不进日志

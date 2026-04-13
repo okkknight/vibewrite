@@ -61,6 +61,7 @@ V3 的部署目标是把后端 AI 网关和后台管理页放到阿里云上，�
 - 当前模型名
 - AI system prompt 配置来源
 - 管理员登录凭证
+- `ADMIN_SECRET_ENCRYPTION_KEY`
 - 数据库连接串
 - Redis 连接串
 - 会话密钥
@@ -82,6 +83,7 @@ V3 的密钥和 AI system prompt 配置不得写死在客户端。
 
 - 后端从受保护配置里读取密钥
 - 管理后台修改受保护配置
+- `ADMIN_SECRET_ENCRYPTION_KEY` 用于 secret config 的加密与解密
 - 修改后立即对新请求生效
 - 不做多版本回滚系统，只保留当前生效值
 

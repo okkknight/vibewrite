@@ -103,7 +103,14 @@
 - AI system prompt 配置更新
 - 限额查看和封禁
 
-### 第 6 步：清理客户端机密
+### 第 6 步：把后端数据层切到 PostgreSQL
+
+- 把 device、quota、request log、secret config、system prompt config、admin session 持久化到 PostgreSQL
+- secret config 必须按加密 ciphertext 落库
+- 仍然保持现有 API、DTO 和后台页面不变
+- 只切生产主实现，不做双写 / 双读过渡
+
+### 第 7 步：清理客户端机密
 
 - 删除本地密钥依赖
 - 删除 AI system prompt builder

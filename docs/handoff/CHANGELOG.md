@@ -1,5 +1,8 @@
 # Changelog
 
+# 2026-04-14
+- Added `task/TASK_20260414_041.md` as the next Phase 4 execution card. It will move the current backend runtime state to PostgreSQL persistence and store secret config encrypted at rest with `ADMIN_SECRET_ENCRYPTION_KEY`.
+
 # 2026-04-13
 - Independent review of `TASK_20260413_040.md` passed: the backend now serves `/v3/admin` as a browser-openable single-page admin view, shows the login form when unauthenticated, shows the dashboard shell when authenticated, and keeps the page as a thin vanilla-JS shell over the existing admin API surface without adding a new frontend framework, independent web site, database, Redis, RBAC, or multi-page backend. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 

@@ -164,6 +164,8 @@ V3 的数据原则非常明确：
 
 当前 V3 实现阶段先用内存版 secret config store 承载这份数据，启动时从环境变量 seed，更新后只在当前进程内生效；下面的表字段是后续持久化阶段的目标形态，不是本轮必须落库的内容。
 
+后续落到 PostgreSQL 时，`secret_ciphertext` 必须保存为可逆加密后的密文，不允许以明文写入数据库。加密密钥来源固定为 `ADMIN_SECRET_ENCRYPTION_KEY`。
+
 必备字段：
 
 - `secret_key`
