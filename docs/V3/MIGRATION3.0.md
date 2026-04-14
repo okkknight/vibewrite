@@ -117,6 +117,13 @@
 - 删除 provider 直连
 - 保留 `project.prompt` 作为用户写作简述和本地项目元数据
 
+### 第 8 步：清理客户端正常路径残留
+
+- 删除 `WritingAIClientFactory` 的正常运行态默认选择入口
+- 删除 `WritingAIConfiguration` 对 `MINIMAX_*` 的正常运行态默认读取
+- 删除 `WritingAIPromptBuilder` 和 `RemoteWritingAIClient` 的正常构建依赖
+- 将仍需要保留的 provider 语义测试迁到 backend / shared 测试，或者删除已经被 backend gateway 覆盖的重复断言
+
 ---
 
 ## 5. 迁移时必须保留的兼容点

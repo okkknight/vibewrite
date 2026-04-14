@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-14
+- Added `task/TASK_20260414_042.md` as the next Phase 5 cleanup card. It will remove the client-side direct-provider normal runtime path and prompt-builder dependencies so the app's production path stays on the backend gateway.
+
+# 2026-04-14
 - Independent review of `TASK_20260414_041.md` passed: the backend runtime state now switches to PostgreSQL in the non-testing production path, with devices, request logs, quota, secret config, system prompt config, and admin sessions all behind the PostgreSQL-backed persistence layer. Secret config is encrypted at rest with `ADMIN_SECRET_ENCRYPTION_KEY`, the existing API/admin surfaces remain unchanged, and the codebase still keeps the testing in-memory fallback for local test runs. Verification passed with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`; no live PostgreSQL server was available in this environment, so online connectivity was reviewed from the code path rather than exercised end to end.
 
 # 2026-04-14
