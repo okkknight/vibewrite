@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-14
+- Final V3 closeout verification passed for `task/TASK_20260414_044.md`. The repo root and backend test suites pass, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` both pass, and live HTTP smoke checks against the running backend confirmed `GET /v3/health`, `POST /v3/client/bootstrap`, `POST /v3/writes/start`, `POST /v3/writes/continue`, `POST /v3/writes/edit`, `GET /v3/admin`, `POST /v3/admin/login`, `GET /v3/admin/requests`, `GET /v3/admin/secrets`, `PUT /v3/admin/secrets`, `GET /v3/admin/system-prompt`, `PUT /v3/admin/system-prompt`, `GET /v3/admin/quota`, `PUT /v3/admin/quota`, and `GET /v3/admin/devices` all behaved as expected.
+
+# 2026-04-14
 - Added `task/TASK_20260414_044.md` as the final V3 closeout card. It will run the last backend/app/admin verification, freeze the release state, and write the final archival status back into the handoff docs.
 - Independent review of `TASK_20260414_043.md` passed: the app target no longer contains the legacy provider-direct AI implementation files, the old direct-provider semantics tests have been收口到 backend / shared boundaries, and the normal app build path stays on backend gateway plus stub/offline compatibility. Verification passed with `swift test` at the repo root and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`. The remaining mentions of the old files live only in migration / archival docs, not in the app target or normal runtime path.
 
