@@ -22,10 +22,11 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `task/TASK_20260412_039.md` is implemented: the backend admin surfaces now cover overview, quota, and device controls on top of the current in-memory stores, still without adding persistence or a UI.
 - `task/TASK_20260413_040.md` is implemented: the backend now serves `GET /v3/admin` as a browser-openable single-page management view that shows login when unauthenticated and a dashboard shell when authenticated, while still reusing the existing admin API surface and avoiding a new frontend framework.
 - `task/TASK_20260414_041.md` is now implemented in the repo: the remaining backend runtime state has been moved to PostgreSQL and secret config is encrypted at rest, while the existing API and admin page surface stay unchanged.
-- `task/TASK_20260414_042.md` is now in place in the repo: the next Phase 5 cleanup card removes the client-side direct-provider normal runtime path and prompt-builder dependencies so the production app stays on the backend gateway.
+- `task/TASK_20260414_042.md` is now implemented in the repo: the client-side direct-provider normal runtime path and prompt-builder dependencies have been removed so the production app stays on the backend gateway.
 - The current `WriteService` no longer returns stub `WritingAIResponse` payloads for the write routes; it now delegates to `BackendAIExecutor` and logs the real configured provider/model values.
 - The backend write transport envelope is route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
 - The backend edit route keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.
+- The app-side direct-provider runtime support files (`WritingAIConfiguration.swift`, `WritingAIPromptBuilder.swift`, and `RemoteWritingAIClient.swift`) have been removed from the normal runtime path; the backend gateway is now the production AI path and the backend prompt composer owns the route-specific prompt assembly.
 - The app's default launch window size is now 1024x700.
 - The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.
 - The wide Composer now keeps the zero-gap body-to-composer seam while preserving its shadow and internal padding.
