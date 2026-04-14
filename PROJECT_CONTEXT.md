@@ -24,6 +24,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `task/TASK_20260414_041.md` is now implemented in the repo: the remaining backend runtime state has been moved to PostgreSQL and secret config is encrypted at rest, while the existing API and admin page surface stay unchanged.
 - `task/TASK_20260414_042.md` is now implemented in the repo: the client-side direct-provider normal runtime path and prompt-builder dependencies have been removed so the production app stays on the backend gateway.
 - `task/TASK_20260414_043.md` is now implemented in the repo: the remaining legacy provider-direct AI implementation files are gone from the app target, and the still-useful AI prompt / metadata semantics tests now live on the backend / shared boundary.
+- `task/TASK_20260414_044.md` is now in place in the repo as the final V3 closeout card that will verify the current backend/app/admin state, freeze the release, and write the archival status back into the handoff docs.
 - The current `WriteService` no longer returns stub `WritingAIResponse` payloads for the write routes; it now delegates to `BackendAIExecutor` and logs the real configured provider/model values.
 - The backend write transport envelope is route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
 - The backend edit route keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.

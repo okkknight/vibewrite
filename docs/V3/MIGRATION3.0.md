@@ -124,6 +124,14 @@
 - 删除 `WritingAIPromptBuilder` 和 `RemoteWritingAIClient` 的正常构建依赖
 - 将仍需要保留的 provider 语义测试迁到 backend / shared 测试，或者删除已经被 backend gateway 覆盖的重复断言
 
+### 第 9 步：收官验收与冻结
+
+- 对 backend、app、admin 和核心接口做完整回归验证
+- 对照当前代码状态和 V3 文档，确认没有明显冲突
+- 仅修阻塞性问题，不再新增功能或扩大范围
+- 把 V3 的最终状态写回 roadmap、handoff 和 project context
+- 明确当前 V3 已进入归档 / 维护状态
+
 ---
 
 ## 5. 迁移时必须保留的兼容点
