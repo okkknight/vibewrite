@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-14
+- Independent review of `TASK_20260414_043.md` passed: the app target no longer contains the legacy provider-direct AI implementation files, the old direct-provider semantics tests have been收口到 backend / shared boundaries, and the normal app build path stays on backend gateway plus stub/offline compatibility. Verification passed with `swift test` at the repo root and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`. The remaining mentions of the old files live only in migration / archival docs, not in the app target or normal runtime path.
+
+# 2026-04-14
 - Implemented `task/TASK_20260414_043.md`: the remaining legacy provider-direct AI implementation files have been removed from the app target, and the still-useful AI prompt / metadata semantics tests now live on the backend / shared boundary. Verification passed with `swift test` at the repo root and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-14
