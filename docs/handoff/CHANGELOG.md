@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-14
+- Implemented `task/TASK_20260414_041.md`: the backend runtime state now persists in PostgreSQL, and secret config is encrypted at rest with `ADMIN_SECRET_ENCRYPTION_KEY`, while the existing API and admin page surface stay unchanged. Verified with `swift test` in `Backend/` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-14
 - Added `task/TASK_20260414_041.md` as the next Phase 4 execution card. It will move the current backend runtime state to PostgreSQL persistence and store secret config encrypted at rest with `ADMIN_SECRET_ENCRYPTION_KEY`.
 
 # 2026-04-13

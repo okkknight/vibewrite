@@ -1,6 +1,6 @@
 import Foundation
 
-actor AdminSessionStore {
+actor AdminSessionStore: VibeWriteAdminSessionStore {
     private var activeSessionTokens: Set<String> = []
 
     func issueSession() -> String {

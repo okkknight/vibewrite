@@ -2,17 +2,17 @@ import Vapor
 import VibeWriteShared
 
 actor WriteService {
-    private let deviceRegistry: InMemoryDeviceRegistry
-    private let quotaLedger: InMemoryQuotaLedger
-    private let requestLogStore: InMemoryRequestLogStore
+    private let deviceRegistry: any VibeWriteDeviceRegistryStore
+    private let quotaLedger: any VibeWriteQuotaLedgerStore
+    private let requestLogStore: any VibeWriteRequestLogStore
     private let aiConfiguration: BackendAIConfiguration
     private let aiExecutor: BackendAIExecutor
     private let clock: any VibeWriteClock
 
     init(
-        deviceRegistry: InMemoryDeviceRegistry,
-        quotaLedger: InMemoryQuotaLedger,
-        requestLogStore: InMemoryRequestLogStore,
+        deviceRegistry: any VibeWriteDeviceRegistryStore,
+        quotaLedger: any VibeWriteQuotaLedgerStore,
+        requestLogStore: any VibeWriteRequestLogStore,
         aiConfiguration: BackendAIConfiguration,
         aiExecutor: BackendAIExecutor,
         clock: any VibeWriteClock = SystemVibeWriteClock()
@@ -49,7 +49,7 @@ actor WriteService {
         let startedAt = clock.now()
 
         guard envelope.action == expectedAction else {
-            recordRejectedLog(
+            await recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,
                 errorCode: "invalid_request"
@@ -57,21 +57,21 @@ actor WriteService {
             throw Abort(.badRequest, reason: "Only \(expectedAction.rawValue) is supported in this task.")
         }
 
-        switch await deviceRegistry.validateDevice(
+        switch try await deviceRegistry.validateDevice(
             installationId: envelope.installationId,
             deviceToken: envelope.deviceToken
         ) {
         case .valid:
             break
         case .blocked:
-            recordRejectedLog(
+            await recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,
                 errorCode: "device_blocked"
             )
             throw Abort(.forbidden, reason: "device_blocked")
         case .unauthorized:
-            recordRejectedLog(
+            await recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,
                 errorCode: "unauthorized"
@@ -82,7 +82,7 @@ actor WriteService {
         if requiresSelectionRange {
             guard let selectionRange = envelope.selectionRange,
                   selectionRange.range(in: envelope.project.documentText) != nil else {
-                recordRejectedLog(
+                await recordRejectedLog(
                     envelope: envelope,
                     startedAt: startedAt,
                     errorCode: "invalid_request"
@@ -91,8 +91,8 @@ actor WriteService {
             }
         }
 
-        guard await quotaLedger.evaluateAndConsumeIfAllowed(installationId: envelope.installationId) == .allowed else {
-            recordRejectedLog(
+        guard try await quotaLedger.evaluateAndConsumeIfAllowed(installationId: envelope.installationId) == .allowed else {
+            await recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,
                 errorCode: "quota_exceeded"
@@ -102,17 +102,17 @@ actor WriteService {
 
         do {
             let response = try await aiExecutor.execute(for: envelope)
-            recordAcceptedLog(envelope: envelope, startedAt: startedAt)
+            await recordAcceptedLog(envelope: envelope, startedAt: startedAt)
             return response
         } catch let error as BackendAIError {
-            recordRejectedLog(
+            await recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,
                 errorCode: error.requestLogCode
             )
             throw Abort(error.abortStatus, reason: error.errorDescription ?? "AI request failed.")
         } catch {
-            recordRejectedLog(
+            await recordRejectedLog(
                 envelope: envelope,
                 startedAt: startedAt,
                 errorCode: "backend_error"
@@ -124,11 +124,11 @@ actor WriteService {
     private func recordAcceptedLog(
         envelope: WriteRequestEnvelope,
         startedAt: Date
-    ) {
+    ) async {
         let endedAt = clock.now()
         let durationMs = Self.durationMilliseconds(from: startedAt, to: endedAt)
 
-        requestLogStore.append(
+        try? await requestLogStore.append(
             RequestLogEntry(
                 requestId: envelope.requestId,
                 installationId: envelope.installationId,
@@ -149,11 +149,11 @@ actor WriteService {
         envelope: WriteRequestEnvelope,
         startedAt: Date,
         errorCode: String
-    ) {
+    ) async {
         let endedAt = clock.now()
         let durationMs = Self.durationMilliseconds(from: startedAt, to: endedAt)
 
-        requestLogStore.append(
+        try? await requestLogStore.append(
             RequestLogEntry(
                 requestId: envelope.requestId,
                 installationId: envelope.installationId,

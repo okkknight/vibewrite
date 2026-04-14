@@ -47,19 +47,14 @@ struct RequestLogQueryResult: Codable, Sendable, Equatable {
     let summary: RequestLogSummary
 }
 
-final class InMemoryRequestLogStore: @unchecked Sendable {
-    private let lock = NSLock()
+actor InMemoryRequestLogStore: VibeWriteRequestLogStore {
     private var entries: [RequestLogEntry] = []
 
     func append(_ entry: RequestLogEntry) {
-        lock.lock()
-        defer { lock.unlock() }
         entries.append(entry)
     }
 
     func snapshot() -> [RequestLogEntry] {
-        lock.lock()
-        defer { lock.unlock() }
         return entries
     }
 
@@ -79,7 +74,7 @@ final class InMemoryRequestLogStore: @unchecked Sendable {
 
         return RequestLogQueryResult(
             entries: filtered,
-            summary: RequestLogSummary(from: filtered)
+            summary: RequestLogSummary(entries: filtered)
         )
     }
 
@@ -116,8 +111,8 @@ private extension RequestLogQuery {
     }
 }
 
-private extension RequestLogSummary {
-    init(from entries: [RequestLogEntry]) {
+extension RequestLogSummary {
+    init(entries: [RequestLogEntry]) {
         let acceptedCount = entries.reduce(into: 0) { partialResult, entry in
             if entry.status == .accepted {
                 partialResult += 1

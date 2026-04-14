@@ -3,13 +3,13 @@ import VibeWriteShared
 
 func routes(
     _ app: Application,
-    deviceRegistry: InMemoryDeviceRegistry,
-    quotaLedger: InMemoryQuotaLedger,
+    deviceRegistry: any VibeWriteDeviceRegistryStore,
+    quotaLedger: any VibeWriteQuotaLedgerStore,
     writeService: WriteService,
-    requestLogStore: InMemoryRequestLogStore,
-    secretStore: AdminSecretStore,
-    systemPromptStore: AdminSystemPromptStore,
-    adminSessionStore: AdminSessionStore,
+    requestLogStore: any VibeWriteRequestLogStore,
+    secretStore: any VibeWriteAdminSecretStore,
+    systemPromptStore: any VibeWriteAdminSystemPromptStore,
+    adminSessionStore: any VibeWriteAdminSessionStore,
     aiConfiguration: BackendAIConfiguration,
     clock: any VibeWriteClock
 ) throws {
@@ -19,8 +19,8 @@ func routes(
 
     app.post("v3", "client", "bootstrap") { req async throws -> BootstrapResponse in
         let request = try req.content.decode(BootstrapRequest.self)
-        let bootstrap = await deviceRegistry.bootstrap(installationId: request.installationId)
-        let currentLimit = await quotaLedger.currentLimit()
+        let bootstrap = try await deviceRegistry.bootstrap(installationId: request.installationId)
+        let currentLimit = try await quotaLedger.currentLimit()
 
         return BootstrapResponse(
             deviceToken: bootstrap.deviceToken,

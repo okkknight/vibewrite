@@ -51,16 +51,16 @@ actor BackendAIExecutor {
     private let configuration: BackendAIConfiguration
     private let promptComposer: BackendPromptComposer
     private let providerClient: any BackendAIProviderClient
-    private let secretStore: AdminSecretStore
-    private let systemPromptStore: AdminSystemPromptStore
+    private let secretStore: any VibeWriteAdminSecretStore
+    private let systemPromptStore: any VibeWriteAdminSystemPromptStore
     private let responseBuilder = BackendWritingResponseBuilder()
 
     init(
         configuration: BackendAIConfiguration,
         promptComposer: BackendPromptComposer = BackendPromptComposer(),
         providerClient: any BackendAIProviderClient,
-        secretStore: AdminSecretStore,
-        systemPromptStore: AdminSystemPromptStore
+        secretStore: any VibeWriteAdminSecretStore,
+        systemPromptStore: any VibeWriteAdminSystemPromptStore
     ) {
         self.configuration = configuration
         self.promptComposer = promptComposer
@@ -79,8 +79,8 @@ actor BackendAIExecutor {
             kind: envelope.kind
         )
 
-        let systemPromptSnapshot = await systemPromptStore.currentSnapshot()
-        let secretSnapshot = await secretStore.currentSnapshot()
+        let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
+        let secretSnapshot = try await secretStore.secretCurrentSnapshot()
         let providerApiKey = secretSnapshot.providerApiKey
 
         if configuration.mode == .real && (providerApiKey?.isEmpty ?? true) {

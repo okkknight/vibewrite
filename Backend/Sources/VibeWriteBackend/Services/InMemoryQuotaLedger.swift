@@ -36,7 +36,7 @@ struct SystemVibeWriteClock: VibeWriteClock {
     }
 }
 
-actor InMemoryQuotaLedger {
+actor InMemoryQuotaLedger: VibeWriteQuotaLedgerStore {
     private struct Usage: Sendable {
         var dailyKey: String
         var dailyCount: Int

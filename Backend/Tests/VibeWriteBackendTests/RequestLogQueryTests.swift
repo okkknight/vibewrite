@@ -4,11 +4,11 @@ import XCTest
 import VibeWriteShared
 
 final class RequestLogQueryTests: XCTestCase {
-    func testQueryFiltersByInstallationIdAndSortsByCreatedAtDescending() {
+    func testQueryFiltersByInstallationIdAndSortsByCreatedAtDescending() async throws {
         let store = InMemoryRequestLogStore()
         let base = Date(timeIntervalSince1970: 1_000)
 
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-001",
             installationId: "installation-a",
             action: .startDraft,
@@ -16,7 +16,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: nil,
             createdAt: base.addingTimeInterval(10)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-002",
             installationId: "installation-b",
             action: .continueWriting,
@@ -24,7 +24,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: "quota_exceeded",
             createdAt: base.addingTimeInterval(15)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-003",
             installationId: "installation-a",
             action: .edit,
@@ -33,7 +33,7 @@ final class RequestLogQueryTests: XCTestCase {
             createdAt: base.addingTimeInterval(5)
         ))
 
-        let result = store.query(RequestLogQuery(installationId: "installation-a", action: nil, status: nil, errorCode: nil, createdAtRange: nil))
+        let result = try await store.query(RequestLogQuery(installationId: "installation-a", action: nil, status: nil, errorCode: nil, createdAtRange: nil))
 
         XCTAssertEqual(result.entries.map(\.requestId), ["request-001", "request-003"])
         XCTAssertEqual(result.summary.totalCount, 2)
@@ -41,11 +41,11 @@ final class RequestLogQueryTests: XCTestCase {
         XCTAssertEqual(result.summary.rejectedCount, 1)
     }
 
-    func testQueryFiltersByActionStatusAndErrorCode() {
+    func testQueryFiltersByActionStatusAndErrorCode() async throws {
         let store = InMemoryRequestLogStore()
         let base = Date(timeIntervalSince1970: 2_000)
 
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-004",
             installationId: "installation-a",
             action: .startDraft,
@@ -53,7 +53,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: nil,
             createdAt: base.addingTimeInterval(10)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-005",
             installationId: "installation-a",
             action: .continueWriting,
@@ -61,7 +61,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: "quota_exceeded",
             createdAt: base.addingTimeInterval(20)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-006",
             installationId: "installation-b",
             action: .continueWriting,
@@ -70,7 +70,7 @@ final class RequestLogQueryTests: XCTestCase {
             createdAt: base.addingTimeInterval(30)
         ))
 
-        let continueRejected = store.query(RequestLogQuery(
+        let continueRejected = try await store.query(RequestLogQuery(
             installationId: nil,
             action: .continueWriting,
             status: .rejected,
@@ -82,7 +82,7 @@ final class RequestLogQueryTests: XCTestCase {
         XCTAssertEqual(continueRejected.summary.acceptedCount, 0)
         XCTAssertEqual(continueRejected.summary.rejectedCount, 2)
 
-        let quotaRejected = store.query(RequestLogQuery(
+        let quotaRejected = try await store.query(RequestLogQuery(
             installationId: nil,
             action: nil,
             status: nil,
@@ -95,11 +95,11 @@ final class RequestLogQueryTests: XCTestCase {
         XCTAssertEqual(quotaRejected.summary.rejectedCount, 1)
     }
 
-    func testQueryFiltersByTimeRangeAndProducesSummaryCounts() {
+    func testQueryFiltersByTimeRangeAndProducesSummaryCounts() async throws {
         let store = InMemoryRequestLogStore()
         let base = Date(timeIntervalSince1970: 3_000)
 
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-007",
             installationId: "installation-a",
             action: .startDraft,
@@ -107,7 +107,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: nil,
             createdAt: base.addingTimeInterval(5)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-008",
             installationId: "installation-b",
             action: .continueWriting,
@@ -115,7 +115,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: "quota_exceeded",
             createdAt: base.addingTimeInterval(15)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-009",
             installationId: "installation-a",
             action: .edit,
@@ -123,7 +123,7 @@ final class RequestLogQueryTests: XCTestCase {
             errorCode: nil,
             createdAt: base.addingTimeInterval(25)
         ))
-        store.append(makeEntry(
+        try await store.append(makeEntry(
             requestId: "request-010",
             installationId: "installation-c",
             action: .edit,
@@ -132,7 +132,7 @@ final class RequestLogQueryTests: XCTestCase {
             createdAt: base.addingTimeInterval(35)
         ))
 
-        let result = store.query(RequestLogQuery(
+        let result = try await store.query(RequestLogQuery(
             installationId: nil,
             action: nil,
             status: nil,
@@ -145,7 +145,7 @@ final class RequestLogQueryTests: XCTestCase {
         XCTAssertEqual(result.summary.acceptedCount, 1)
         XCTAssertEqual(result.summary.rejectedCount, 1)
 
-        let summary = store.summary(matching: RequestLogQuery(
+        let summary = try await store.summary(matching: RequestLogQuery(
             installationId: "installation-a",
             action: nil,
             status: nil,

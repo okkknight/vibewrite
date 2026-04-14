@@ -37,7 +37,7 @@ final class RequestLogTests: XCTestCase {
             requestId: "request-log-edit-001"
         )
 
-        let entries = snapshotEntries(from: requestLogStore)
+        let entries = try snapshotEntries(from: requestLogStore)
         XCTAssertEqual(entries.count, 3)
 
         XCTAssertEqual(entries[0].requestId, "request-log-start-001")
@@ -81,7 +81,7 @@ final class RequestLogTests: XCTestCase {
             expectedStatus: .unauthorized
         )
 
-        let entries = snapshotEntries(from: requestLogStore)
+        let entries = try snapshotEntries(from: requestLogStore)
         XCTAssertEqual(entries.count, 1)
         XCTAssertEqual(entries[0].status, .rejected)
         XCTAssertEqual(entries[0].errorCode, "unauthorized")
@@ -134,7 +134,7 @@ final class RequestLogTests: XCTestCase {
             requestId: "request-log-quota-next-day"
         )
 
-        let entries = snapshotEntries(from: requestLogStore)
+        let entries = try snapshotEntries(from: requestLogStore)
         XCTAssertEqual(entries.count, 3)
         XCTAssertEqual(entries[1].status, .rejected)
         XCTAssertEqual(entries[1].errorCode, "quota_exceeded")
@@ -286,8 +286,43 @@ final class RequestLogTests: XCTestCase {
         return components.date ?? Date(timeIntervalSince1970: 0)
     }
 
-    private func snapshotEntries(from store: InMemoryRequestLogStore) -> [RequestLogEntry] {
-        store.snapshot()
+    private func snapshotEntries(from store: InMemoryRequestLogStore) throws -> [RequestLogEntry] {
+        try blockingValue {
+            await store.snapshot()
+        }
+    }
+
+    private func blockingValue<T: Sendable>(_ operation: @Sendable @escaping () async throws -> T) throws -> T {
+        let semaphore = DispatchSemaphore(value: 0)
+        let box = BlockingResultBox<T>()
+        let job: @Sendable () async -> Void = {
+            do {
+                box.store(.success(try await operation()))
+            } catch {
+                box.store(.failure(error))
+            }
+            semaphore.signal()
+        }
+        Task.detached(operation: job)
+        semaphore.wait()
+        return try box.load()
+    }
+}
+
+private final class BlockingResultBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<T, Error>?
+
+    func store(_ result: Result<T, Error>) {
+        lock.lock()
+        self.result = result
+        lock.unlock()
+    }
+
+    func load() throws -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try result!.get()
     }
 }
 

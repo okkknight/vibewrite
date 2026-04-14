@@ -14,7 +14,7 @@ struct AdminSystemPromptResponse: Content {
     let updatedAt: String
 }
 
-actor AdminSystemPromptStore {
+actor AdminSystemPromptStore: VibeWriteAdminSystemPromptStore {
     struct Snapshot: Sendable, Equatable {
         let templateBody: String
         let actionRulesJson: String
@@ -68,7 +68,7 @@ actor AdminSystemPromptStore {
         )
     }
 
-    private static func validateJSON(_ value: String, field: String) throws {
+    static func validateJSON(_ value: String, field: String) throws {
         guard let data = value.data(using: .utf8) else {
             throw Abort(.badRequest, reason: "\(field) must be valid JSON text.")
         }
@@ -78,6 +78,28 @@ actor AdminSystemPromptStore {
         } catch {
             throw Abort(.badRequest, reason: "\(field) must be valid JSON text.")
         }
+    }
+}
+
+extension AdminSystemPromptStore {
+    func systemPromptSnapshotResponse() async throws -> AdminSystemPromptResponse {
+        snapshotResponse()
+    }
+
+    func systemPromptCurrentSnapshot() async throws -> Snapshot {
+        currentSnapshot()
+    }
+
+    func updateSystemPrompt(
+        templateBody: String?,
+        actionRulesJson: String?,
+        modelContextRulesJson: String?
+    ) async throws {
+        try update(
+            templateBody: templateBody,
+            actionRulesJson: actionRulesJson,
+            modelContextRulesJson: modelContextRulesJson
+        )
     }
 }
 

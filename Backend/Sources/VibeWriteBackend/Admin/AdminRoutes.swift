@@ -3,17 +3,17 @@ import Vapor
 
 func registerAdminRoutes(
     _ app: Application,
-    deviceRegistry: InMemoryDeviceRegistry,
-    quotaLedger: InMemoryQuotaLedger,
-    requestLogStore: InMemoryRequestLogStore,
-    secretStore: AdminSecretStore,
-    systemPromptStore: AdminSystemPromptStore,
-    adminSessionStore: AdminSessionStore,
+    deviceRegistry: any VibeWriteDeviceRegistryStore,
+    quotaLedger: any VibeWriteQuotaLedgerStore,
+    requestLogStore: any VibeWriteRequestLogStore,
+    secretStore: any VibeWriteAdminSecretStore,
+    systemPromptStore: any VibeWriteAdminSystemPromptStore,
+    adminSessionStore: any VibeWriteAdminSessionStore,
     aiConfiguration: BackendAIConfiguration,
     clock: any VibeWriteClock
 ) throws {
     app.get("v3", "admin") { req async throws -> Response in
-        let isAuthenticated = await adminSessionStore.isAuthenticated(
+        let isAuthenticated = try await adminSessionStore.isAuthenticated(
             sessionToken: AdminSessionCookie.sessionToken(from: req)
         )
         return makeAdminPageResponse(authenticated: isAuthenticated)
@@ -21,18 +21,18 @@ func registerAdminRoutes(
 
     app.post("v3", "admin", "login") { req async throws -> Response in
         let request = try req.content.decode(AdminLoginRequest.self)
-        guard await secretStore.authenticate(username: request.username, password: request.password) else {
+        guard try await secretStore.authenticate(username: request.username, password: request.password) else {
             throw Abort(.unauthorized, reason: "Invalid admin credentials.")
         }
 
         return try makeJSONResponse(
             AdminStatusResponse(status: "ok"),
-            setCookieHeader: AdminSessionCookie.loginHeader(for: await adminSessionStore.issueSession())
+            setCookieHeader: AdminSessionCookie.loginHeader(for: try await adminSessionStore.issueSession())
         )
     }
 
     app.post("v3", "admin", "logout") { req async throws -> Response in
-        await adminSessionStore.logout(sessionToken: AdminSessionCookie.sessionToken(from: req))
+        try await adminSessionStore.logout(sessionToken: AdminSessionCookie.sessionToken(from: req))
 
         return try makeJSONResponse(
             AdminStatusResponse(status: "ok"),
@@ -41,23 +41,23 @@ func registerAdminRoutes(
     }
 
     app.get("v3", "admin", "requests") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
         let query = try req.query.decode(AdminRequestQuery.self)
         let requestLogQuery = try makeRequestLogQuery(from: query)
-        return try makeJSONResponse(requestLogStore.query(requestLogQuery))
+        return try makeJSONResponse(try await requestLogStore.query(requestLogQuery))
     }
 
     app.get("v3", "admin", "overview") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
         let now = clock.now()
         let todayRange = currentDayRange(now: now)
-        let todaySummary = requestLogStore.query(
+        let todaySummary = try await requestLogStore.query(
             RequestLogQuery(
                 installationId: nil,
                 action: nil,
@@ -66,7 +66,7 @@ func registerAdminRoutes(
                 createdAtRange: todayRange
             )
         ).summary
-        let quotaExceededCount = requestLogStore.query(
+        let quotaExceededCount = try await requestLogStore.query(
             RequestLogQuery(
                 installationId: nil,
                 action: nil,
@@ -75,7 +75,7 @@ func registerAdminRoutes(
                 createdAtRange: todayRange
             )
         ).summary.totalCount
-        let currentLimit = await quotaLedger.currentLimit()
+        let currentLimit = try await quotaLedger.currentLimit()
 
         return try makeJSONResponse(
             AdminOverviewResponse(
@@ -84,7 +84,7 @@ func registerAdminRoutes(
                     ? 0
                     : Double(todaySummary.acceptedCount) / Double(todaySummary.totalCount),
                 todayQuotaExceededCount: quotaExceededCount,
-                activeDeviceCount: await deviceRegistry.activeDeviceCount(),
+                activeDeviceCount: try await deviceRegistry.activeDeviceCount(),
                 provider: aiConfiguration.provider,
                 model: aiConfiguration.model,
                 dailyLimit: currentLimit.dailyLimit,
@@ -94,11 +94,11 @@ func registerAdminRoutes(
     }
 
     app.get("v3", "admin", "quota") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
-        let snapshot = await quotaLedger.currentUsageSnapshot()
+        let snapshot = try await quotaLedger.currentUsageSnapshot()
         return try makeJSONResponse(
             AdminQuotaResponse(
                 dailyLimit: snapshot.limit.dailyLimit,
@@ -111,7 +111,7 @@ func registerAdminRoutes(
     }
 
     app.put("v3", "admin", "quota") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
@@ -125,8 +125,8 @@ func registerAdminRoutes(
             throw Abort(.badRequest, reason: "weeklyLimit must be zero or greater.")
         }
 
-        await quotaLedger.updateLimit(dailyLimit: request.dailyLimit, weeklyLimit: request.weeklyLimit)
-        let snapshot = await quotaLedger.currentUsageSnapshot()
+        try await quotaLedger.updateLimit(dailyLimit: request.dailyLimit, weeklyLimit: request.weeklyLimit)
+        let snapshot = try await quotaLedger.currentUsageSnapshot()
         return try makeJSONResponse(
             AdminQuotaResponse(
                 dailyLimit: snapshot.limit.dailyLimit,
@@ -139,13 +139,13 @@ func registerAdminRoutes(
     }
 
     app.get("v3", "admin", "devices") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
         return try makeJSONResponse(
             AdminDeviceListResponse(
-                devices: await makeAdminDeviceResponses(
+                devices: try await makeAdminDeviceResponses(
                     deviceRegistry: deviceRegistry,
                     quotaLedger: quotaLedger
                 )
@@ -154,7 +154,7 @@ func registerAdminRoutes(
     }
 
     app.post("v3", "admin", "devices", ":installationId", "block") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
@@ -163,7 +163,7 @@ func registerAdminRoutes(
         }
 
         let blockRequest = try? req.content.decode(AdminDeviceBlockRequest.self)
-        let snapshot = await deviceRegistry.block(
+        let snapshot = try await deviceRegistry.block(
             installationId: installationId,
             reason: blockRequest?.blockReason
         )
@@ -171,13 +171,13 @@ func registerAdminRoutes(
         return try makeJSONResponse(
             makeAdminDeviceResponse(
                 from: snapshot,
-                usage: await quotaLedger.usageSnapshot(for: installationId)
+                usage: try await quotaLedger.usageSnapshot(for: installationId)
             )
         )
     }
 
     app.post("v3", "admin", "devices", ":installationId", "unblock") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
@@ -185,58 +185,58 @@ func registerAdminRoutes(
             throw Abort(.badRequest, reason: "installationId is required.")
         }
 
-        let snapshot = await deviceRegistry.unblock(installationId: installationId)
+        let snapshot = try await deviceRegistry.unblock(installationId: installationId)
         return try makeJSONResponse(
             makeAdminDeviceResponse(
                 from: snapshot,
-                usage: await quotaLedger.usageSnapshot(for: installationId)
+                usage: try await quotaLedger.usageSnapshot(for: installationId)
             )
         )
     }
 
     app.get("v3", "admin", "secrets") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
-        return try makeJSONResponse(await secretStore.snapshotResponse())
+        return try makeJSONResponse(try await secretStore.secretSnapshotResponse())
     }
 
     app.put("v3", "admin", "secrets") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
         let request = try req.content.decode(AdminSecretsUpdateRequest.self)
-        await secretStore.update(
+        try await secretStore.updateSecrets(
             providerApiKey: request.providerApiKey,
             adminUsername: request.adminUsername,
             adminPassword: request.adminPassword
         )
-        return try makeJSONResponse(await secretStore.snapshotResponse())
+        return try makeJSONResponse(try await secretStore.secretSnapshotResponse())
     }
 
     app.get("v3", "admin", "system-prompt") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
-        return try makeJSONResponse(await systemPromptStore.snapshotResponse())
+        return try makeJSONResponse(try await systemPromptStore.systemPromptSnapshotResponse())
     }
 
     app.put("v3", "admin", "system-prompt") { req async throws -> Response in
-        guard await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
+        guard try await adminSessionStore.isAuthenticated(sessionToken: AdminSessionCookie.sessionToken(from: req)) else {
             throw Abort(.unauthorized, reason: "Admin session required.")
         }
 
         let request = try req.content.decode(AdminSystemPromptUpdateRequest.self)
-        try await systemPromptStore.update(
+        try await systemPromptStore.updateSystemPrompt(
             templateBody: request.templateBody,
             actionRulesJson: request.actionRulesJson,
             modelContextRulesJson: request.modelContextRulesJson
         )
 
-        return try makeJSONResponse(await systemPromptStore.snapshotResponse())
+        return try makeJSONResponse(try await systemPromptStore.systemPromptSnapshotResponse())
     }
 }
 
@@ -249,11 +249,11 @@ private func currentDayRange(now: Date, timeZone: TimeZone = TimeZone(identifier
 }
 
 private func makeAdminDeviceResponses(
-    deviceRegistry: InMemoryDeviceRegistry,
-    quotaLedger: InMemoryQuotaLedger
-) async -> [AdminDeviceResponse] {
-    let deviceSnapshots = await deviceRegistry.snapshot()
-    let quotaSnapshots = await quotaLedger.snapshotUsage()
+    deviceRegistry: any VibeWriteDeviceRegistryStore,
+    quotaLedger: any VibeWriteQuotaLedgerStore
+) async throws -> [AdminDeviceResponse] {
+    let deviceSnapshots = try await deviceRegistry.snapshot()
+    let quotaSnapshots = try await quotaLedger.snapshotUsage()
     let usageByInstallationId = Dictionary(
         uniqueKeysWithValues: quotaSnapshots.map { snapshot in
             (snapshot.installationId, snapshot)

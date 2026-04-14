@@ -22,7 +22,7 @@ struct DeviceSnapshot: Sendable, Equatable {
     let blockReason: String?
 }
 
-actor InMemoryDeviceRegistry {
+actor InMemoryDeviceRegistry: VibeWriteDeviceRegistryStore {
     private struct DeviceRecord: Sendable {
         let installationId: String
         var deviceToken: String

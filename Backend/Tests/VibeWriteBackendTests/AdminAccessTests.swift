@@ -589,7 +589,9 @@ final class AdminAccessTests: XCTestCase {
             XCTAssertEqual(response.status, .forbidden)
         })
 
-        let rejectedLogs = requestLogStore.snapshot().filter { $0.requestId == "request-device-blocked" }
+        let rejectedLogs = try blockingValue {
+            (await requestLogStore.snapshot()).filter { $0.requestId == "request-device-blocked" }
+        }
         XCTAssertEqual(rejectedLogs.count, 1)
         XCTAssertEqual(rejectedLogs[0].status, .rejected)
         XCTAssertEqual(rejectedLogs[0].errorCode, "device_blocked")
@@ -645,6 +647,22 @@ final class AdminAccessTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
         })
+    }
+
+    private func blockingValue<T: Sendable>(_ operation: @Sendable @escaping () async throws -> T) throws -> T {
+        let semaphore = DispatchSemaphore(value: 0)
+        let box = BlockingResultBox<T>()
+        let job: @Sendable () async -> Void = {
+            do {
+                box.store(.success(try await operation()))
+            } catch {
+                box.store(.failure(error))
+            }
+            semaphore.signal()
+        }
+        Task.detached(operation: job)
+        semaphore.wait()
+        return try box.load()
     }
 
     private func adminSessionCookieHeader(in app: Application, username: String, password: String) throws -> String {
@@ -806,5 +824,22 @@ final class AdminAccessTests: XCTestCase {
         components.path = path
         components.queryItems = queryItems
         return components.string ?? path
+    }
+}
+
+private final class BlockingResultBox<T>: @unchecked Sendable {
+    private let lock = NSLock()
+    private var result: Result<T, Error>?
+
+    func store(_ result: Result<T, Error>) {
+        lock.lock()
+        self.result = result
+        lock.unlock()
+    }
+
+    func load() throws -> T {
+        lock.lock()
+        defer { lock.unlock() }
+        return try result!.get()
     }
 }

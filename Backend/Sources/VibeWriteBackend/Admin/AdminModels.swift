@@ -99,7 +99,7 @@ enum AdminDateCodec {
     }
 }
 
-actor AdminSecretStore {
+actor AdminSecretStore: VibeWriteAdminSecretStore {
     struct Snapshot: Sendable, Equatable {
         let providerApiKey: String?
         let adminUsername: String
@@ -173,6 +173,24 @@ actor AdminSecretStore {
             adminPassword: adminPassword ?? snapshot.adminPassword,
             updatedAt: clock.now()
         )
+    }
+}
+
+extension AdminSecretStore {
+    func secretCurrentSnapshot() async throws -> Snapshot {
+        currentSnapshot()
+    }
+
+    func secretSnapshotResponse() async throws -> AdminSecretsResponse {
+        snapshotResponse()
+    }
+
+    func updateSecrets(
+        providerApiKey: String?,
+        adminUsername: String?,
+        adminPassword: String?
+    ) async throws {
+        update(providerApiKey: providerApiKey, adminUsername: adminUsername, adminPassword: adminPassword)
     }
 }
 
