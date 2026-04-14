@@ -1,6 +1,11 @@
 # Changelog
 
 # 2026-04-14
+- Implemented `task/TASK_20260414_043.md`: the remaining legacy provider-direct AI implementation files have been removed from the app target, and the still-useful AI prompt / metadata semantics tests now live on the backend / shared boundary. Verification passed with `swift test` at the repo root and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-14
+- Added `task/TASK_20260414_043.md` as the next cleanup card. It will remove the remaining legacy provider-direct AI implementation files from the app target and migrate any still-useful AI semantics tests to backend/shared boundaries.
+
 - Independent review of `TASK_20260414_042.md` passed: the client normal runtime no longer depends on the legacy provider-direct path or prompt-builder wiring, the default app path stays on the backend gateway, stub/offline compatibility remains available, and the remaining `MINIMAX_*` references are confined to backend provider configuration rather than client runtime selection. Verification passed with `swift test` at the repo root, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and a code-path review that confirmed no remaining client-side direct-provider references in the normal production flow.
 
 # 2026-04-14
