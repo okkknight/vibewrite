@@ -1,4 +1,5 @@
 import Foundation
+import Logging
 import Vapor
 import VibeWriteShared
 
@@ -48,6 +49,7 @@ enum BackendAIError: LocalizedError {
 }
 
 actor BackendAIExecutor {
+    private let logger = Logger(label: "VibeWriteBackend.AI")
     private let configuration: BackendAIConfiguration
     private let promptComposer: BackendPromptComposer
     private let providerClient: any BackendAIProviderClient
@@ -143,31 +145,29 @@ actor BackendAIExecutor {
             kind: .metadata
         )
 
-        let metadataMessages: [WritingAIChatMessage]
+        var metadata: WritingAICompletionMetadata
         do {
-            metadataMessages = try promptComposer.metadataMessages(
+            let metadataMessages = try promptComposer.metadataMessages(
                 for: metadataRequest,
                 systemPromptSnapshot: systemPromptSnapshot,
                 configuration: configuration
             )
-        } catch let error as BackendAIError {
-            throw error
-        } catch {
-            throw BackendAIError.invalidConfiguration(error.localizedDescription)
-        }
-
-        let metadata: WritingAICompletionMetadata
-        do {
             metadata = try await providerClient.generateMetadata(
                 for: metadataRequest,
                 messages: metadataMessages,
                 configuration: configuration,
                 apiKey: apiKey
             )
-        } catch let error as BackendAIError {
-            throw error
         } catch {
-            throw BackendAIError.providerError(error.localizedDescription)
+            logger.error(
+                "Backend metadata generation failed action=\(request.action.rawValue) error=\(error.localizedDescription) usingFallbackMetadata=true"
+            )
+            metadata = WritingAICompletionMetadata(
+                localSummary: request.project.localSummary,
+                globalSynopsis: request.project.globalSynopsis,
+                nextFocus: request.project.context.nextFocus,
+                suggestionChips: request.project.suggestionChips
+            )
         }
 
         return responseBuilder.response(

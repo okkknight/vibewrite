@@ -154,7 +154,9 @@ enum AdminSystemPromptSeed {
                 "Keep the output short enough to stream quickly.",
                 "Write only the opening prose for the first draft.",
                 "Keep the opening brief and concrete so it can stand on its own.",
-                "When the action is startDraft, focus on the first usable opening rather than a full outline."
+                "Keep the writing voice calm, precise, and native to a macOS writing app.",
+                "Preserve the current article's structure unless the action explicitly changes it.",
+                "When the action is \"startDraft\", focus on the first usable opening rather than a full outline."
             ],
             continueWriting: [
                 "Output only prose text for the requested action.",
@@ -162,7 +164,10 @@ enum AdminSystemPromptSeed {
                 "Keep the output short enough to stream quickly.",
                 "Continue the current正文 with the next short paragraph or scene.",
                 "Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.",
-                "When the action is continueWriting, continue the existing正文 instead of restarting the article."
+                "Leave a small amount of forward momentum for the next step.",
+                "Keep the writing voice calm, precise, and native to a macOS writing app.",
+                "Preserve the current article's structure unless the action explicitly changes it.",
+                "When the action is \"continueWriting\", continue the existing正文 instead of restarting the article."
             ],
             edit: [
                 "Output the writing text first, then append exactly one metadata block for the app.",
@@ -170,6 +175,7 @@ enum AdminSystemPromptSeed {
                 "A response is incomplete until the metadata block is present.",
                 "When the action is edit, return only the replacement text for the selected segment.",
                 "Do not stop after writing text alone.",
+                "Keep the output short enough to stream quickly.",
                 "When the action is edit, rewrite only the selected passage or local region whenever practical."
             ]
         ),
@@ -205,20 +211,22 @@ enum AdminSystemPromptSeed {
         ],
         metadataRoute: .init(
             current: [
-                "The only valid response is a single emit_metadata tool call.",
-                "Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.",
-                "Do not answer in any other format.",
-                "If you are about to produce ordinary assistant text, stop and emit the tool call instead.",
-                "Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.",
-                "Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete."
+                "Use the provided emit_metadata tool to return the metadata for the completed prose.",
+                "Do not output prose, markdown fences, or commentary.",
+                "Do not answer in plain text.",
+                "Keep the metadata specific to the current正文 and actionable for the next step.",
+                "Match the metadata language to the language of the current正文 and user request.",
+                "For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.",
+                "suggestionChips must be concise, concrete, and non-generic."
             ],
             text01JsonSchema: [
                 "Return only the metadata for the completed prose.",
                 "Do not output prose, markdown fences, tool calls, or commentary.",
                 "Do not answer in plain text.",
-                "The response format is schema-enforced, so do not wrap the metadata in extra text.",
-                "Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.",
-                "Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete."
+                "Keep the metadata specific to the current正文 and actionable for the next step.",
+                "Match the metadata language to the language of the current正文 and user request.",
+                "For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.",
+                "suggestionChips must be concise, concrete, and non-generic."
             ]
         )
     )

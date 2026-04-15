@@ -32,7 +32,7 @@ final class BackendPromptComposerTests: XCTestCase {
         let userPrompt = messages[1].content
 
         XCTAssertTrue(systemPrompt.contains("You are VibeWrite, a calm macOS writing collaborator."))
-        XCTAssertTrue(systemPrompt.contains("Prose rules"))
+        XCTAssertFalse(systemPrompt.contains("Prose rules"))
         XCTAssertTrue(systemPrompt.contains("Output only prose text for the requested action."))
         XCTAssertTrue(systemPrompt.contains("Write only the opening prose for the first draft."))
         XCTAssertTrue(systemPrompt.contains("Provider: minimax"))
@@ -88,7 +88,7 @@ final class BackendPromptComposerTests: XCTestCase {
         let systemPrompt = messages[0].content
         let userPrompt = messages[1].content
 
-        XCTAssertTrue(systemPrompt.contains("Prose rules"))
+        XCTAssertFalse(systemPrompt.contains("Prose rules"))
         XCTAssertTrue(systemPrompt.contains("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph."))
         XCTAssertTrue(systemPrompt.contains("Provider: minimax"))
         XCTAssertTrue(systemPrompt.contains("Model: MiniMax-M2.5-highspeed"))
@@ -141,21 +141,21 @@ final class BackendPromptComposerTests: XCTestCase {
         let textSystemPrompt = textRouteMessages[0].content
         let textUserPrompt = textRouteMessages[1].content
 
-        XCTAssertTrue(currentSystemPrompt.contains("Metadata rules"))
-        XCTAssertTrue(currentSystemPrompt.contains("The only valid response is a single emit_metadata tool call."))
+        XCTAssertFalse(currentSystemPrompt.contains("Metadata rules"))
+        XCTAssertTrue(currentSystemPrompt.contains("Use the provided emit_metadata tool to return the metadata for the completed prose."))
+        XCTAssertTrue(currentSystemPrompt.contains("Do not output prose, markdown fences, or commentary."))
         XCTAssertTrue(currentSystemPrompt.contains("Provider: minimax"))
         XCTAssertTrue(currentSystemPrompt.contains("Model: MiniMax-M2.5-highspeed"))
-        XCTAssertTrue(currentSystemPrompt.contains("Return suggestionChips as the primary output and keep them concrete."))
         XCTAssertTrue(currentUserPrompt.contains("Action: startDraft metadata"))
         XCTAssertTrue(currentUserPrompt.contains("Completed prose:"))
         XCTAssertTrue(currentUserPrompt.contains("Current global synopsis:"))
         XCTAssertTrue(currentUserPrompt.contains("Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call."))
 
-        XCTAssertTrue(textSystemPrompt.contains("Metadata rules"))
+        XCTAssertFalse(textSystemPrompt.contains("Metadata rules"))
         XCTAssertTrue(textSystemPrompt.contains("Return only the metadata for the completed prose."))
         XCTAssertTrue(textSystemPrompt.contains("Provider: minimax"))
         XCTAssertTrue(textSystemPrompt.contains("Model: MiniMax-Text-01"))
-        XCTAssertTrue(textSystemPrompt.contains("The response format is schema-enforced, so do not wrap the metadata in extra text."))
+        XCTAssertTrue(textSystemPrompt.contains("Do not output prose, markdown fences, tool calls, or commentary."))
         XCTAssertTrue(textUserPrompt.contains("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only."))
         XCTAssertFalse(textSystemPrompt.contains("emit_metadata"))
     }

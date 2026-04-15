@@ -15,7 +15,7 @@ defer { app.shutdown() }
 if let bootstrapper = try configure(app) {
     let startupSemaphore = DispatchSemaphore(value: 0)
     let startupErrorBox = StartupErrorBox()
-    Task {
+    Task.detached(priority: .userInitiated) {
         do {
             try await bootstrapper.prepare()
         } catch {

@@ -1,5 +1,10 @@
 # Changelog
 
+# 2026-04-15
+- Aligned the backend AI metadata prompt more closely with the old pre-split wording and restored the old failure semantics for missing metadata tool calls: prose still completes first, metadata is requested separately, and metadata failures now log and fall back to the existing project metadata instead of surfacing a whole-request HTTP 502.
+- Added a backend executor regression test that proves metadata-phase failures still return a successful write response when fallback metadata is available.
+- Verification passed with `cd Backend && swift test`, `swift test`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
 # 2026-04-14
 - Final V3 closeout verification passed for `task/TASK_20260414_044.md`. The repo root and backend test suites pass, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` both pass, and live HTTP smoke checks against the running backend confirmed `GET /v3/health`, `POST /v3/client/bootstrap`, `POST /v3/writes/start`, `POST /v3/writes/continue`, `POST /v3/writes/edit`, `GET /v3/admin`, `POST /v3/admin/login`, `GET /v3/admin/requests`, `GET /v3/admin/secrets`, `PUT /v3/admin/secrets`, `GET /v3/admin/system-prompt`, `PUT /v3/admin/system-prompt`, `GET /v3/admin/quota`, `PUT /v3/admin/quota`, and `GET /v3/admin/devices` all behaved as expected.
 

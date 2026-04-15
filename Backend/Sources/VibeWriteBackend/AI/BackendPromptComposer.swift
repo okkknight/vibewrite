@@ -59,11 +59,9 @@ struct BackendPromptComposer {
 
         return renderSystemPrompt(
             templateBody: snapshot.templateBody,
-            primaryTitle: "Prose rules",
             primaryLines: actionRules,
             provider: provider,
             model: model,
-            contextTitle: "Model context",
             contextLines: contextRules
         )
     }
@@ -80,29 +78,25 @@ struct BackendPromptComposer {
 
         return renderSystemPrompt(
             templateBody: snapshot.templateBody,
-            primaryTitle: "Metadata rules",
             primaryLines: actionRules,
             provider: provider,
             model: model,
-            contextTitle: "Route rules",
             contextLines: routeRules
         )
     }
 
     private func renderSystemPrompt(
         templateBody: String,
-        primaryTitle: String,
         primaryLines: [String],
         provider: String,
         model: String,
-        contextTitle: String,
         contextLines: [String]
     ) -> String {
         var sections: [String] = []
         sections.append(templateBody.trimmingCharacters(in: .whitespacesAndNewlines))
 
         if !primaryLines.isEmpty {
-            sections.append(renderBulletSection(title: primaryTitle, lines: primaryLines))
+            sections.append(primaryLines.map { "- \($0)" }.joined(separator: "\n"))
         }
 
         sections.append(
@@ -113,23 +107,13 @@ struct BackendPromptComposer {
         )
 
         if !contextLines.isEmpty {
-            sections.append(renderBulletSection(title: contextTitle, lines: contextLines))
+            sections.append(contextLines.map { "- \($0)" }.joined(separator: "\n"))
         }
 
         return sections
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
             .joined(separator: "\n\n")
-    }
-
-    private func renderBulletSection(title: String, lines: [String]) -> String {
-        guard !lines.isEmpty else {
-            return ""
-        }
-
-        var rendered = [title]
-        rendered.append(contentsOf: lines.map { "- \($0)" })
-        return rendered.joined(separator: "\n")
     }
 
     private func proseUserPrompt(for request: WritingAIRequest) -> String {
@@ -222,11 +206,10 @@ struct BackendPromptComposer {
         switch metadataRoute {
         case .current:
             lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call.")
-            lines.append("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.")
+            lines.append("Do not include prose, markdown fences, or commentary.")
         case .text01JsonSchema:
             lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.")
-            lines.append("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.")
-            lines.append("The response format is schema-enforced, so do not wrap the metadata in extra text.")
+            lines.append("Do not include prose, markdown fences, or commentary.")
         }
 
         lines.append("For Chinese writing tasks, keep localSummary, globalSynopsis, nextFocus, and suggestionChips in concise Chinese.")
@@ -378,4 +361,3 @@ private extension BackendPromptComposer {
         return try? JSONDecoder().decode(BackendModelContextRulesSnapshot.self, from: data)
     }
 }
-
