@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-18
+- Restored default prompt parity for the backend split: the seeded admin system-prompt snapshot now reproduces the pre-split prompt bytes for prose and metadata generation, while manual admin edits remain a separate override flow. Verification passed with `swift test --filter BackendPromptComposerTests`, `swift test` in `Backend/`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-18
 - Review of `codex/v3` prompt generation failed the "keep prompt identical after backend split" requirement. `swift test --filter BackendPromptComposerTests` passed, but the implementation now changes prompt assembly for `.edit` and metadata requests: the old edit-only metadata block instructions were moved out of the system prompt into the user prompt, and the metadata user prompts no longer match the previous wording about `suggestionChips`/`emit_metadata` exactly. The default seed also makes prompt generation admin-configurable, so the output is no longer locked to the old hardcoded prompt unless the snapshot stays at seed.
 
 # 2026-04-18
