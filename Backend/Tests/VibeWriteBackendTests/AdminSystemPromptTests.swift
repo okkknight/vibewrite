@@ -36,7 +36,7 @@ final class AdminSystemPromptTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             XCTAssertContent(AdminSystemPromptResponse.self, response) { body in
-                XCTAssertTrue(body.templateBody.contains("VibeWrite, a calm macOS writing collaborator"))
+                XCTAssertEqual(body.templateBody, "")
                 XCTAssertFalse(body.actionRulesJson.isEmpty)
                 XCTAssertFalse(body.modelContextRulesJson.isEmpty)
                 XCTAssertNotNil(AdminDateCodec.parse(body.updatedAt))

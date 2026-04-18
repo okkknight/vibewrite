@@ -7,21 +7,20 @@ struct BackendPromptComposer {
         systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
         configuration: BackendAIConfiguration
     ) throws -> [WritingAIChatMessage] {
-        let sanitizedRequest = sanitizedRequest(for: request)
-        let promptRules = resolvedPromptRules(from: systemPromptSnapshot)
+        let sanitized = sanitizedRequest(for: request)
         return [
             WritingAIChatMessage(
                 role: .system,
                 content: proseSystemPrompt(
-                    promptRules: promptRules,
+                    snapshot: systemPromptSnapshot,
                     provider: configuration.provider,
                     model: configuration.model,
-                    action: sanitizedRequest.action
+                    action: sanitized.action
                 )
             ),
             WritingAIChatMessage(
                 role: .user,
-                content: proseUserPrompt(for: sanitizedRequest)
+                content: proseUserPrompt(for: sanitized)
             )
         ]
     }
@@ -31,12 +30,11 @@ struct BackendPromptComposer {
         systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
         configuration: BackendAIConfiguration
     ) throws -> [WritingAIChatMessage] {
-        let promptRules = resolvedPromptRules(from: systemPromptSnapshot)
-        return [
+        [
             WritingAIChatMessage(
                 role: .system,
                 content: metadataSystemPrompt(
-                    promptRules: promptRules,
+                    snapshot: systemPromptSnapshot,
                     provider: configuration.provider,
                     model: configuration.metadataModel,
                     action: request.action,
@@ -51,121 +49,48 @@ struct BackendPromptComposer {
     }
 
     private func proseSystemPrompt(
-        promptRules: ResolvedPromptRules,
+        snapshot: AdminSystemPromptStore.Snapshot,
         provider: String,
         model: String,
         action: WritingAIAction
     ) -> String {
-        switch action {
-        case .startDraft:
-            return composePrompt(
-                leading: promptRules.templateBody,
-                sections: promptRules.actionRules.prose.lines(for: action) + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
-            )
-        case .continueWriting:
-            return composePrompt(
-                leading: promptRules.templateBody,
-                sections: promptRules.actionRules.prose.lines(for: action) + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
-            )
-        case .edit:
-            return composePrompt(
-                leading: promptRules.templateBody,
-                sections: promptRules.actionRules.prose.lines(for: action) + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
-            )
-        }
+        let actionRules = parseActionRules(from: snapshot.actionRulesJson)?.prose.rules(for: action) ?? []
+        let contextRules = parseModelContextRules(from: snapshot.modelContextRulesJson)?.providerModel ?? []
+
+        return renderTemplateLines(
+            promptLines(from: snapshot.templateBody)
+            + actionRules
+            + contextRules,
+            provider: provider,
+            model: model
+        )
+        .joined(separator: "\n")
     }
 
     private func metadataSystemPrompt(
-        promptRules: ResolvedPromptRules,
+        snapshot: AdminSystemPromptStore.Snapshot,
         provider: String,
         model: String,
         action: WritingAIAction,
         metadataRoute: BackendAIConfiguration.MetadataRoute
     ) -> String {
-        switch metadataRoute {
-        case .current:
-            return composePrompt(
-                leading: promptRules.templateBody,
-                sections: promptRules.actionRules.metadata.lines(for: action) + promptRules.modelContextRules.metadataRouteLines(for: metadataRoute)
-            )
+        let actionRules = parseActionRules(from: snapshot.actionRulesJson)?.metadata.rules(for: action) ?? []
+        let routeRules = parseModelContextRules(from: snapshot.modelContextRulesJson)?.metadataRules(for: metadataRoute) ?? []
 
-        case .text01JsonSchema:
-            return composePrompt(
-                leading: promptRules.templateBody,
-                sections: promptRules.actionRules.metadata.lines(for: action)
-                    + promptRules.modelContextRules.metadataRouteLines(for: metadataRoute)
-                    + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
-            )
-        }
-    }
+        var lines = promptLines(from: snapshot.templateBody)
+        lines.append(contentsOf: metadataIntroLines(for: metadataRoute))
+        lines.append("")
+        lines.append(contentsOf: actionRules)
+        lines.append("")
+        lines.append(contentsOf: routeRules)
 
-    private func composePrompt(leading: String, sections: [String]) -> String {
-        var lines: [String] = []
-        let trimmedLeading = leading.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmedLeading.isEmpty {
-            lines.append(trimmedLeading)
-        }
-        lines.append(contentsOf: sections)
-        return lines.joined(separator: "\n")
-    }
-
-    private func resolvedPromptRules(from snapshot: AdminSystemPromptStore.Snapshot) -> ResolvedPromptRules {
-        let defaultSnapshot = AdminSystemPromptSeed.makeSnapshot()
-        return ResolvedPromptRules(
-            templateBody: normalizedPromptSection(snapshot.templateBody, fallback: defaultSnapshot.templateBody),
-            actionRules: decodedPromptRules(
-                from: snapshot.actionRulesJson,
-                fallbackJSON: defaultSnapshot.actionRulesJson,
-                field: "actionRulesJson"
-            ),
-            modelContextRules: decodedPromptRules(
-                from: snapshot.modelContextRulesJson,
-                fallbackJSON: defaultSnapshot.modelContextRulesJson,
-                field: "modelContextRulesJson"
-            )
-        )
-    }
-
-    private func decodedPromptRules<T: Decodable>(
-        from rawValue: String,
-        fallbackJSON: String,
-        field: String
-    ) -> T {
-        let decoder = JSONDecoder()
-        if let decoded = decodePromptRules(T.self, rawValue: rawValue, decoder: decoder, field: field) {
-            return decoded
-        }
-        if let fallback = decodePromptRules(T.self, rawValue: fallbackJSON, decoder: decoder, field: field) {
-            return fallback
+        if metadataRoute == .text01JsonSchema {
+            lines.append("")
+            lines.append("Provider: \(provider)")
+            lines.append("Model: \(model)")
         }
 
-        fatalError("Failed to decode backend prompt rules for \(field).")
-    }
-
-    private func decodePromptRules<T: Decodable>(
-        _ type: T.Type,
-        rawValue: String,
-        decoder: JSONDecoder,
-        field: String
-    ) -> T? {
-        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard let data = trimmed.data(using: .utf8) else {
-            return nil
-        }
-
-        do {
-            return try decoder.decode(type, from: data)
-        } catch {
-            return nil
-        }
-    }
-
-    private func normalizedPromptSection(_ value: String, fallback: String) -> String {
-        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
-        if !trimmed.isEmpty {
-            return trimmed
-        }
-        return fallback.trimmingCharacters(in: .whitespacesAndNewlines)
+        return renderTemplateLines(lines, provider: provider, model: model).joined(separator: "\n")
     }
 
     private func proseUserPrompt(for request: WritingAIRequest) -> String {
@@ -196,22 +121,23 @@ struct BackendPromptComposer {
             lines.append("Selection: \(selection)")
         }
 
-        if request.action == .continueWriting {
+        switch request.action {
+        case .startDraft:
+            lines.append("Write the opening prose for the first draft.")
+            lines.append("Keep the opening brief and concrete so it can stand on its own.")
+            lines.append("Do not output metadata or commentary.")
+        case .continueWriting:
             lines.append("Use the global synopsis as stable context and the document tail as the continuation anchor.")
             lines.append("Do not restart from the beginning of the article.")
             lines.append("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.")
             lines.append("Leave a small amount of forward momentum for the next step.")
             lines.append("Keep the continuation brief so the next move still feels natural.")
-        } else if request.action == .edit {
+        case .edit:
             lines.append("Return only the replacement text for the selected segment.")
             lines.append("Rewrite only the selected passage or local region whenever practical.")
             lines.append("After the prose, append a blank line, then [[VIBEWRITE_METADATA]], then a single JSON object with localSummary, globalSynopsis, nextFocus, and suggestionChips.")
             lines.append("Do not mix the metadata into the prose.")
             lines.append("The metadata must be concise, concrete, and in the same language as the current正文.")
-        } else {
-            lines.append("Write the opening prose for the first draft.")
-            lines.append("Keep the opening brief and concrete so it can stand on its own.")
-            lines.append("Do not output metadata or commentary.")
         }
 
         return lines.joined(separator: "\n")
@@ -258,10 +184,14 @@ struct BackendPromptComposer {
 
         switch metadataRoute {
         case .current:
-            lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call.")
+            lines.append("Use the `emit_metadata` tool to return localSummary, globalSynopsis, nextFocus, and suggestionChips.")
+            lines.append("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.")
+            lines.append("Return exactly one `emit_metadata` tool call and nothing else.")
             lines.append("Do not include prose, markdown fences, or commentary.")
+            lines.append("Do not produce ordinary assistant text.")
         case .text01JsonSchema:
             lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.")
+            lines.append("Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.")
             lines.append("Do not include prose, markdown fences, or commentary.")
         }
 
@@ -306,6 +236,43 @@ struct BackendPromptComposer {
     private func nonEmptyText(_ value: String, fallback: String) -> String {
         let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
         return trimmed.isEmpty ? fallback : trimmed
+    }
+
+    private func promptLines(from text: String) -> [String] {
+        guard !text.isEmpty else {
+            return []
+        }
+
+        return text.split(separator: "\n", omittingEmptySubsequences: false).map(String.init)
+    }
+
+    private func metadataIntroLines(for route: BackendAIConfiguration.MetadataRoute) -> [String] {
+        switch route {
+        case .current:
+            return [
+                "You are VibeWrite metadata-only response builder.",
+                "The only valid response is a single `emit_metadata` tool call.",
+                "Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.",
+                "Do not answer in any other format.",
+                "If you are about to produce ordinary assistant text, stop and emit the tool call instead."
+            ]
+
+        case .text01JsonSchema:
+            return [
+                "You are VibeWrite metadata-only response builder.",
+                "Return only the metadata for the completed prose.",
+                "Do not output prose, markdown fences, tool calls, or commentary.",
+                "Do not answer in plain text."
+            ]
+        }
+    }
+
+    private func renderTemplateLines(_ lines: [String], provider: String, model: String) -> [String] {
+        lines.map { line in
+            line
+                .replacingOccurrences(of: "{provider}", with: provider)
+                .replacingOccurrences(of: "{model}", with: model)
+        }
     }
 
     private func documentExcerpt(for text: String, maximumCharacterCount: Int = 900) -> String {
@@ -356,61 +323,61 @@ struct BackendPromptComposer {
     }
 }
 
-private struct ResolvedPromptRules {
-    let templateBody: String
-    let actionRules: PromptActionRules
-    let modelContextRules: PromptModelContextRules
+private struct BackendActionRulesSnapshot: Decodable {
+    let prose: BackendActionPhaseRules
+    let metadata: BackendActionPhaseRules
 }
 
-private struct PromptActionRules: Decodable {
-    struct PromptStepRules: Decodable {
-        let startDraft: [String]
-        let continueWriting: [String]
-        let edit: [String]
+private struct BackendActionPhaseRules: Decodable {
+    let startDraft: [String]
+    let continueWriting: [String]
+    let edit: [String]
 
-        func lines(for action: WritingAIAction) -> [String] {
-            switch action {
-            case .startDraft:
-                return startDraft
-            case .continueWriting:
-                return continueWriting
-            case .edit:
-                return edit
-            }
+    func rules(for action: WritingAIAction) -> [String] {
+        switch action {
+        case .startDraft:
+            return startDraft
+        case .continueWriting:
+            return continueWriting
+        case .edit:
+            return edit
         }
     }
-
-    let prose: PromptStepRules
-    let metadata: PromptStepRules
 }
 
-private struct PromptModelContextRules: Decodable {
-    struct MetadataRouteRules: Decodable {
-        let current: [String]
-        let text01JsonSchema: [String]
-
-        func lines(for route: BackendAIConfiguration.MetadataRoute) -> [String] {
-            switch route {
-            case .current:
-                return current
-            case .text01JsonSchema:
-                return text01JsonSchema
-            }
-        }
-    }
-
+private struct BackendModelContextRulesSnapshot: Decodable {
     let providerModel: [String]
-    let metadataRoute: MetadataRouteRules
+    let metadataRoute: BackendMetadataRouteRules
 
-    func providerModelLines(provider: String, model: String) -> [String] {
-        providerModel.map { line in
-            line
-                .replacingOccurrences(of: "{provider}", with: provider)
-                .replacingOccurrences(of: "{model}", with: model)
+    func metadataRules(for route: BackendAIConfiguration.MetadataRoute) -> [String] {
+        switch route {
+        case .current:
+            return metadataRoute.current
+        case .text01JsonSchema:
+            return metadataRoute.text01JsonSchema
         }
     }
+}
 
-    func metadataRouteLines(for route: BackendAIConfiguration.MetadataRoute) -> [String] {
-        metadataRoute.lines(for: route)
+private struct BackendMetadataRouteRules: Decodable {
+    let current: [String]
+    let text01JsonSchema: [String]
+}
+
+private extension BackendPromptComposer {
+    func parseActionRules(from json: String) -> BackendActionRulesSnapshot? {
+        guard let data = json.data(using: .utf8) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(BackendActionRulesSnapshot.self, from: data)
+    }
+
+    func parseModelContextRules(from json: String) -> BackendModelContextRulesSnapshot? {
+        guard let data = json.data(using: .utf8) else {
+            return nil
+        }
+
+        return try? JSONDecoder().decode(BackendModelContextRulesSnapshot.self, from: data)
     }
 }
