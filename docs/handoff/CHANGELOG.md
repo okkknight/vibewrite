@@ -1,5 +1,8 @@
 # Changelog
 
+# 2026-04-19
+- Tightened the backend default prose prompts so `startDraft` now aims for a fuller 2-paragraph opening, `continueWriting` prefers 1-2 short paragraphs instead of long walls of text, and `edit` stays prose-only without any metadata marker in the body output. The matching backend prompt composer tests were updated to cover the new length guidance, and verification passed with `swift test --filter BackendPromptComposerTests`, `swift test --filter AdminSystemPromptTests`, and `swift test` in `Backend/`.
+
 # 2026-04-18
 - Restored the default backend metadata prompt to the pre-split structure by removing the extra current-route intro lines and the rewritten user-prompt wording that had drifted from the old builder. The matching tests were also returned to the original golden wording, and verification passed with `swift test --filter BackendPromptComposerTests`, `swift test --filter AdminSystemPromptTests`, `swift test` in `Backend/`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 

@@ -214,9 +214,6 @@ struct BackendPromptComposer {
         } else if request.action == .edit {
             lines.append("Return only the replacement text for the selected segment.")
             lines.append("Rewrite only the selected passage or local region whenever practical.")
-            lines.append("After the prose, append a blank line, then [[VIBEWRITE_METADATA]], then a single JSON object with localSummary, globalSynopsis, nextFocus, and suggestionChips.")
-            lines.append("Do not mix the metadata into the prose.")
-            lines.append("The metadata must be concise, concrete, and in the same language as the current正文.")
         } else {
             lines.append("Write the opening prose for the first draft.")
             lines.append("Keep the opening brief and concrete so it can stand on its own.")
