@@ -4,6 +4,45 @@ import XCTest
 import VibeWriteShared
 
 final class BackendAIProviderClientTests: XCTestCase {
+    func testProseRequestPreservesLeadingAndInternalParagraphBreaks() async throws {
+        let request = WritingAIRequest(
+            action: .continueWriting,
+            project: makeRequest().project,
+            userMessage: "继续往下写",
+            selectionText: nil,
+            kind: .prose
+        )
+
+        let responseJSON = """
+        {
+          "content": [
+            { "type": "text", "text": "\\n\\n第一段。\\n\\n第二段。\\n" }
+          ]
+        }
+        """
+
+        let session = makeSession { urlRequest in
+            XCTAssertTrue(urlRequest.url?.path.hasSuffix("/v1/messages") ?? false)
+            let response = HTTPURLResponse(
+                url: urlRequest.url ?? URL(string: "https://example.com")!,
+                statusCode: 200,
+                httpVersion: nil,
+                headerFields: nil
+            )!
+            return (response, Data(responseJSON.utf8))
+        }
+
+        let client = MiniMaxBackendAIProviderClient(session: session)
+        let proseText = try await client.generateProseText(
+            for: request,
+            messages: [],
+            configuration: makeConfiguration(metadataRoute: .current),
+            apiKey: "provider-key"
+        )
+
+        XCTAssertEqual(proseText, "\n\n第一段。\n\n第二段。\n")
+    }
+
     func testCurrentRouteMetadataFallsBackWhenToolCallIsMissing() async throws {
         let request = makeRequest()
         let responseJSON = """

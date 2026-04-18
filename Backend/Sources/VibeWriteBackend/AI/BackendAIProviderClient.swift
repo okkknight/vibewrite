@@ -171,8 +171,11 @@ final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked 
             throw BackendAIError.providerError("AI prose response was not valid JSON.")
         }
 
-        guard let proseText = decodedResponse.textContent?.trimmingCharacters(in: .whitespacesAndNewlines),
-              !proseText.isEmpty else {
+        guard let proseText = decodedResponse.textContent else {
+            throw BackendAIError.providerError("AI prose response did not include text content.")
+        }
+
+        guard !proseText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
             throw BackendAIError.providerError("AI prose response did not include text content.")
         }
 

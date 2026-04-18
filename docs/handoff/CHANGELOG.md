@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Restored prose paragraph boundaries in the real backend write path by stopping the Anthropic prose client from trimming leading/trailing whitespace off model output. That keeps model-emitted blank lines intact instead of flattening continuation text into a single block, and the regression is covered by a new backend provider client test.
+
+# 2026-04-19
 - Fixed the live edit leak where `[[VIBEWRITE_METADATA]]` was still surfacing in the visible正文: the backend's current default metadata seed now drops that legacy marker, the PostgreSQL bootstrap path now upgrades a stale `system_prompt_configs.current` row when it still contains the old seed, and the real backend/app processes were restarted on the latest binary so the fix is active in the验收环境.
 
 # 2026-04-19
