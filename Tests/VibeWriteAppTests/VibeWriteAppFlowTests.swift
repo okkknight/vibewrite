@@ -209,6 +209,17 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(line.height, 32)
     }
 
+    func testAssistantSuggestionRailPolicyKeepsAtMostTwoVisibleChips() {
+        XCTAssertEqual(
+            AssistantSuggestionRailPolicy.visibleChips(from: ["A", "B", "C"]),
+            ["A", "B"]
+        )
+        XCTAssertEqual(
+            AssistantSuggestionRailPolicy.visibleChips(from: ["A"]),
+            ["A"]
+        )
+    }
+
     func testForceBlankStartupIgnoresPersistedProjectsAndResetsStore() throws {
         let storageURL = try makeTempStorageURL()
         defer {
@@ -489,6 +500,46 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(snapshot.generateKinds.isEmpty)
         XCTAssertFalse(flow.activeProject.suggestionChips.isEmpty)
         XCTAssertFalse(flow.isMetadataRequestInFlight)
+    }
+
+    func testIntegratedBackendMetadataPhaseExposesLoadingStateDuringRequest() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(
+            storageURL: storageURL,
+            aiClient: DelayedIntegratedBackendMetadataWritingAIClient()
+        )
+        flow.openProject(
+            WritingProject.entryShell(
+                prompt: "写一篇关于成年人孤独感的公众号文章",
+                mode: .collaboration,
+                automationKey: "project.backend.integrated.loading"
+            )
+        )
+
+        let task = Task { @MainActor in
+            try await flow.performWritingAction(
+                .startDraft,
+                userMessage: "写一篇关于成年人孤独感的公众号文章",
+                selectionText: nil
+            )
+        }
+
+        let loadingStateObserved = await waitUntil(timeout: 4) {
+            flow.isMetadataRequestInFlight
+        }
+        XCTAssertTrue(loadingStateObserved)
+        XCTAssertTrue(flow.isMetadataRequestInFlight)
+        XCTAssertTrue(flow.isProseRequestInFlight)
+
+        try await task.value
+
+        XCTAssertFalse(flow.isMetadataRequestInFlight)
+        XCTAssertFalse(flow.isProseRequestInFlight)
+        XCTAssertFalse(flow.activeProject.suggestionChips.isEmpty)
     }
 
     func testEditAppliesPatchAtCompletionWhilePreservingPatchBoundaries() async throws {
@@ -1209,6 +1260,37 @@ private struct IntegratedBackendMetadataWritingAIClient: WritingAIClient {
 
     func snapshot() async -> (streamKinds: [WritingAIRequestKind], generateKinds: [WritingAIRequestKind]) {
         await recorder.snapshot()
+    }
+
+    private func response(for request: WritingAIRequest) -> WritingAIResponse {
+        let documentText = MockWritingEngine.streamedDocumentText(for: request)
+        return WritingProjectResponseBuilder.response(
+            for: request,
+            documentText: documentText,
+            metadata: MockWritingEngine.completionMetadata(for: request)
+        )
+    }
+}
+
+private struct DelayedIntegratedBackendMetadataWritingAIClient: WritingAIClient {
+    private let streamDelayNanoseconds: UInt64 = 250_000_000
+
+    var usesIntegratedBackendMetadataPhase: Bool { true }
+
+    func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                try await Task.sleep(nanoseconds: streamDelayNanoseconds)
+                let response = response(for: request)
+                continuation.yield(.textDelta(response.documentText))
+                continuation.yield(.completed(response))
+                continuation.finish()
+            }
+        }
+    }
+
+    func generateResponse(for request: WritingAIRequest) async throws -> WritingAIResponse {
+        response(for: request)
     }
 
     private func response(for request: WritingAIRequest) -> WritingAIResponse {

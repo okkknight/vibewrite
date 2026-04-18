@@ -292,7 +292,7 @@ final class VibeWriteAppFlow: ObservableObject {
         isBodyThinkingInFlight = true
         isPrimaryActionDisplayInFlight = true
         isProseRequestInFlight = true
-        isMetadataRequestInFlight = false
+        isMetadataRequestInFlight = aiClient.usesIntegratedBackendMetadataPhase
         activeEditLock = requestLock
         aiErrorMessage = nil
         defer {

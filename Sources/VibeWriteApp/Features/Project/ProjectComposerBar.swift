@@ -39,7 +39,7 @@ struct ProjectComposerBar: View {
                 } else if isOpeningState {
                     guidanceExampleChip(title: openingExampleTitle)
                 } else {
-                    ForEach(normalizedAssistantSuggestionChips, id: \.self) { chip in
+                    ForEach(AssistantSuggestionRailPolicy.visibleChips(from: normalizedAssistantSuggestionChips), id: \.self) { chip in
                         AssistantSuggestionChip(title: chip) {
                             onAssistantSuggestionTap(chip)
                         }
@@ -763,6 +763,14 @@ struct SingleLineOverflowHidingLayout: Layout {
             )
             x += element.size.width + itemSpacing
         }
+    }
+}
+
+enum AssistantSuggestionRailPolicy {
+    static let maxVisibleChips = 2
+
+    static func visibleChips(from chips: [String]) -> [String] {
+        Array(chips.prefix(maxVisibleChips))
     }
 }
 

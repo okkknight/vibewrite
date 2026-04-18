@@ -30,6 +30,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The backend write transport envelope is route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
 - The backend edit route keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.
 - The app-side direct-provider runtime support files (`WritingAIConfiguration.swift`, `WritingAIPromptBuilder.swift`, and `RemoteWritingAIClient.swift`) have been removed from the normal runtime path; the backend gateway is now the production AI path and the backend prompt composer owns the route-specific prompt assembly.
+- The composer guidance rail now keeps at most two visible assistant suggestion chips, and the integrated backend metadata path now raises the suggestion-loading pill so the rail still shows `建议生成中` while the integrated response is in flight instead of squeezing three chips into one row.
 - The app's default launch window size is now 1024x700.
 - The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.
 - The wide Composer now keeps the zero-gap body-to-composer seam while preserving its shadow and internal padding.

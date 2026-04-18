@@ -1,5 +1,10 @@
 # Changelog
 
+# 2026-04-18
+- Restored the composer's suggestion-loading pill for the integrated backend metadata path and capped the guidance rail to at most two visible assistant suggestion chips so long suggestion sets fall back to a shorter prefix instead of squeezing three chips into one row.
+- Added regression coverage for the integrated loading state and the assistant-suggestion rail policy.
+- Verification passed with `swift test` and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
 # 2026-04-15
 - Aligned the backend AI metadata prompt more closely with the old pre-split wording and restored the old failure semantics for missing metadata tool calls: prose still completes first, metadata is requested separately, and metadata failures now log and fall back to the existing project metadata instead of surfacing a whole-request HTTP 502.
 - Added a backend executor regression test that proves metadata-phase failures still return a successful write response when fallback metadata is available.
