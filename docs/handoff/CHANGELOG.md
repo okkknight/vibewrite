@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-18
+- Review result for `Restore backend metadata fallback and fix tests`: fail. The prose/metadata split itself is back in line, but two semantic gaps remain: `systemPromptSnapshot` is still threaded through the backend prompt composer without affecting runtime prompt construction, so the admin system-prompt store is effectively inert; and the backend still keeps an alternate `text01_json_schema` metadata branch whose prompt wording diverges from the original direct-provider path. The visible write flow tests pass, but these residual branches still mean the split is not a pure relocation of the old logic.
+
+# 2026-04-18
 - Restored the missing-tool-call fallback in the backend metadata path so the old two-phase prose + metadata shape now matches the pre-split behavior again: metadata misses fall back to the existing project metadata instead of surfacing HTTP 502s. Verification passed with `swift test` at the repo root, `cd Backend && swift test`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-18
