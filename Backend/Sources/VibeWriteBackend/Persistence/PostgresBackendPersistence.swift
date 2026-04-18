@@ -381,7 +381,7 @@ actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
             modelContextRulesJson: modelContextRulesJson ?? snapshot.modelContextRulesJson,
             updatedAt: now
         )
-        try await saveSystemPromptSnapshot(updated)
+        try await saveSystemPromptSnapshot(updated, updatedBy: "admin")
     }
 
     // MARK: Admin Sessions
@@ -462,12 +462,19 @@ actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
     }
 
     private func seedSystemPromptConfigIfNeeded() async throws {
-        if try await SystemPromptConfigRecordModel.query(on: app.db).filter(\.$configKey == "current").first() != nil {
-            _ = try await loadSystemPromptSnapshot()
+        guard let record = try await SystemPromptConfigRecordModel.query(on: app.db)
+            .filter(\.$configKey == "current")
+            .first() else {
+            try await saveSystemPromptSnapshot(systemPromptSeed)
             return
         }
 
-        try await saveSystemPromptSnapshot(systemPromptSeed)
+        if shouldUpgradeLegacySystemPromptSeed(record) {
+            try await saveSystemPromptSnapshot(systemPromptSeed)
+            return
+        }
+
+        _ = try await loadSystemPromptSnapshot()
     }
 
     private func loadDevice(installationId: String) async throws -> DeviceRecordModel? {
@@ -659,7 +666,7 @@ actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
         )
     }
 
-    private func saveSystemPromptSnapshot(_ snapshot: AdminSystemPromptStore.Snapshot) async throws {
+    private func saveSystemPromptSnapshot(_ snapshot: AdminSystemPromptStore.Snapshot, updatedBy: String? = nil) async throws {
         let record = try await SystemPromptConfigRecordModel.query(on: app.db)
             .filter(\.$configKey == "current")
             .first() ?? SystemPromptConfigRecordModel(
@@ -674,11 +681,16 @@ actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
         record.actionRulesJson = snapshot.actionRulesJson
         record.modelContextRulesJson = snapshot.modelContextRulesJson
         record.updatedAt = snapshot.updatedAt
+        record.updatedBy = updatedBy
         if record.id == nil {
             try await record.create(on: app.db)
         } else {
             try await record.save(on: app.db)
         }
+    }
+
+    private func shouldUpgradeLegacySystemPromptSeed(_ record: SystemPromptConfigRecordModel) -> Bool {
+        record.updatedBy == nil && record.actionRulesJson.contains("[[VIBEWRITE_METADATA]]")
     }
 
     private static func normalizedBlockReason(_ reason: String?) -> String {

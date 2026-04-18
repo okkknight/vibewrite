@@ -253,10 +253,10 @@ final class BackendPromptComposerTests: XCTestCase {
             currentRouteMessages[0].content,
             joined(
                 "You are VibeWrite metadata-only response builder.",
-                "The only valid response is a single `emit_metadata` tool call.",
-                "Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.",
-                "Do not answer in any other format.",
-                "If you are about to produce ordinary assistant text, stop and emit the tool call instead.",
+                "Return only a single JSON object.",
+                "Do not output prose, markdown fences, or commentary.",
+                "Do not include any keys other than localSummary, globalSynopsis, nextFocus, and suggestionChips.",
+                "The JSON is incomplete unless all four keys are present.",
                 "",
                 "- Return suggestionChips as the primary output and keep them concrete.",
                 "- Describe the current opening state as the local summary.",
@@ -282,7 +282,7 @@ final class BackendPromptComposerTests: XCTestCase {
                 "Current global synopsis:",
                 "给模型看的全局摘要要更短、更偏状态",
                 "User message: 继续往下写",
-                "Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call.",
+                "Return exactly one JSON object with localSummary, globalSynopsis, nextFocus, and suggestionChips.",
                 "Do not include prose, markdown fences, or commentary.",
                 "For Chinese writing tasks, keep localSummary, globalSynopsis, nextFocus, and suggestionChips in concise Chinese.",
                 "Return exactly 3 concise suggestion chips."

@@ -264,7 +264,7 @@ struct BackendPromptComposer {
 
         switch metadataRoute {
         case .current:
-            lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call.")
+            lines.append("Return exactly one JSON object with localSummary, globalSynopsis, nextFocus, and suggestionChips.")
             lines.append("Do not include prose, markdown fences, or commentary.")
         case .text01JsonSchema:
             lines.append("Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.")
@@ -319,10 +319,10 @@ struct BackendPromptComposer {
         case .current:
             return [
                 "You are VibeWrite metadata-only response builder.",
-                "The only valid response is a single `emit_metadata` tool call.",
-                "Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.",
-                "Do not answer in any other format.",
-                "If you are about to produce ordinary assistant text, stop and emit the tool call instead."
+                "Return only a single JSON object.",
+                "Do not output prose, markdown fences, or commentary.",
+                "Do not include any keys other than localSummary, globalSynopsis, nextFocus, and suggestionChips.",
+                "The JSON is incomplete unless all four keys are present."
             ]
 
         case .text01JsonSchema:
