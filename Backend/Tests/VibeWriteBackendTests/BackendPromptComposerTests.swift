@@ -266,11 +266,8 @@ final class BackendPromptComposerTests: XCTestCase {
             currentRouteMessages[0].content,
             joined(
                 "You are VibeWrite metadata-only response builder.",
-                "Use the provided emit_metadata tool to return the metadata for the completed prose.",
                 "The only valid response is a single `emit_metadata` tool call.",
-                "Do not output prose, markdown fences, or commentary.",
                 "Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.",
-                "Do not answer in plain text.",
                 "Do not answer in any other format.",
                 "If you are about to produce ordinary assistant text, stop and emit the tool call instead.",
                 "",
@@ -298,11 +295,8 @@ final class BackendPromptComposerTests: XCTestCase {
                 "Current global synopsis:",
                 "给模型看的全局摘要要更短、更偏状态",
                 "User message: 继续往下写",
-                "Use the `emit_metadata` tool to return localSummary, globalSynopsis, nextFocus, and suggestionChips.",
-                "Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.",
-                "Return exactly one `emit_metadata` tool call and nothing else.",
+                "Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call.",
                 "Do not include prose, markdown fences, or commentary.",
-                "Do not produce ordinary assistant text.",
                 "For Chinese writing tasks, keep localSummary, globalSynopsis, nextFocus, and suggestionChips in concise Chinese.",
                 "Return exactly 3 concise suggestion chips."
             )
@@ -344,7 +338,6 @@ final class BackendPromptComposerTests: XCTestCase {
                 "给模型看的全局摘要要更短、更偏状态",
                 "User message: 继续往下写",
                 "Return localSummary, globalSynopsis, nextFocus, and suggestionChips only.",
-                "Make suggestionChips the most concrete part of the response; keep globalSynopsis short and stable.",
                 "Do not include prose, markdown fences, or commentary.",
                 "For Chinese writing tasks, keep localSummary, globalSynopsis, nextFocus, and suggestionChips in concise Chinese.",
                 "Return exactly 3 concise suggestion chips."

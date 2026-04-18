@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-18
+- Restored the default backend metadata prompt to the pre-split structure by removing the extra current-route intro lines and the rewritten user-prompt wording that had drifted from the old builder. The matching tests were also returned to the original golden wording, and verification passed with `swift test --filter BackendPromptComposerTests`, `swift test --filter AdminSystemPromptTests`, `swift test` in `Backend/`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-18
 - Review of `Restore default backend prompt parity` failed: the default backend current-route metadata prompt still diverges from the pre-split builder. The system prompt now carries extra intro lines that were not present in the old builder, and the current-route user prompt was rewritten from the original single-line `emit_metadata` instruction into a longer multi-line variant. The matching tests also codify the rewritten wording, so they no longer guard exact parity. Verification was done by comparing the current backend composer and seed against the pre-split `WritingAIPromptBuilder` output.
 
 # 2026-04-18
