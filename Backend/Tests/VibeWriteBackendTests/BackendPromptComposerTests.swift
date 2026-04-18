@@ -162,6 +162,72 @@ final class BackendPromptComposerTests: XCTestCase {
         XCTAssertFalse(textSystemPrompt.contains("emit_metadata"))
     }
 
+    func testSnapshotOverridesAreReflectedInGeneratedPrompts() throws {
+        let composer = BackendPromptComposer()
+        let snapshot = AdminSystemPromptStore.Snapshot(
+            templateBody: "CUSTOM TEMPLATE BODY",
+            actionRulesJson: """
+            {
+              "metadata": {
+                "continueWriting": ["CUSTOM META CONTINUE"],
+                "edit": ["CUSTOM META EDIT"],
+                "startDraft": ["CUSTOM META START"]
+              },
+              "prose": {
+                "continueWriting": ["CUSTOM PROSE CONTINUE"],
+                "edit": ["CUSTOM PROSE EDIT"],
+                "startDraft": ["CUSTOM PROSE START"]
+              }
+            }
+            """,
+            modelContextRulesJson: """
+            {
+              "metadataRoute": {
+                "current": ["CUSTOM CURRENT RULE"],
+                "text01JsonSchema": ["CUSTOM TEXT01 RULE"]
+              },
+              "providerModel": [
+                "Custom provider: {provider}",
+                "Custom model: {model}"
+              ]
+            }
+            """,
+            updatedAt: Date(timeIntervalSince1970: 1_710_000_000)
+        )
+        let request = makeRequest(
+            action: .continueWriting,
+            project: makeSnapshot(
+                title: "自定义快照",
+                prompt: "继续往下写",
+                documentText: "前文一段。\n\n尾部一段。",
+                mode: .collaboration
+            ),
+            userMessage: "继续往下写",
+            selectionText: nil
+        )
+
+        let proseMessages = try composer.proseMessages(
+            for: request,
+            systemPromptSnapshot: snapshot,
+            configuration: makeConfiguration(metadataRoute: .current)
+        )
+        let metadataMessages = try composer.metadataMessages(
+            for: request,
+            systemPromptSnapshot: snapshot,
+            configuration: makeConfiguration(metadataRoute: .current)
+        )
+
+        XCTAssertTrue(proseMessages[0].content.contains("CUSTOM TEMPLATE BODY"))
+        XCTAssertTrue(proseMessages[0].content.contains("CUSTOM PROSE CONTINUE"))
+        XCTAssertTrue(proseMessages[0].content.contains("Custom provider: minimax"))
+        XCTAssertTrue(proseMessages[0].content.contains("Custom model: MiniMax-M2.5-highspeed"))
+
+        XCTAssertTrue(metadataMessages[0].content.contains("CUSTOM TEMPLATE BODY"))
+        XCTAssertTrue(metadataMessages[0].content.contains("CUSTOM META CONTINUE"))
+        XCTAssertTrue(metadataMessages[0].content.contains("CUSTOM CURRENT RULE"))
+        XCTAssertFalse(metadataMessages[0].content.contains("Custom provider:"))
+    }
+
     private func makeConfiguration(metadataRoute: BackendAIConfiguration.MetadataRoute) -> BackendAIConfiguration {
         BackendAIConfiguration(
             mode: .real,

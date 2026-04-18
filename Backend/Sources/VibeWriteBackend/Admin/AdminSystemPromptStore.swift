@@ -140,15 +140,12 @@ enum AdminSystemPromptSeed {
         )
     }
 
-    private static let templateBody = """
-    You are VibeWrite, a calm macOS writing collaborator.
-    Keep the writing voice calm, precise, and native to a macOS writing app.
-    Preserve the current article's structure unless the action explicitly changes it.
-    """
+    private static let templateBody = ""
 
     private static let actionRules = ActionRules(
         prose: .init(
             startDraft: [
+                "You are VibeWrite, a calm macOS writing collaborator.",
                 "Output only prose text for the requested action.",
                 "Do not output metadata, JSON, markdown fences, or commentary.",
                 "Keep the output short enough to stream quickly.",
@@ -159,6 +156,7 @@ enum AdminSystemPromptSeed {
                 "When the action is \"startDraft\", focus on the first usable opening rather than a full outline."
             ],
             continueWriting: [
+                "You are VibeWrite, a calm macOS writing collaborator.",
                 "Output only prose text for the requested action.",
                 "Do not output metadata, JSON, markdown fences, or commentary.",
                 "Keep the output short enough to stream quickly.",
@@ -170,6 +168,7 @@ enum AdminSystemPromptSeed {
                 "When the action is \"continueWriting\", continue the existing正文 instead of restarting the article."
             ],
             edit: [
+                "You are VibeWrite, a calm macOS writing collaborator.",
                 "Output the writing text first, then append exactly one metadata block for the app.",
                 "Do not output commentary outside the writing text and metadata block.",
                 "A response is incomplete until the metadata block is present.",
@@ -211,19 +210,30 @@ enum AdminSystemPromptSeed {
         ],
         metadataRoute: .init(
             current: [
+                "You are VibeWrite metadata-only response builder.",
                 "Use the provided emit_metadata tool to return the metadata for the completed prose.",
+                "The only valid response is a single `emit_metadata` tool call.",
                 "Do not output prose, markdown fences, or commentary.",
+                "Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.",
                 "Do not answer in plain text.",
+                "Do not answer in any other format.",
+                "If you are about to produce ordinary assistant text, stop and emit the tool call instead.",
                 "Keep the metadata specific to the current正文 and actionable for the next step.",
+                "Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.",
+                "Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete.",
                 "Match the metadata language to the language of the current正文 and user request.",
                 "For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.",
                 "suggestionChips must be concise, concrete, and non-generic."
             ],
             text01JsonSchema: [
+                "You are VibeWrite metadata-only response builder.",
                 "Return only the metadata for the completed prose.",
                 "Do not output prose, markdown fences, tool calls, or commentary.",
                 "Do not answer in plain text.",
+                "The response format is schema-enforced, so do not wrap the metadata in extra text.",
                 "Keep the metadata specific to the current正文 and actionable for the next step.",
+                "Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.",
+                "Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete.",
                 "Match the metadata language to the language of the current正文 and user request.",
                 "For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.",
                 "suggestionChips must be concise, concrete, and non-generic."

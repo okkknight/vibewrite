@@ -8,10 +8,12 @@ struct BackendPromptComposer {
         configuration: BackendAIConfiguration
     ) throws -> [WritingAIChatMessage] {
         let sanitizedRequest = sanitizedRequest(for: request)
+        let promptRules = resolvedPromptRules(from: systemPromptSnapshot)
         return [
             WritingAIChatMessage(
                 role: .system,
                 content: proseSystemPrompt(
+                    promptRules: promptRules,
                     provider: configuration.provider,
                     model: configuration.model,
                     action: sanitizedRequest.action
@@ -29,10 +31,12 @@ struct BackendPromptComposer {
         systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
         configuration: BackendAIConfiguration
     ) throws -> [WritingAIChatMessage] {
-        [
+        let promptRules = resolvedPromptRules(from: systemPromptSnapshot)
+        return [
             WritingAIChatMessage(
                 role: .system,
                 content: metadataSystemPrompt(
+                    promptRules: promptRules,
                     provider: configuration.provider,
                     model: configuration.metadataModel,
                     action: request.action,
@@ -46,144 +50,122 @@ struct BackendPromptComposer {
         ]
     }
 
-    private func proseSystemPrompt(provider: String, model: String, action: WritingAIAction) -> String {
+    private func proseSystemPrompt(
+        promptRules: ResolvedPromptRules,
+        provider: String,
+        model: String,
+        action: WritingAIAction
+    ) -> String {
         switch action {
         case .startDraft:
-            return """
-            You are VibeWrite, a calm macOS writing collaborator.
-            Output only prose text for the requested action.
-            Do not output metadata, JSON, markdown fences, or commentary.
-            Keep the output short enough to stream quickly.
-            - Write only the opening prose for the first draft.
-            - Keep the opening brief and concrete so it can stand on its own.
-            - Keep the writing voice calm, precise, and native to a macOS writing app.
-            - Preserve the current article's structure unless the action explicitly changes it.
-            - When the action is "startDraft", focus on the first usable opening rather than a full outline.
-            Provider: \(provider)
-            Model: \(model)
-            """
-
+            return composePrompt(
+                leading: promptRules.templateBody,
+                sections: promptRules.actionRules.prose.lines(for: action) + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
+            )
         case .continueWriting:
-            return """
-            You are VibeWrite, a calm macOS writing collaborator.
-            Output only prose text for the requested action.
-            Do not output metadata, JSON, markdown fences, or commentary.
-            Keep the output short enough to stream quickly.
-            - Continue the current正文 with the next short paragraph or scene.
-            - Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.
-            - Leave a small amount of forward momentum for the next step.
-            - Keep the writing voice calm, precise, and native to a macOS writing app.
-            - Preserve the current article's structure unless the action explicitly changes it.
-            - When the action is "continueWriting", continue the existing正文 instead of restarting the article.
-            Provider: \(provider)
-            Model: \(model)
-            """
-
+            return composePrompt(
+                leading: promptRules.templateBody,
+                sections: promptRules.actionRules.prose.lines(for: action) + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
+            )
         case .edit:
-            return """
-            You are VibeWrite, a calm macOS writing collaborator.
-            Output the writing text first, then append exactly one metadata block for the app.
-            Do not output commentary outside the writing text and metadata block.
-            A response is incomplete until the metadata block is present.
-            - When the action is "edit", return only the replacement text for the selected segment.
-            - Keep the output short enough to stream quickly.
-            - Do not stop after writing text alone.
-            - After the prose is finished, output a blank line, then `[[VIBEWRITE_METADATA]]`, then a single JSON object.
-            - The metadata JSON must contain: localSummary, globalSynopsis, nextFocus, suggestionChips.
-            - Keep the metadata specific to the current正文 and actionable for the next step.
-            - Match the metadata language to the language of the current正文 and user request.
-            - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
-            - The metadata block is not part of the正文 and must not be mixed into the prose.
-            - Every response must end with exactly one metadata block.
-            - When the action is "edit", rewrite only the selected passage or local region whenever practical.
-            - Keep the prose concise enough for streaming.
-            - The metadata JSON should stay concise and concrete, not templated.
-
-            Rules:
-            - Keep the writing voice calm, precise, and native to a macOS writing app.
-            - Preserve the current article's structure unless the action explicitly changes it.
-            - When the action is "edit", rewrite only the selected passage or local region whenever practical.
-
-            Provider: \(provider)
-            Model: \(model)
-            """
+            return composePrompt(
+                leading: promptRules.templateBody,
+                sections: promptRules.actionRules.prose.lines(for: action) + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
+            )
         }
     }
 
     private func metadataSystemPrompt(
+        promptRules: ResolvedPromptRules,
         provider: String,
         model: String,
         action: WritingAIAction,
         metadataRoute: BackendAIConfiguration.MetadataRoute
     ) -> String {
-        let actionInstructions: String
-        switch action {
-        case .startDraft:
-            actionInstructions = """
-            - Return suggestionChips as the primary output and keep them concrete.
-            - Describe the current opening state as the local summary.
-            - Keep the global synopsis short and stable; it should preserve broader story state without repeating the local summary.
-            - Suggest the next concrete step after the opening exists.
-            - Return exactly 3 concise suggestion chips.
-            """
-        case .continueWriting:
-            actionInstructions = """
-            - Return suggestionChips as the primary output and keep them concrete.
-            - Describe the completed正文 as the local summary.
-            - Keep the global synopsis short and stable; it should preserve broader story state without repeating the local summary.
-            - Suggest the next concrete step after the continuation.
-            - Return exactly 3 concise suggestion chips.
-            """
-        case .edit:
-            actionInstructions = """
-            - Return suggestionChips as the primary output and keep them concrete.
-            - Describe the completed change as the local summary.
-            - Keep the global synopsis short and stable; it should preserve broader story state without repeating the local summary.
-            - Suggest the next concrete step after the edit.
-            - Return exactly 3 concise suggestion chips.
-            """
-        }
-
         switch metadataRoute {
         case .current:
-            return """
-            You are VibeWrite metadata-only response builder.
-            The only valid response is a single `emit_metadata` tool call.
-            Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary.
-            Do not answer in any other format.
-            If you are about to produce ordinary assistant text, stop and emit the tool call instead.
-
-            \(actionInstructions)
-
-            - Keep the metadata specific to the current正文 and actionable for the next step.
-            - Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.
-            - Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete.
-            - Match the metadata language to the language of the current正文 and user request.
-            - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
-            - suggestionChips must be concise, concrete, and non-generic.
-            """
+            return composePrompt(
+                leading: promptRules.templateBody,
+                sections: promptRules.actionRules.metadata.lines(for: action) + promptRules.modelContextRules.metadataRouteLines(for: metadataRoute)
+            )
 
         case .text01JsonSchema:
-            return """
-            You are VibeWrite metadata-only response builder.
-            Return only the metadata for the completed prose.
-            Do not output prose, markdown fences, tool calls, or commentary.
-            Do not answer in plain text.
-
-            \(actionInstructions)
-
-            - Keep the metadata specific to the current正文 and actionable for the next step.
-            - Treat suggestionChips as the most important field and do not let globalSynopsis crowd it out.
-            - Keep localSummary brief, keep globalSynopsis stable and short, and let suggestionChips stay concrete.
-            - Match the metadata language to the language of the current正文 and user request.
-            - For Chinese writing tasks, localSummary, globalSynopsis, nextFocus, and suggestionChips must be concise Chinese.
-            - suggestionChips must be concise, concrete, and non-generic.
-            - The response format is schema-enforced, so do not wrap the metadata in extra text.
-
-            Provider: \(provider)
-            Model: \(model)
-            """
+            return composePrompt(
+                leading: promptRules.templateBody,
+                sections: promptRules.actionRules.metadata.lines(for: action)
+                    + promptRules.modelContextRules.metadataRouteLines(for: metadataRoute)
+                    + promptRules.modelContextRules.providerModelLines(provider: provider, model: model)
+            )
         }
+    }
+
+    private func composePrompt(leading: String, sections: [String]) -> String {
+        var lines: [String] = []
+        let trimmedLeading = leading.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmedLeading.isEmpty {
+            lines.append(trimmedLeading)
+        }
+        lines.append(contentsOf: sections)
+        return lines.joined(separator: "\n")
+    }
+
+    private func resolvedPromptRules(from snapshot: AdminSystemPromptStore.Snapshot) -> ResolvedPromptRules {
+        let defaultSnapshot = AdminSystemPromptSeed.makeSnapshot()
+        return ResolvedPromptRules(
+            templateBody: normalizedPromptSection(snapshot.templateBody, fallback: defaultSnapshot.templateBody),
+            actionRules: decodedPromptRules(
+                from: snapshot.actionRulesJson,
+                fallbackJSON: defaultSnapshot.actionRulesJson,
+                field: "actionRulesJson"
+            ),
+            modelContextRules: decodedPromptRules(
+                from: snapshot.modelContextRulesJson,
+                fallbackJSON: defaultSnapshot.modelContextRulesJson,
+                field: "modelContextRulesJson"
+            )
+        )
+    }
+
+    private func decodedPromptRules<T: Decodable>(
+        from rawValue: String,
+        fallbackJSON: String,
+        field: String
+    ) -> T {
+        let decoder = JSONDecoder()
+        if let decoded = decodePromptRules(T.self, rawValue: rawValue, decoder: decoder, field: field) {
+            return decoded
+        }
+        if let fallback = decodePromptRules(T.self, rawValue: fallbackJSON, decoder: decoder, field: field) {
+            return fallback
+        }
+
+        fatalError("Failed to decode backend prompt rules for \(field).")
+    }
+
+    private func decodePromptRules<T: Decodable>(
+        _ type: T.Type,
+        rawValue: String,
+        decoder: JSONDecoder,
+        field: String
+    ) -> T? {
+        let trimmed = rawValue.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard let data = trimmed.data(using: .utf8) else {
+            return nil
+        }
+
+        do {
+            return try decoder.decode(type, from: data)
+        } catch {
+            return nil
+        }
+    }
+
+    private func normalizedPromptSection(_ value: String, fallback: String) -> String {
+        let trimmed = value.trimmingCharacters(in: .whitespacesAndNewlines)
+        if !trimmed.isEmpty {
+            return trimmed
+        }
+        return fallback.trimmingCharacters(in: .whitespacesAndNewlines)
     }
 
     private func proseUserPrompt(for request: WritingAIRequest) -> String {
@@ -371,5 +353,64 @@ struct BackendPromptComposer {
         }
 
         return String(joined.suffix(maximumCharacterCount))
+    }
+}
+
+private struct ResolvedPromptRules {
+    let templateBody: String
+    let actionRules: PromptActionRules
+    let modelContextRules: PromptModelContextRules
+}
+
+private struct PromptActionRules: Decodable {
+    struct PromptStepRules: Decodable {
+        let startDraft: [String]
+        let continueWriting: [String]
+        let edit: [String]
+
+        func lines(for action: WritingAIAction) -> [String] {
+            switch action {
+            case .startDraft:
+                return startDraft
+            case .continueWriting:
+                return continueWriting
+            case .edit:
+                return edit
+            }
+        }
+    }
+
+    let prose: PromptStepRules
+    let metadata: PromptStepRules
+}
+
+private struct PromptModelContextRules: Decodable {
+    struct MetadataRouteRules: Decodable {
+        let current: [String]
+        let text01JsonSchema: [String]
+
+        func lines(for route: BackendAIConfiguration.MetadataRoute) -> [String] {
+            switch route {
+            case .current:
+                return current
+            case .text01JsonSchema:
+                return text01JsonSchema
+            }
+        }
+    }
+
+    let providerModel: [String]
+    let metadataRoute: MetadataRouteRules
+
+    func providerModelLines(provider: String, model: String) -> [String] {
+        providerModel.map { line in
+            line
+                .replacingOccurrences(of: "{provider}", with: provider)
+                .replacingOccurrences(of: "{model}", with: model)
+        }
+    }
+
+    func metadataRouteLines(for route: BackendAIConfiguration.MetadataRoute) -> [String] {
+        metadataRoute.lines(for: route)
     }
 }
