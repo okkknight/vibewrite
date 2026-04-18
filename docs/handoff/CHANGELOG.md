@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-18
+- Review of `codex/v3` prompt generation failed the "keep prompt identical after backend split" requirement. `swift test --filter BackendPromptComposerTests` passed, but the implementation now changes prompt assembly for `.edit` and metadata requests: the old edit-only metadata block instructions were moved out of the system prompt into the user prompt, and the metadata user prompts no longer match the previous wording about `suggestionChips`/`emit_metadata` exactly. The default seed also makes prompt generation admin-configurable, so the output is no longer locked to the old hardcoded prompt unless the snapshot stays at seed.
+
+# 2026-04-18
 - Review result for `Wire system prompt snapshot into prompt generation`: pass. The default current-route prompt now reflects the live system-prompt snapshot, the remaining `text01_json_schema` branch is treated as unsupported/out of scope for the current runtime contract, and no further split-logic semantic differences remain in the default path. Verification passed with `cd Backend && swift test --filter BackendPromptComposerTests`, `swift test`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-18
