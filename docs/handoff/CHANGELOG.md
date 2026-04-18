@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-18
+- Review result for `Wire system prompt snapshot into prompt generation`: pass. The default current-route prompt now reflects the live system-prompt snapshot, the remaining `text01_json_schema` branch is treated as unsupported/out of scope for the current runtime contract, and no further split-logic semantic differences remain in the default path. Verification passed with `cd Backend && swift test --filter BackendPromptComposerTests`, `swift test`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-18
 - Review result for `Wire system prompt snapshot into prompt generation`: fail. The default current-route prompt output now reflects the live system-prompt snapshot and matches the old seeded wording closely, but the backend still exposes the alternate `text01_json_schema` metadata branch as a selectable runtime path. If the review standard is "split only, no semantic surface change," that alternate branch is still a residual divergence from the original direct-provider behavior.
 
 # 2026-04-18
