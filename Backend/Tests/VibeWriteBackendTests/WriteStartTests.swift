@@ -52,8 +52,8 @@ final class WriteStartTests: XCTestCase {
                     这篇文字先不急着给结论，而是从一个更具体的开头进入，让内容慢慢往前走。
                     """
                 )
-                XCTAssertEqual(writeResponse.localSummary, "已生成开头")
-                XCTAssertEqual(writeResponse.globalSynopsis, "已生成总览")
+                XCTAssertEqual(writeResponse.localSummary, "")
+                XCTAssertEqual(writeResponse.globalSynopsis, "")
                 XCTAssertEqual(
                     writeResponse.intentSummary,
                     "围绕“先写一个开头”持续协作，正文会直接写入文档而不是停留在聊天里。"
@@ -62,8 +62,8 @@ final class WriteStartTests: XCTestCase {
                 XCTAssertEqual(writeResponse.currentGoal, "收紧开头")
                 XCTAssertEqual(writeResponse.recentDecisions, ["先生成第一稿", "开头保持克制"])
                 XCTAssertEqual(writeResponse.workingMemory, ["正文已经进入协作阶段", "后续修改优先围绕主线推进"])
-                XCTAssertEqual(writeResponse.nextFocus, "继续推进第一段")
-                XCTAssertEqual(writeResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
+                XCTAssertEqual(writeResponse.nextFocus, "")
+                XCTAssertEqual(writeResponse.suggestionChips, [])
                 XCTAssertEqual(writeResponse.mode, .collaboration)
             }
         })

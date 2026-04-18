@@ -80,8 +80,8 @@ final class WriteContinueTests: XCTestCase {
                     接下来可以顺着这个主线，再补一段更自然的推进。
                     """
                 )
-                XCTAssertEqual(writeResponse.localSummary, "已续写一段")
-                XCTAssertEqual(writeResponse.globalSynopsis, "已续写一段总览")
+                XCTAssertEqual(writeResponse.localSummary, "")
+                XCTAssertEqual(writeResponse.globalSynopsis, "")
                 XCTAssertEqual(
                     writeResponse.intentSummary,
                     "围绕当前正文继续往下写一段，让主线自然往前推进。"
@@ -90,8 +90,8 @@ final class WriteContinueTests: XCTestCase {
                 XCTAssertEqual(writeResponse.currentGoal, "继续写")
                 XCTAssertEqual(writeResponse.recentDecisions, ["继续沿当前主线", "保持节奏稳定"])
                 XCTAssertEqual(writeResponse.workingMemory, ["继续沿当前正文推进", "优先保持节奏稳定"])
-                XCTAssertEqual(writeResponse.nextFocus, "继续顺着当前主线往下写")
-                XCTAssertEqual(writeResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
+                XCTAssertEqual(writeResponse.nextFocus, "")
+                XCTAssertEqual(writeResponse.suggestionChips, [])
                 XCTAssertEqual(writeResponse.mode, continueRequest.project.mode)
             }
         })

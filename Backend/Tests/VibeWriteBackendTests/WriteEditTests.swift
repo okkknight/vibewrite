@@ -51,8 +51,8 @@ final class WriteEditTests: XCTestCase {
                     writeResponse.documentText,
                     "前文正文这里不用说得太满，留白会更好。后文正文"
                 )
-                XCTAssertEqual(writeResponse.localSummary, "已完成局部修改")
-                XCTAssertEqual(writeResponse.globalSynopsis, "已完成局部修改总览")
+                XCTAssertEqual(writeResponse.localSummary, "")
+                XCTAssertEqual(writeResponse.globalSynopsis, "")
                 XCTAssertEqual(
                     writeResponse.intentSummary,
                     "围绕当前选中文段局部协作，优先保持整体语气和节奏一致。"
@@ -61,8 +61,8 @@ final class WriteEditTests: XCTestCase {
                 XCTAssertEqual(writeResponse.currentGoal, "修改选中文段")
                 XCTAssertEqual(writeResponse.recentDecisions, ["选区带入对话", "局部修改优先"])
                 XCTAssertEqual(writeResponse.workingMemory, ["当前在改选中文段", "先局部处理，再回到整体"])
-                XCTAssertEqual(writeResponse.nextFocus, "检查选中文段是否还需要继续调整")
-                XCTAssertEqual(writeResponse.suggestionChips, ["继续写", "编辑这段", "补一段"])
+                XCTAssertEqual(writeResponse.nextFocus, "")
+                XCTAssertEqual(writeResponse.suggestionChips, [])
                 XCTAssertEqual(writeResponse.mode, editRequest.project.mode)
             }
         })

@@ -1,5 +1,4 @@
 import Foundation
-import Logging
 import Vapor
 import VibeWriteShared
 
@@ -49,7 +48,6 @@ enum BackendAIError: LocalizedError {
 }
 
 actor BackendAIExecutor {
-    private let logger = Logger(label: "VibeWriteBackend.AI")
     private let configuration: BackendAIConfiguration
     private let promptComposer: BackendPromptComposer
     private let providerClient: any BackendAIProviderClient
@@ -91,6 +89,28 @@ actor BackendAIExecutor {
 
         let apiKey = providerApiKey ?? ""
 
+        switch envelope.kind {
+        case .prose:
+            return try await executeProse(
+                for: request,
+                systemPromptSnapshot: systemPromptSnapshot,
+                apiKey: apiKey
+            )
+
+        case .metadata:
+            return try await executeMetadata(
+                for: request,
+                systemPromptSnapshot: systemPromptSnapshot,
+                apiKey: apiKey
+            )
+        }
+    }
+
+    private func executeProse(
+        for request: WritingAIRequest,
+        systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
+        apiKey: String
+    ) async throws -> WritingAIResponse {
         let proseMessages: [WritingAIChatMessage]
         do {
             proseMessages = try promptComposer.proseMessages(
@@ -118,9 +138,9 @@ actor BackendAIExecutor {
             throw BackendAIError.providerError(error.localizedDescription)
         }
 
-        let finalDocumentText: String
+        let documentText: String
         do {
-            finalDocumentText = try responseBuilder.appliedDocumentText(
+            documentText = try responseBuilder.appliedDocumentText(
                 for: request,
                 proseText: proseText
             )
@@ -130,51 +150,51 @@ actor BackendAIExecutor {
             throw BackendAIError.backendError(error.localizedDescription)
         }
 
-        let assistantMessage = responseBuilder.assistantLine(for: request.action)
-        let proseAppliedProject = responseBuilder.updatedProjectSnapshot(
+        return responseBuilder.response(
             for: request,
-            documentText: finalDocumentText,
-            assistantMessage: assistantMessage
+            documentText: documentText,
+            metadata: nil,
+            assistantMessage: responseBuilder.assistantLine(for: request.action)
         )
-        let metadataRequest = WritingAIRequest(
-            action: request.action,
-            project: proseAppliedProject,
-            userMessage: request.userMessage,
-            selectionText: request.selectionText,
-            selectionRange: request.selectionRange,
-            kind: .metadata
-        )
+    }
 
-        var metadata: WritingAICompletionMetadata
+    private func executeMetadata(
+        for request: WritingAIRequest,
+        systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
+        apiKey: String
+    ) async throws -> WritingAIResponse {
+        let metadataMessages: [WritingAIChatMessage]
         do {
-            let metadataMessages = try promptComposer.metadataMessages(
-                for: metadataRequest,
+            metadataMessages = try promptComposer.metadataMessages(
+                for: request,
                 systemPromptSnapshot: systemPromptSnapshot,
                 configuration: configuration
             )
+        } catch let error as BackendAIError {
+            throw error
+        } catch {
+            throw BackendAIError.invalidConfiguration(error.localizedDescription)
+        }
+
+        let metadata: WritingAICompletionMetadata
+        do {
             metadata = try await providerClient.generateMetadata(
-                for: metadataRequest,
+                for: request,
                 messages: metadataMessages,
                 configuration: configuration,
                 apiKey: apiKey
             )
+        } catch let error as BackendAIError {
+            throw error
         } catch {
-            logger.error(
-                "Backend metadata generation failed action=\(request.action.rawValue) error=\(error.localizedDescription) usingFallbackMetadata=true"
-            )
-            metadata = WritingAICompletionMetadata(
-                localSummary: request.project.localSummary,
-                globalSynopsis: request.project.globalSynopsis,
-                nextFocus: request.project.context.nextFocus,
-                suggestionChips: request.project.suggestionChips
-            )
+            throw BackendAIError.providerError(error.localizedDescription)
         }
 
         return responseBuilder.response(
             for: request,
-            documentText: finalDocumentText,
+            documentText: request.project.documentText,
             metadata: metadata,
-            assistantMessage: assistantMessage
+            assistantMessage: responseBuilder.assistantLine(for: request.action)
         )
     }
 }

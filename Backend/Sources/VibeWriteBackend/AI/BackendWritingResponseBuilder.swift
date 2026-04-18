@@ -5,15 +5,15 @@ struct BackendWritingResponseBuilder {
     func response(
         for request: WritingAIRequest,
         documentText: String,
-        metadata: WritingAICompletionMetadata,
+        metadata: WritingAICompletionMetadata? = nil,
         assistantMessage: String? = nil
     ) -> WritingAIResponse {
         let action = request.action
         let resolvedAssistantMessage = assistantMessage ?? assistantLine(for: action)
-        let resolvedLocalSummary = normalizedMetadataValue(metadata.localSummary)
-        let resolvedGlobalSynopsis = normalizedMetadataValue(metadata.globalSynopsis)
-        let resolvedNextFocus = normalizedMetadataValue(metadata.nextFocus)
-        let resolvedSuggestionChips = normalizedSuggestionChips(metadata.suggestionChips)
+        let resolvedLocalSummary = normalizedMetadataValue(metadata?.localSummary)
+        let resolvedGlobalSynopsis = normalizedMetadataValue(metadata?.globalSynopsis)
+        let resolvedNextFocus = normalizedMetadataValue(metadata?.nextFocus)
+        let resolvedSuggestionChips = normalizedSuggestionChips(metadata?.suggestionChips ?? [])
 
         return WritingAIResponse(
             assistantMessage: resolvedAssistantMessage,
@@ -138,8 +138,8 @@ struct BackendWritingResponseBuilder {
         }
     }
 
-    private func normalizedMetadataValue(_ value: String) -> String {
-        value.trimmingCharacters(in: .whitespacesAndNewlines)
+    private func normalizedMetadataValue(_ value: String?) -> String {
+        value?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
     }
 
     private func normalizedSuggestionChips(_ chips: [String]) -> [String] {
@@ -150,4 +150,3 @@ struct BackendWritingResponseBuilder {
             .filter { seen.insert($0).inserted }
     }
 }
-

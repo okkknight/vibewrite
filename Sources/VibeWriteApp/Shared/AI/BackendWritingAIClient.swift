@@ -40,14 +40,19 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         self.session = session
     }
 
-    var usesIntegratedBackendMetadataPhase: Bool { true }
-
     func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
         AsyncThrowingStream { continuation in
             Task {
                 do {
                     let response = try await generateResponse(for: request)
-                    let chunks = MockWritingEngine.streamChunks(for: response.documentText)
+                    if request.kind == .metadata {
+                        continuation.yield(.completed(response))
+                        continuation.finish()
+                        return
+                    }
+
+                    let streamedText = streamedTextDelta(for: request, documentText: response.documentText)
+                    let chunks = MockWritingEngine.streamChunks(for: streamedText)
 
                     if chunks.isEmpty {
                         continuation.yield(.completed(response))
@@ -68,6 +73,39 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                     continuation.finish(throwing: error)
                 }
             }
+        }
+    }
+
+    private func streamedTextDelta(
+        for request: WritingAIRequest,
+        documentText: String
+    ) -> String {
+        switch request.action {
+        case .startDraft:
+            return documentText
+
+        case .continueWriting:
+            let prefix = request.project.documentText
+            guard documentText.hasPrefix(prefix) else {
+                return documentText
+            }
+            return String(documentText.dropFirst(prefix.count))
+
+        case .edit:
+            guard let selectionRange = request.selectionRange,
+                  let targetRange = selectionRange.range(in: request.project.documentText) else {
+                return documentText
+            }
+
+            let prefix = String(request.project.documentText[..<targetRange.lowerBound])
+            let suffix = String(request.project.documentText[targetRange.upperBound...])
+            guard documentText.hasPrefix(prefix), documentText.hasSuffix(suffix) else {
+                return documentText
+            }
+
+            let lowerBound = documentText.index(documentText.startIndex, offsetBy: prefix.count)
+            let upperBound = documentText.index(documentText.endIndex, offsetBy: -suffix.count)
+            return String(documentText[lowerBound..<upperBound])
         }
     }
 

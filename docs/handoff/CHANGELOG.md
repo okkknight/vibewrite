@@ -1,6 +1,11 @@
 # Changelog
 
 # 2026-04-18
+- Reverted the backend gateway client back to the old two-phase prose-then-metadata semantics: continue/edit prose now stream as incremental deltas again, metadata runs as a separate request again, and a missing metadata tool call falls back to the existing project metadata instead of surfacing an HTTP 502.
+- Restored the pre-split prompt wording on the backend prompt composer, removed the two-chip suggestion cap, and brought back the `建议生成中` loading pill for the separate metadata request.
+- Verification passed with `swift test` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-18
 - Restored the composer's suggestion-loading pill for the integrated backend metadata path and capped the guidance rail to at most two visible assistant suggestion chips so long suggestion sets fall back to a shorter prefix instead of squeezing three chips into one row.
 - Added regression coverage for the integrated loading state and the assistant-suggestion rail policy.
 - Verification passed with `swift test` and `xcodebuild test -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.

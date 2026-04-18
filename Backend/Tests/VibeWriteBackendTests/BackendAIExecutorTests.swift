@@ -4,7 +4,7 @@ import XCTest
 import VibeWriteShared
 
 final class BackendAIExecutorTests: XCTestCase {
-    func testMetadataFailureFallsBackToExistingProjectMetadata() async throws {
+    func testProseRequestReturnsEmptyMetadataAndKeepsProseBody() async throws {
         let configuration = makeConfiguration(metadataRoute: .current)
         let secretStore = AdminSecretStore(
             providerApiKey: "provider-key",
@@ -16,15 +16,15 @@ final class BackendAIExecutorTests: XCTestCase {
         )
         let executor = BackendAIExecutor(
             configuration: configuration,
-            providerClient: ThrowingMetadataProviderClient(),
+            providerClient: ProseOnlyProviderClient(),
             secretStore: secretStore,
             systemPromptStore: systemPromptStore
         )
 
         let request = WriteRequestEnvelope(
-            installationId: "installation-fallback-001",
-            deviceToken: "token-fallback-001",
-            requestId: "request-fallback-001",
+            installationId: "installation-prose-001",
+            deviceToken: "token-prose-001",
+            requestId: "request-prose-001",
             action: .continueWriting,
             kind: .prose,
             project: sampleProjectSnapshot(),
@@ -42,10 +42,49 @@ final class BackendAIExecutorTests: XCTestCase {
             接下来可以顺着这个主线，再补一段更自然的推进。
             """
         )
-        XCTAssertEqual(response.localSummary, request.project.localSummary)
-        XCTAssertEqual(response.globalSynopsis, request.project.globalSynopsis)
-        XCTAssertEqual(response.nextFocus, request.project.context.nextFocus)
-        XCTAssertEqual(response.suggestionChips, request.project.suggestionChips)
+        XCTAssertEqual(response.localSummary, "")
+        XCTAssertEqual(response.globalSynopsis, "")
+        XCTAssertEqual(response.nextFocus, "")
+        XCTAssertEqual(response.suggestionChips, [])
+        XCTAssertEqual(response.assistantMessage, "我接着往下写了一段，让主线继续往前走。")
+    }
+
+    func testMetadataRequestReturnsMetadataWithoutChangingDocumentText() async throws {
+        let configuration = makeConfiguration(metadataRoute: .current)
+        let secretStore = AdminSecretStore(
+            providerApiKey: "provider-key",
+            adminUsername: "admin",
+            adminPassword: "password"
+        )
+        let systemPromptStore = AdminSystemPromptStore(
+            snapshot: AdminSystemPromptSeed.makeSnapshot(clock: BackendAIExecutorTestClock(date: Date(timeIntervalSince1970: 1_710_000_000)))
+        )
+        let executor = BackendAIExecutor(
+            configuration: configuration,
+            providerClient: MetadataOnlyProviderClient(),
+            secretStore: secretStore,
+            systemPromptStore: systemPromptStore
+        )
+
+        let request = WriteRequestEnvelope(
+            installationId: "installation-metadata-001",
+            deviceToken: "token-metadata-001",
+            requestId: "request-metadata-001",
+            action: .continueWriting,
+            kind: .metadata,
+            project: sampleProjectSnapshot(),
+            userMessage: "继续写下去",
+            selectionText: "开头正文",
+            selectionRange: WritingTextSelectionRange(location: 0, length: 4)
+        )
+
+        let response = try await executor.execute(for: request)
+
+        XCTAssertEqual(response.documentText, request.project.documentText)
+        XCTAssertEqual(response.localSummary, "已续写一段")
+        XCTAssertEqual(response.globalSynopsis, "已续写一段总览")
+        XCTAssertEqual(response.nextFocus, "继续顺着当前主线往下写")
+        XCTAssertEqual(response.suggestionChips, ["继续写", "编辑这段", "补一段"])
         XCTAssertEqual(response.assistantMessage, "我接着往下写了一段，让主线继续往前走。")
     }
 
@@ -87,7 +126,7 @@ final class BackendAIExecutorTests: XCTestCase {
     }
 }
 
-private struct ThrowingMetadataProviderClient: BackendAIProviderClient {
+private struct ProseOnlyProviderClient: BackendAIProviderClient {
     func generateProseText(
         for request: WritingAIRequest,
         messages: [WritingAIChatMessage],
@@ -95,7 +134,7 @@ private struct ThrowingMetadataProviderClient: BackendAIProviderClient {
         apiKey: String
     ) async throws -> String {
         return """
-        
+
         接下来可以顺着这个主线，再补一段更自然的推进。
         """
     }
@@ -106,7 +145,34 @@ private struct ThrowingMetadataProviderClient: BackendAIProviderClient {
         configuration: BackendAIConfiguration,
         apiKey: String
     ) async throws -> WritingAICompletionMetadata {
-        throw BackendAIError.providerError("AI metadata response did not include the expected tool call.")
+        XCTFail("Metadata generation should not be called for prose requests.")
+        return WritingAICompletionMetadata(localSummary: "", globalSynopsis: "", nextFocus: "", suggestionChips: [])
+    }
+}
+
+private struct MetadataOnlyProviderClient: BackendAIProviderClient {
+    func generateProseText(
+        for request: WritingAIRequest,
+        messages: [WritingAIChatMessage],
+        configuration: BackendAIConfiguration,
+        apiKey: String
+    ) async throws -> String {
+        XCTFail("Prose generation should not be called for metadata requests.")
+        return ""
+    }
+
+    func generateMetadata(
+        for request: WritingAIRequest,
+        messages: [WritingAIChatMessage],
+        configuration: BackendAIConfiguration,
+        apiKey: String
+    ) async throws -> WritingAICompletionMetadata {
+        WritingAICompletionMetadata(
+            localSummary: "已续写一段",
+            globalSynopsis: "已续写一段总览",
+            nextFocus: "继续顺着当前主线往下写",
+            suggestionChips: ["继续写", "编辑这段", "补一段"]
+        )
     }
 }
 

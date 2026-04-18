@@ -292,7 +292,7 @@ final class VibeWriteAppFlow: ObservableObject {
         isBodyThinkingInFlight = true
         isPrimaryActionDisplayInFlight = true
         isProseRequestInFlight = true
-        isMetadataRequestInFlight = aiClient.usesIntegratedBackendMetadataPhase
+        isMetadataRequestInFlight = false
         activeEditLock = requestLock
         aiErrorMessage = nil
         defer {
@@ -525,33 +525,21 @@ final class VibeWriteAppFlow: ObservableObject {
                 after: liveProject.aiSnapshot
             )
             replaceActiveProject(liveProject)
-            let usesIntegratedBackendMetadataPhase = aiClient.usesIntegratedBackendMetadataPhase
-            let metadataRequestStartedAt: Date?
-            let metadataTask: Task<WritingAIResponse, Error>?
-            if usesIntegratedBackendMetadataPhase {
-                metadataRequestStartedAt = nil
-                metadataTask = nil
-                VibeWriteLog.ai.info(
-                    "Flow metadata already included in backend response action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public)"
-                )
-            } else {
-                let metadataRequest = WritingAIRequest(
-                    action: action,
-                    project: liveProject.aiSnapshot,
-                    userMessage: requestUserMessage,
-                    selectionText: normalizedSelectionText ?? selectionText,
-                    selectionRange: selectionRange,
-                    kind: .metadata
-                )
-                let startedAt = Date()
-                metadataRequestStartedAt = startedAt
-                VibeWriteLog.ai.info(
-                    "Flow metadata request start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) docCount=\(metadataRequest.project.documentText.count, privacy: .public) suggestionCount=\(metadataRequest.project.suggestionChips.count, privacy: .public)"
-                )
-                isMetadataRequestInFlight = true
-                metadataTask = Task {
-                    try await aiClient.generateResponse(for: metadataRequest)
-                }
+            let metadataRequest = WritingAIRequest(
+                action: action,
+                project: liveProject.aiSnapshot,
+                userMessage: requestUserMessage,
+                selectionText: normalizedSelectionText ?? selectionText,
+                selectionRange: selectionRange,
+                kind: .metadata
+            )
+            let metadataRequestStartedAt = Date()
+            VibeWriteLog.ai.info(
+                "Flow metadata request start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) docCount=\(metadataRequest.project.documentText.count, privacy: .public) suggestionCount=\(metadataRequest.project.suggestionChips.count, privacy: .public)"
+            )
+            isMetadataRequestInFlight = true
+            let metadataTask = Task {
+                try await aiClient.generateResponse(for: metadataRequest)
             }
 
             if let currentDocumentURL {
@@ -573,44 +561,29 @@ final class VibeWriteAppFlow: ObservableObject {
                 "Flow prose playback wait finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) waitSeconds=\(prosePlaybackElapsed, privacy: .public)"
             )
 
-            if usesIntegratedBackendMetadataPhase {
+            do {
+                let metadataResponse = try await metadataTask.value
                 guard isCurrentRequest(requestToken) else {
                     return
                 }
-                let metadata = response.completionMetadata
+                let metadata = metadataResponse.completionMetadata
                 liveProject.applyWritingMetadata(metadata)
                 replaceActiveProject(liveProject)
                 if let currentDocumentURL {
                     _ = saveCurrentDocument(to: currentDocumentURL)
                 }
+                let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
                 VibeWriteLog.ai.info(
-                    "Flow backend metadata applied action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) localSummaryCount=\(metadata.localSummary.count, privacy: .public) globalSynopsisCount=\(metadata.globalSynopsis.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
+                    "Flow metadata response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) localSummaryCount=\(metadata.localSummary.count, privacy: .public) globalSynopsisCount=\(metadata.globalSynopsis.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
                 )
-            } else if let metadataTask, let metadataRequestStartedAt {
-                do {
-                    let metadataResponse = try await metadataTask.value
-                    guard isCurrentRequest(requestToken) else {
-                        return
-                    }
-                    let metadata = metadataResponse.completionMetadata
-                    liveProject.applyWritingMetadata(metadata)
-                    replaceActiveProject(liveProject)
-                    if let currentDocumentURL {
-                        _ = saveCurrentDocument(to: currentDocumentURL)
-                    }
-                    let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
-                    VibeWriteLog.ai.info(
-                        "Flow metadata response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) localSummaryCount=\(metadata.localSummary.count, privacy: .public) globalSynopsisCount=\(metadata.globalSynopsis.count, privacy: .public) nextFocusCount=\(metadata.nextFocus.count, privacy: .public) suggestionCount=\(metadata.suggestionChips.count, privacy: .public)"
-                    )
-                } catch {
-                    let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
-                    VibeWriteLog.ai.error(
-                        "Flow metadata request failed action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
-                    )
-                }
-                if isCurrentRequest(requestToken) {
-                    isMetadataRequestInFlight = false
-                }
+            } catch {
+                let metadataElapsed = Self.elapsedSeconds(since: metadataRequestStartedAt)
+                VibeWriteLog.ai.error(
+                    "Flow metadata request failed action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) metadataSeconds=\(metadataElapsed, privacy: .public) error=\(error.localizedDescription, privacy: .public)"
+                )
+            }
+            if isCurrentRequest(requestToken) {
+                isMetadataRequestInFlight = false
             }
         } catch {
             guard isCurrentRequest(requestToken) else {

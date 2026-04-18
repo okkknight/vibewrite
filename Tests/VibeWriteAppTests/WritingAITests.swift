@@ -239,6 +239,117 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/start", "/v3/client/bootstrap", "/v3/writes/start"])
     }
 
+    func testBackendGatewayClientStreamsContinueWritingAsIncrementalDelta() async throws {
+        let storageURL = try makeBackendGatewayTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let identityStore = BackendGatewayIdentityStore(storageURL: storageURL)
+        let requestsLock = NSLock()
+        var recordedPaths: [String] = []
+        let prompt = "继续写下去"
+        let project = WritingProjectSnapshot(
+            id: UUID(uuidString: "00000000-0000-0000-0000-000000000012") ?? UUID(),
+            automationKey: "gateway.stream.delta.demo",
+            title: "续写测试",
+            prompt: "先写开头",
+            mode: .collaboration,
+            localSummary: "继续推进当前正文",
+            globalSynopsis: "继续推进当前正文",
+            context: ProjectContext(
+                intentSummary: "先写开头",
+                styleConstraints: ["克制", "平静"],
+                currentGoal: "续写",
+                recentDecisions: ["已经写到一半"],
+                workingMemory: ["当前正文仍在推进"],
+                nextFocus: "把主线往前推"
+            ),
+            conversation: [
+                ConversationMessage(role: .user, text: prompt, timestamp: "用户 · 刚刚")
+            ],
+            documentText: "开头正文",
+            suggestionChips: ["继续写", "编辑这段", "补一段"],
+            updatedAt: Date(timeIntervalSince1970: 1_719_000_000)
+        )
+        let request = WritingAIRequest(
+            action: .continueWriting,
+            project: project,
+            userMessage: prompt,
+            selectionText: "开头正文"
+        )
+
+        let session = makeAnthropicMockSession { request in
+            requestsLock.lock()
+            defer { requestsLock.unlock() }
+
+            recordedPaths.append(request.url?.path ?? "")
+
+            switch request.url?.path {
+            case "/v3/client/bootstrap":
+                let body = try JSONEncoder().encode(
+                    BackendGatewayBootstrapResponseEnvelope(
+                        deviceToken: "device-token-1",
+                        deviceStatus: "active",
+                        quotaSummary: .init(dailyLimit: 50, weeklyLimit: 200)
+                    )
+                )
+                return (self.makeHTTPResponse(statusCode: 200), body)
+
+            case "/v3/writes/continue":
+                let envelope = try self.decodeBackendGatewayWriteEnvelope(from: request)
+                XCTAssertEqual(envelope.kind, .prose)
+                let backendRequest = self.makeBackendGatewayWritingRequest(from: envelope)
+                let streamedText = MockWritingEngine.streamedTextDelta(for: backendRequest)
+                let documentText = MockWritingEngine.finalDocumentText(
+                    for: backendRequest,
+                    streamedText: streamedText
+                )
+                let response = WritingProjectResponseBuilder.response(
+                    for: backendRequest,
+                    documentText: documentText,
+                    metadata: nil
+                )
+                let body = try JSONEncoder().encode(response)
+                return (self.makeHTTPResponse(statusCode: 200), body)
+
+            default:
+                XCTFail("Unexpected backend gateway request path \(request.url?.path ?? "nil")")
+                return (self.makeHTTPResponse(statusCode: 500), Data())
+            }
+        }
+
+        let client = BackendWritingAIClient(
+            configuration: BackendGatewayConfiguration.configuration(
+                from: [
+                    "VIBEWRITE_BACKEND_DEFAULT_MODE": "real",
+                    "VIBEWRITE_BACKEND_BASE_URL": "http://127.0.0.1:8080"
+                ]
+            ),
+            identityStore: identityStore,
+            session: session
+        )
+
+        var streamedText = ""
+        var finalResponse: WritingAIResponse?
+        for try await event in client.streamResponse(for: request) {
+            switch event {
+            case .textDelta(let delta):
+                streamedText += delta
+            case .completed(let response):
+                finalResponse = response
+            }
+        }
+
+        XCTAssertFalse(streamedText.hasPrefix(project.documentText))
+        XCTAssertTrue(streamedText.contains("接下来可以顺着现在的主线，再补一段更自然的推进。"))
+        XCTAssertEqual(finalResponse?.documentText, """
+        开头正文
+        接下来可以顺着现在的主线，再补一段更自然的推进。
+        """)
+        XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/continue"])
+    }
+
     func testBackendGatewayClientMapsNetworkUnavailableErrors() async throws {
         let storageURL = try makeBackendGatewayTempStorageURL()
         defer {
