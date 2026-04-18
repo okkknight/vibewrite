@@ -130,6 +130,7 @@ struct StubBackendAIProviderClient: BackendAIProviderClient {
 
 final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked Sendable {
     private let session: URLSession
+    private let responseBuilder = BackendWritingResponseBuilder()
 
     init(session: URLSession = .shared) {
         self.session = session
@@ -249,7 +250,7 @@ final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked 
             return decoded
         }
 
-        throw BackendAIError.providerError("AI metadata response did not include the expected tool call.")
+        return responseBuilder.fallbackMetadata(for: request)
     }
 
     private func generateTextSchemaMetadata(
@@ -301,13 +302,13 @@ final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked 
         }
 
         guard let content = decodedResponse.firstMessageContent else {
-            throw BackendAIError.providerError("AI metadata response did not include content.")
+            return responseBuilder.fallbackMetadata(for: request)
         }
 
         do {
             return try WritingAICompletionMetadataDecoder.decode(from: content)
         } catch {
-            throw BackendAIError.providerError("AI metadata response was not valid JSON.")
+            return responseBuilder.fallbackMetadata(for: request)
         }
     }
 

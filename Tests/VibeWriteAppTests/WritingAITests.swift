@@ -345,6 +345,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertTrue(streamedText.contains("接下来可以顺着现在的主线，再补一段更自然的推进。"))
         XCTAssertEqual(finalResponse?.documentText, """
         开头正文
+
         接下来可以顺着现在的主线，再补一段更自然的推进。
         """)
         XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/continue"])

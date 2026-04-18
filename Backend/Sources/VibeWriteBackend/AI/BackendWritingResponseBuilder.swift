@@ -61,6 +61,15 @@ struct BackendWritingResponseBuilder {
         return snapshot
     }
 
+    func fallbackMetadata(for request: WritingAIRequest) -> WritingAICompletionMetadata {
+        WritingAICompletionMetadata(
+            localSummary: normalizedMetadataValue(request.project.localSummary),
+            globalSynopsis: normalizedMetadataValue(request.project.globalSynopsis),
+            nextFocus: normalizedMetadataValue(request.project.context.nextFocus),
+            suggestionChips: normalizedSuggestionChips(request.project.suggestionChips)
+        )
+    }
+
     func appliedDocumentText(
         for request: WritingAIRequest,
         proseText: String

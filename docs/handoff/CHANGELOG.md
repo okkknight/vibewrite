@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-18
+- Restored the missing-tool-call fallback in the backend metadata path so the old two-phase prose + metadata shape now matches the pre-split behavior again: metadata misses fall back to the existing project metadata instead of surfacing HTTP 502s. Verification passed with `swift test` at the repo root, `cd Backend && swift test`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-18
 - Review result for `Restore original split semantics`: fail. The app/backend split is back to the old two-phase prose + metadata shape, but the backend still throws `providerError` / HTTP 502 when the metadata phase omits the expected tool call. The next fix is to restore the missing-tool-call fallback in the backend metadata path instead of only describing it in handoff notes.
 
 # 2026-04-18

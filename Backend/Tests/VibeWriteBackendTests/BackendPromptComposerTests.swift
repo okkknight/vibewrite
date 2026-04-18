@@ -142,16 +142,18 @@ final class BackendPromptComposerTests: XCTestCase {
         let textUserPrompt = textRouteMessages[1].content
 
         XCTAssertFalse(currentSystemPrompt.contains("Metadata rules"))
-        XCTAssertTrue(currentSystemPrompt.contains("Use the provided emit_metadata tool to return the metadata for the completed prose."))
-        XCTAssertTrue(currentSystemPrompt.contains("Do not output prose, markdown fences, or commentary."))
-        XCTAssertTrue(currentSystemPrompt.contains("Provider: minimax"))
-        XCTAssertTrue(currentSystemPrompt.contains("Model: MiniMax-M2.5-highspeed"))
+        XCTAssertTrue(currentSystemPrompt.contains("You are VibeWrite metadata-only response builder."))
+        XCTAssertTrue(currentSystemPrompt.contains("The only valid response is a single `emit_metadata` tool call."))
+        XCTAssertTrue(currentSystemPrompt.contains("Do not output plain text, prose, markdown fences, JSON, reasoning, or commentary."))
+        XCTAssertFalse(currentSystemPrompt.contains("Provider:"))
+        XCTAssertFalse(currentSystemPrompt.contains("Model:"))
         XCTAssertTrue(currentUserPrompt.contains("Action: startDraft metadata"))
         XCTAssertTrue(currentUserPrompt.contains("Completed prose:"))
         XCTAssertTrue(currentUserPrompt.contains("Current global synopsis:"))
         XCTAssertTrue(currentUserPrompt.contains("Return localSummary, globalSynopsis, nextFocus, and suggestionChips as a single emit_metadata tool call."))
 
         XCTAssertFalse(textSystemPrompt.contains("Metadata rules"))
+        XCTAssertTrue(textSystemPrompt.contains("You are VibeWrite metadata-only response builder."))
         XCTAssertTrue(textSystemPrompt.contains("Return only the metadata for the completed prose."))
         XCTAssertTrue(textSystemPrompt.contains("Provider: minimax"))
         XCTAssertTrue(textSystemPrompt.contains("Model: MiniMax-Text-01"))
