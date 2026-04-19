@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Independent review of `task/TASK_20260419_047.md` failed. The new shortcut wiring and focused tests build cleanly, but a direct runtime check against the current model/history flow showed that `undoLastRevision()` leaves the revision history empty, so `cmd+shift+z` only retries the live current revision state and cannot restore an actually undone AI revision. The task still needs a real redo memory or stack before it can pass acceptance.
+
+# 2026-04-19
 - Implemented `task/TASK_20260419_047.md`: `command+shift+z` now routes through the same AI revision retry path used by the history panel while still letting native text redo run first, and the new shortcut routing is covered by focused `VibeWriteAppFlowTests`. Verification passed with `swift test --filter VibeWriteAppFlowTests/testRedoShortcut` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
 
 # 2026-04-19
