@@ -1,9 +1,17 @@
 import AppKit
 import SwiftUI
 
+final class VibeWriteUndoActionBox: ObservableObject {
+    var perform: () -> Bool
+
+    init(perform: @escaping () -> Bool) {
+        self.perform = perform
+    }
+}
+
 struct VibeWriteCommands: Commands {
     @ObservedObject var flow: VibeWriteAppFlow
-    @FocusedValue(\.vibeWriteUndoAction) private var vibeWriteUndoAction
+    @FocusedObject private var vibeWriteUndoActionBox: VibeWriteUndoActionBox?
 
     var body: some Commands {
         CommandGroup(replacing: .undoRedo) {
@@ -13,7 +21,9 @@ struct VibeWriteCommands: Commands {
                 )
                 let outcome = flow.handleUndoShortcut(
                     systemUndo: { NSApp.sendAction(#selector(UndoManager.undo), to: nil, from: nil) },
-                    aiUndo: vibeWriteUndoAction
+                    aiUndo: vibeWriteUndoActionBox.map { box in
+                        { box.perform() }
+                    }
                 )
                 VibeWriteLog.ai.info(
                     "command undo resolved outcome=\(outcome.rawValue, privacy: .public) activeCount=\(flow.activeDocumentText.count, privacy: .public) revisionCount=\(flow.activeProject.revisionHistory.count, privacy: .public)"

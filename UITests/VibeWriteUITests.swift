@@ -79,6 +79,68 @@ final class VibeWriteUITests: XCTestCase {
         XCTAssertTrue(waitForElementToAppear(sendButton, timeout: 10))
     }
 
+    func testCommandZUndefaultsToAIRevisionUndoWhenNoNativeUndoIsAvailable() throws {
+        let app = launchApplication(
+            bundleIdentifier: "com.knightspace.vibewrite",
+            launchArguments: [
+                "--vibe-ai-mode=stub"
+            ]
+        )
+        addUIInterruptionMonitor(withDescription: "Dismiss unexpected startup dialog") { dialog in
+            if dialog.frame.height < 80 {
+                return false
+            }
+
+            for label in ["Allow", "OK", "Continue", "取消", "Cancel", "Not Now", "不要", "Don't Allow"] {
+                let button = dialog.buttons[label]
+                if button.exists {
+                    button.click()
+                    return true
+                }
+            }
+
+            if let firstButton = dialog.buttons.allElementsBoundByIndex.first {
+                firstButton.click()
+                return true
+            }
+
+            return false
+        }
+
+        let window = app.windows.firstMatch
+        XCTAssertTrue(waitForElementToAppear(window, timeout: 15))
+        app.activate()
+        window.click()
+
+        let bodyEditor = window.textViews.firstMatch
+        XCTAssertTrue(waitForElementToAppear(bodyEditor, timeout: 10))
+
+        let messageInputField = window.descendants(matching: .any)
+            .matching(identifier: "project.messageInput")
+            .firstMatch
+        XCTAssertTrue(waitForElementToAppear(messageInputField, timeout: 10))
+
+        let sendButton = window.descendants(matching: .any)
+            .matching(identifier: "project.sendButton")
+            .firstMatch
+        XCTAssertTrue(waitForElementToAppear(sendButton, timeout: 10))
+
+        messageInputField.click()
+        messageInputField.typeText("写一篇关于成年人孤独感的公众号文章")
+        sendButton.click()
+
+        XCTAssertTrue(waitForCondition(timeout: 20) {
+            (bodyEditor.value as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty == false
+        })
+
+        bodyEditor.click()
+        bodyEditor.typeKey("z", modifierFlags: [.command])
+
+        XCTAssertTrue(waitForCondition(timeout: 20) {
+            (bodyEditor.value as? String ?? "").trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        })
+    }
+
     func testSelectionPopoverShowsPresetOptionsAndTriggersLocalEdit() throws {
         throw XCTSkip("Temporarily disabled because this selection-flow UI test still risks opening a system file panel and stealing focus.")
     }

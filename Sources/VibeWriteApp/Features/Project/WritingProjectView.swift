@@ -95,7 +95,7 @@ struct WritingProjectView: View {
 
             projectWorkspace
         }
-        .focusedSceneValue(\.vibeWriteUndoAction, performUndoLastChange)
+        .focusedSceneObject(VibeWriteUndoActionBox(perform: performUndoLastChange))
         .onChange(of: project.id) { _, _ in
             selectedText = nil
             selectedTextRange = nil
