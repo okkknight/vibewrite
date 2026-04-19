@@ -74,12 +74,13 @@ struct BackendWritingResponseBuilder {
         for request: WritingAIRequest,
         proseText: String
     ) throws -> String {
+        let documentText: String
         switch request.action {
         case .startDraft:
-            return proseText
+            documentText = proseText
 
         case .continueWriting:
-            return request.project.documentText + proseText
+            documentText = request.project.documentText + proseText
 
         case .edit:
             guard let range = request.selectionRange?.range(in: request.project.documentText) else {
@@ -88,8 +89,9 @@ struct BackendWritingResponseBuilder {
 
             var revised = request.project.documentText
             revised.replaceSubrange(range, with: proseText)
-            return revised
+            documentText = revised
         }
+        return documentText
     }
 
     private func intentSummary(for request: WritingAIRequest) -> String {

@@ -9,7 +9,7 @@ struct BackendPromptComposer {
     ) throws -> [WritingAIChatMessage] {
         let sanitizedRequest = sanitizedRequest(for: request)
         let promptRules = resolvedPromptRules(from: systemPromptSnapshot)
-        return [
+        let messages = [
             WritingAIChatMessage(
                 role: .system,
                 content: proseSystemPrompt(
@@ -24,6 +24,8 @@ struct BackendPromptComposer {
                 content: proseUserPrompt(for: sanitizedRequest)
             )
         ]
+
+        return messages
     }
 
     func metadataMessages(
@@ -217,15 +219,15 @@ struct BackendPromptComposer {
         if request.action == .continueWriting {
             lines.append("Use the global synopsis as stable context and the document tail as the continuation anchor.")
             lines.append("Do not restart from the beginning of the article.")
-            lines.append("Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.")
-            lines.append("Leave a small amount of forward momentum for the next step.")
-            lines.append("Keep the continuation brief so the next move still feels natural.")
+            lines.append("Write the continuation as 1 or 2 short natural paragraphs.")
+            lines.append("Let a blank line appear when the focus shifts to a new beat, image, or thought.")
+            lines.append("Keep the continuation brief, open-ended, and natural so the next move still has room to breathe.")
         } else if request.action == .edit {
             lines.append("Return only the replacement text for the selected segment.")
             lines.append("Rewrite only the selected passage or local region whenever practical.")
         } else {
-            lines.append("Write the opening prose for the first draft.")
-            lines.append("Keep the opening brief and concrete so it can stand on its own.")
+            lines.append("Write the opening as 1 or 2 short natural paragraphs.")
+            lines.append("Keep the opening brief and concrete, but let it feel like a real start instead of a placeholder sentence.")
             lines.append("Do not output metadata or commentary.")
         }
 

@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Tightened the default backend prose prompts so `startDraft` now asks for 1 or 2 natural opening paragraphs, `continueWriting` asks for 1 or 2 natural continuation paragraphs and a blank-line break when the beat turns, and `edit` stays prose-only without any metadata marker in the body output. The temporary paragraph-trace instrumentation used during diagnosis was removed again after verification. Verification passed with `swift test --package-path Backend -j 4`.
+
+# 2026-04-19
 - Independent review of `task/TASK_20260419_047.md` passed. I verified the current code path with a standalone runtime probe compiled from the workspace sources: after `performWritingAction(.continueWriting)` the flow recorded one revision, `undoLastRevision()` moved that revision into the redo stack, and `redoLastRevision()` restored the same document text and revision state (`textAfterRedoMatchesWrite=true`, `redoActuallyRestored=true`). This confirms `cmd+shift+z` now restores an actually undone AI revision instead of relying on a live revision snapshot.
 
 # 2026-04-19

@@ -771,7 +771,6 @@ private struct AnthropicMessagesResponse: Decodable {
             guard case .text(let value) = block else { return nil }
             return value
         }
-
         let joined = textBlocks.joined()
         return joined.isEmpty ? nil : joined
     }

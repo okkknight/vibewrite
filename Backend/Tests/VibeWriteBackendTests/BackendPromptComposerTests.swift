@@ -34,10 +34,10 @@ final class BackendPromptComposerTests: XCTestCase {
                 "Output only prose text for the requested action.",
                 "Do not output metadata, JSON, markdown fences, or commentary.",
                 "Keep the output short enough to stream quickly.",
-                "- Write a short opening paragraph or two.",
+                "- Write a short opening in 1 or 2 natural paragraphs.",
                 "- Write only the opening prose for the first draft.",
-                "- Keep the opening brief and concrete so it can stand on its own, but give it enough substance to feel like a real start.",
-                "- Make the opening feel established rather than like a single placeholder sentence.",
+                "- Let the opening breathe as a real scene or thought instead of a single placeholder sentence.",
+                "- Use a blank line only when the opening naturally shifts to a new beat.",
                 "- Keep the writing voice calm, precise, and native to a macOS writing app.",
                 "- Preserve the current article's structure unless the action explicitly changes it.",
                 "- When the action is \"startDraft\", focus on the first usable opening rather than a full outline.",
@@ -53,8 +53,8 @@ final class BackendPromptComposerTests: XCTestCase {
                 "Current document:",
                 "(empty)",
                 "User message: \(prompt)",
-                "Write the opening prose for the first draft.",
-                "Keep the opening brief and concrete so it can stand on its own.",
+                "Write the opening as 1 or 2 short natural paragraphs.",
+                "Keep the opening brief and concrete, but let it feel like a real start instead of a placeholder sentence.",
                 "Do not output metadata or commentary."
             )
         )
@@ -109,9 +109,9 @@ final class BackendPromptComposerTests: XCTestCase {
                 "Output only prose text for the requested action.",
                 "Do not output metadata, JSON, markdown fences, or commentary.",
                 "Keep the output short enough to stream quickly.",
-                "- Continue the current正文 with the next short paragraph or scene.",
-                "- Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.",
-                "- Leave a small amount of forward momentum for the next step.",
+                "- Continue the current正文 with 1 or 2 short natural paragraphs.",
+                "- Advance the passage only a little, but let the paragraph break land when the focus turns.",
+                "- Keep the continuation open-ended so the next step still has room to move.",
                 "- Keep the writing voice calm, precise, and native to a macOS writing app.",
                 "- Preserve the current article's structure unless the action explicitly changes it.",
                 "- When the action is \"continueWriting\", continue the existing正文 instead of restarting the article.",
@@ -131,9 +131,9 @@ final class BackendPromptComposerTests: XCTestCase {
                 "User message: 继续往下写",
                 "Use the global synopsis as stable context and the document tail as the continuation anchor.",
                 "Do not restart from the beginning of the article.",
-                "Advance the passage only a little; do not turn this into a full ending or a fully closed paragraph.",
-                "Leave a small amount of forward momentum for the next step.",
-                "Keep the continuation brief so the next move still feels natural."
+                "Write the continuation as 1 or 2 short natural paragraphs.",
+                "Let a blank line appear when the focus shifts to a new beat, image, or thought.",
+                "Keep the continuation brief, open-ended, and natural so the next move still has room to breathe."
             )
         )
     }
