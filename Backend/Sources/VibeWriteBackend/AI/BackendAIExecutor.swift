@@ -70,34 +70,21 @@ actor BackendAIExecutor {
     }
 
     func execute(for envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
-        let request = WritingAIRequest(
-            action: envelope.action,
-            project: envelope.project,
-            userMessage: envelope.userMessage,
-            selectionText: envelope.selectionText,
-            selectionRange: envelope.selectionRange,
-            kind: envelope.kind
-        )
-
-        let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
-        let secretSnapshot = try await secretStore.secretCurrentSnapshot()
-        let providerApiKey = secretSnapshot.providerApiKey
-
-        if configuration.mode == .real && (providerApiKey?.isEmpty ?? true) {
-            throw BackendAIError.providerUnavailable("Missing provider API key.")
-        }
-
-        let apiKey = providerApiKey ?? ""
-
         switch envelope.kind {
         case .prose:
-            return try await executeProse(
-                for: request,
-                systemPromptSnapshot: systemPromptSnapshot,
-                apiKey: apiKey
-            )
+            return try await executeProse(for: envelope)
 
         case .metadata:
+            let request = WritingAIRequest(
+                action: envelope.action,
+                project: envelope.project,
+                userMessage: envelope.userMessage,
+                selectionText: envelope.selectionText,
+                selectionRange: envelope.selectionRange,
+                kind: envelope.kind
+            )
+            let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
+            let apiKey = try await resolvedProviderApiKey()
             return try await executeMetadata(
                 for: request,
                 systemPromptSnapshot: systemPromptSnapshot,
@@ -106,11 +93,84 @@ actor BackendAIExecutor {
         }
     }
 
+    func streamProse(for envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        let request = WritingAIRequest(
+            action: envelope.action,
+            project: envelope.project,
+            userMessage: envelope.userMessage,
+            selectionText: envelope.selectionText,
+            selectionRange: envelope.selectionRange,
+            kind: envelope.kind
+        )
+        let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
+        let apiKey = try await resolvedProviderApiKey()
+
+        let proseMessages: [WritingAIChatMessage]
+        do {
+            proseMessages = try promptComposer.proseMessages(
+                for: request,
+                systemPromptSnapshot: systemPromptSnapshot,
+                configuration: configuration
+            )
+        } catch let error as BackendAIError {
+            throw error
+        } catch {
+            throw BackendAIError.invalidConfiguration(error.localizedDescription)
+        }
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let proseStream = try await providerClient.streamProseText(
+                        for: request,
+                        messages: proseMessages,
+                        configuration: configuration,
+                        apiKey: apiKey
+                    )
+
+                    var proseText = ""
+                    for try await delta in proseStream {
+                        proseText += delta
+                        continuation.yield(.textDelta(delta))
+                    }
+
+                    let documentText = try responseBuilder.appliedDocumentText(
+                        for: request,
+                        proseText: proseText
+                    )
+
+                    let response = responseBuilder.response(
+                        for: request,
+                        documentText: documentText,
+                        metadata: nil,
+                        assistantMessage: responseBuilder.assistantLine(for: request.action)
+                    )
+
+                    continuation.yield(.completed(response))
+                    continuation.finish()
+                } catch let error as BackendAIError {
+                    continuation.finish(throwing: error)
+                } catch {
+                    continuation.finish(throwing: BackendAIError.providerError(error.localizedDescription))
+                }
+            }
+        }
+    }
+
     private func executeProse(
-        for request: WritingAIRequest,
-        systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
-        apiKey: String
+        for envelope: WriteRequestEnvelope
     ) async throws -> WritingAIResponse {
+        let request = WritingAIRequest(
+            action: envelope.action,
+            project: envelope.project,
+            userMessage: envelope.userMessage,
+            selectionText: envelope.selectionText,
+            selectionRange: envelope.selectionRange,
+            kind: envelope.kind
+        )
+        let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
+        let apiKey = try await resolvedProviderApiKey()
+
         let proseMessages: [WritingAIChatMessage]
         do {
             proseMessages = try promptComposer.proseMessages(
@@ -156,6 +216,17 @@ actor BackendAIExecutor {
             metadata: nil,
             assistantMessage: responseBuilder.assistantLine(for: request.action)
         )
+    }
+
+    private func resolvedProviderApiKey() async throws -> String {
+        let secretSnapshot = try await secretStore.secretCurrentSnapshot()
+        let providerApiKey = secretSnapshot.providerApiKey
+
+        if configuration.mode == .real && (providerApiKey?.isEmpty ?? true) {
+            throw BackendAIError.providerUnavailable("Missing provider API key.")
+        }
+
+        return providerApiKey ?? ""
     }
 
     private func executeMetadata(

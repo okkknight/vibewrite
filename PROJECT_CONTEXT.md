@@ -32,6 +32,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - `task/TASK_20260414_044.md` is now complete in the repo as the final V3 closeout card. It verified the current backend/app/admin state, froze the release status, and wrote the archival closeout back into the handoff docs.
 - The current `WriteService` no longer returns stub `WritingAIResponse` payloads for the write routes; it now delegates to `BackendAIExecutor` and logs the real configured provider/model values.
 - The backend gateway client now preserves the old streaming contract for prose writes again: `startDraft` streams a full first draft, while `continueWriting` and `edit` stream only the incremental delta that the app preview expects.
+- The real prose stream is now end-to-end: the backend forwards Anthropic-compatible SSE deltas as they arrive, so the app sees the first正文 chunk before the final `completed` event instead of waiting for a flattened local replay.
 - Backend metadata generation now follows the old pre-split flow again in two separate phases, and the missing-tool-call fallback is restored so metadata misses fall back to the existing project metadata instead of surfacing HTTP 502s.
 - The backend write transport envelope is route-neutral, so `start`, `continue`, and `edit` share the same backend-only request shape while the shared DTO boundary stays untouched.
 - The backend edit route keeps the original selection semantics: `selectionRange` is the source of truth for local edits, while `selectionText` stays as request context.

@@ -78,6 +78,31 @@ final class BackendAIProviderClientTests: XCTestCase {
         XCTAssertEqual(metadata.suggestionChips, ["继续写", "编辑这段"])
     }
 
+    func testAnthropicStreamParserHandlesTextAndStopEvents() throws {
+        let textDeltaEvent = AnthropicStreamParser.events(
+            eventType: "content_block_delta",
+            dataLines: [
+                #"{"type":"content_block_delta","index":1,"delta":{"type":"text_delta","text":"第一段。"}}"#
+            ]
+        )
+
+        let thinkingDeltaEvent = AnthropicStreamParser.events(
+            eventType: "content_block_delta",
+            dataLines: [
+                #"{"type":"content_block_delta","index":0,"delta":{"type":"thinking_delta","thinking":"用户要求"}}"#
+            ]
+        )
+
+        let stopEvent = AnthropicStreamParser.events(
+            eventType: "message_stop",
+            dataLines: []
+        )
+
+        XCTAssertEqual(textDeltaEvent, [.textDelta("第一段。")])
+        XCTAssertEqual(thinkingDeltaEvent, [])
+        XCTAssertEqual(stopEvent, [.completed])
+    }
+
     private func makeRequest() -> WritingAIRequest {
         WritingAIRequest(
             action: .continueWriting,

@@ -52,12 +52,45 @@ protocol BackendAIProviderClient: Sendable {
         apiKey: String
     ) async throws -> String
 
+    func streamProseText(
+        for request: WritingAIRequest,
+        messages: [WritingAIChatMessage],
+        configuration: BackendAIConfiguration,
+        apiKey: String
+    ) async throws -> AsyncThrowingStream<String, Error>
+
     func generateMetadata(
         for request: WritingAIRequest,
         messages: [WritingAIChatMessage],
         configuration: BackendAIConfiguration,
         apiKey: String
     ) async throws -> WritingAICompletionMetadata
+}
+
+extension BackendAIProviderClient {
+    func streamProseText(
+        for request: WritingAIRequest,
+        messages: [WritingAIChatMessage],
+        configuration: BackendAIConfiguration,
+        apiKey: String
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let proseText = try await generateProseText(
+                        for: request,
+                        messages: messages,
+                        configuration: configuration,
+                        apiKey: apiKey
+                    )
+                    continuation.yield(proseText)
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
 }
 
 enum BackendAIProviderClientFactory {
@@ -93,6 +126,40 @@ struct StubBackendAIProviderClient: BackendAIProviderClient {
 
         case .edit:
             return "这里不用说得太满，留白会更好。"
+        }
+    }
+
+    func streamProseText(
+        for request: WritingAIRequest,
+        messages: [WritingAIChatMessage],
+        configuration: BackendAIConfiguration,
+        apiKey: String
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let proseText = try await generateProseText(
+                        for: request,
+                        messages: messages,
+                        configuration: configuration,
+                        apiKey: apiKey
+                    )
+                    let chunks = proseText
+                        .split(omittingEmptySubsequences: false, whereSeparator: \.isNewline)
+                        .map(String.init)
+
+                    for (index, chunk) in chunks.enumerated() {
+                        let emittedChunk = chunk.isEmpty ? "\n" : chunk + (index < chunks.count - 1 ? "\n" : "")
+                        continuation.yield(emittedChunk)
+                        if index < chunks.count - 1 {
+                            try? await Task.sleep(nanoseconds: 85_000_000)
+                        }
+                    }
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
         }
     }
 
@@ -180,6 +247,58 @@ final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked 
         }
 
         return proseText
+    }
+
+    func streamProseText(
+        for request: WritingAIRequest,
+        messages: [WritingAIChatMessage],
+        configuration: BackendAIConfiguration,
+        apiKey: String
+    ) async throws -> AsyncThrowingStream<String, Error> {
+        let urlRequest = try makeAnthropicRequest(
+            for: request,
+            messages: messages,
+            apiKey: apiKey,
+            baseURL: configuration.baseURL,
+            model: configuration.model,
+            stream: true
+        )
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    let (bytes, response) = try await session.bytes(for: urlRequest)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw BackendAIError.providerUnavailable("AI request did not return an HTTP response.")
+                    }
+
+                    guard (200...299).contains(httpResponse.statusCode) else {
+                        let data = try await Self.collectData(from: bytes)
+                        if let decodedError = try? JSONDecoder().decode(AnthropicErrorEnvelope.self, from: data) {
+                            throw BackendAIError.providerError(decodedError.errorMessage ?? "AI request failed with HTTP \(httpResponse.statusCode).")
+                        }
+
+                        throw BackendAIError.providerUnavailable("AI request failed with HTTP \(httpResponse.statusCode).")
+                    }
+
+                    for try await event in AnthropicStreamParser.parse(bytes: bytes) {
+                        switch event {
+                        case .textDelta(let delta):
+                            continuation.yield(delta)
+                        case .error(let message):
+                            throw BackendAIError.providerError(message)
+                        case .completed:
+                            continuation.finish()
+                            return
+                        }
+                    }
+
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
     }
 
     func generateMetadata(
@@ -356,6 +475,14 @@ final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked 
         return urlRequest
     }
 
+    private static func collectData(from bytes: URLSession.AsyncBytes) async throws -> Data {
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+        }
+        return data
+    }
+
     private func maxTokens(for request: WritingAIRequest) -> Int {
         switch request.kind {
         case .prose:
@@ -370,6 +497,139 @@ final class MiniMaxBackendAIProviderClient: BackendAIProviderClient, @unchecked 
         case .metadata:
             return 512
         }
+    }
+}
+
+enum AnthropicStreamParser {
+    enum Event: Equatable {
+        case textDelta(String)
+        case completed
+        case error(String)
+    }
+
+    static func events(eventType: String?, dataLines: [String]) -> [Event] {
+        switch eventType {
+        case "message_stop":
+            return [.completed]
+
+        case "error":
+            return [.error(extractErrorMessage(from: dataLines.joined(separator: "\n")) ?? "AI stream returned an error.")]
+
+        case "content_block_delta":
+            let joined = dataLines.joined(separator: "\n")
+            if let delta = extractTextDelta(from: joined), !delta.isEmpty {
+                return [.textDelta(delta)]
+            }
+            return []
+
+        default:
+            return []
+        }
+    }
+
+    static func parse(bytes: URLSession.AsyncBytes) -> AsyncThrowingStream<Event, Error> {
+        AsyncThrowingStream { continuation in
+            Task {
+                do {
+                    var currentEvent: String?
+                    var currentDataLines: [String] = []
+
+                    func flush() throws {
+                        guard currentEvent != nil else { return }
+                        let joinedData = currentDataLines.joined(separator: "\n")
+                        let eventType = currentEvent
+                        currentEvent = nil
+                        currentDataLines.removeAll(keepingCapacity: true)
+
+                        for event in Self.events(eventType: eventType, dataLines: [joinedData]) {
+                            switch event {
+                            case .textDelta(let delta):
+                                continuation.yield(.textDelta(delta))
+                            case .completed:
+                                continuation.yield(.completed)
+                                continuation.finish()
+                                return
+                            case .error(let message):
+                                continuation.yield(.error(message))
+                                continuation.finish()
+                                return
+                            }
+                        }
+                    }
+
+                    for try await line in bytes.lines {
+                        let trimmedLine = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        if trimmedLine.hasPrefix("event:") {
+                            try flush()
+                            currentEvent = trimmedLine
+                                .dropFirst("event:".count)
+                                .trimmingCharacters(in: .whitespacesAndNewlines)
+                            continue
+                        }
+
+                        if trimmedLine.isEmpty {
+                            continue
+                        }
+
+                        if trimmedLine.hasPrefix("data:") {
+                            currentDataLines.append(
+                                String(trimmedLine.dropFirst("data:".count)).trimmingCharacters(in: .whitespacesAndNewlines)
+                            )
+                            continue
+                        }
+                    }
+
+                    try flush()
+                    continuation.finish()
+                } catch {
+                    continuation.finish(throwing: error)
+                }
+            }
+        }
+    }
+
+    private static func extractTextDelta(from jsonText: String) -> String? {
+        guard let object = jsonObject(from: jsonText) as? [String: Any] else {
+            return nil
+        }
+
+        guard object["type"] as? String == "content_block_delta" else {
+            return nil
+        }
+
+        guard let delta = object["delta"] as? [String: Any] else {
+            return nil
+        }
+
+        if let text = delta["text"] as? String, !text.isEmpty {
+            return text
+        }
+
+        return nil
+    }
+
+    private static func extractErrorMessage(from jsonText: String) -> String? {
+        guard let object = jsonObject(from: jsonText) as? [String: Any] else {
+            return nil
+        }
+
+        if let error = object["error"] as? [String: Any], let message = error["message"] as? String, !message.isEmpty {
+            return message
+        }
+
+        if let message = object["message"] as? String, !message.isEmpty {
+            return message
+        }
+
+        return nil
+    }
+
+    private static func jsonObject(from jsonText: String) -> Any? {
+        guard let data = jsonText.data(using: .utf8) else {
+            return nil
+        }
+
+        return try? JSONSerialization.jsonObject(with: data, options: [])
     }
 }
 
