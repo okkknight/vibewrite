@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Added a local backend startup convention so the machine-specific backend parameters now live in ignored `Backend/.env.local`, with `scripts/backend_up.sh` sourcing that file before building and launching the backend. The checked-in `Backend/.env.local.example` documents the required keys without secrets, so future launches no longer need to rediscover `DATABASE_URL`, `ADMIN_SECRET_ENCRYPTION_KEY`, `MINIMAX_API_KEY`, `ADMIN_USERNAME`, or `ADMIN_PASSWORD` by hand.
+
+# 2026-04-19
 - Tightened the default backend prose prompts so `startDraft` now asks for 1 or 2 natural opening paragraphs, `continueWriting` asks for 1 or 2 natural continuation paragraphs and a blank-line break when the beat turns, and `edit` stays prose-only without any metadata marker in the body output. The temporary paragraph-trace instrumentation used during diagnosis was removed again after verification. Verification passed with `swift test --package-path Backend -j 4`.
 
 # 2026-04-19

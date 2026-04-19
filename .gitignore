@@ -2,6 +2,7 @@
 .swiftpm/
 .DS_Store
 Config/VibeWrite.local.xcconfig
+Backend/.env.local
 .derivedData/
 .derivedData-dmg/
 dist/
