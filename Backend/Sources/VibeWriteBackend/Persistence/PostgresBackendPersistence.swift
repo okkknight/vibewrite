@@ -440,16 +440,23 @@ actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
     // MARK: Bootstrapping helpers
 
     private func seedQuotaRulesIfNeeded() async throws {
-        if try await QuotaRuleRecordModel.query(on: app.db).filter(\.$configKey == "current").first() != nil {
+        guard let record = try await QuotaRuleRecordModel.query(on: app.db).filter(\.$configKey == "current").first() else {
+            try await QuotaRuleRecordModel(
+                configKey: "current",
+                limit: .default,
+                updatedAt: clock.now(),
+                updatedBy: nil
+            ).create(on: app.db)
             return
         }
 
-        try await QuotaRuleRecordModel(
-            configKey: "current",
-            limit: .default,
-            updatedAt: clock.now(),
-            updatedBy: nil
-        ).create(on: app.db)
+        if shouldUpgradeLegacyQuotaSeed(record) {
+            record.dailyLimit = QuotaLimit.default.dailyLimit
+            record.weeklyLimit = QuotaLimit.default.weeklyLimit
+            record.updatedAt = clock.now()
+            record.updatedBy = nil
+            try await record.save(on: app.db)
+        }
     }
 
     private func seedSecretConfigIfNeeded() async throws {
@@ -691,6 +698,11 @@ actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
 
     private func shouldUpgradeLegacySystemPromptSeed(_ record: SystemPromptConfigRecordModel) -> Bool {
         record.updatedBy == nil && record.actionRulesJson.contains("[[VIBEWRITE_METADATA]]")
+    }
+
+    private func shouldUpgradeLegacyQuotaSeed(_ record: QuotaRuleRecordModel) -> Bool {
+        record.dailyLimit == QuotaLimit.legacyDefault.dailyLimit
+            && record.weeklyLimit == QuotaLimit.legacyDefault.weeklyLimit
     }
 
     private static func normalizedBlockReason(_ reason: String?) -> String {

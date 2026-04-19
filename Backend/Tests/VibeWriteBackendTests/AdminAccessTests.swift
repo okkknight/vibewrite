@@ -418,8 +418,8 @@ final class AdminAccessTests: XCTestCase {
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
             XCTAssertContent(AdminQuotaResponse.self, response) { body in
-                XCTAssertEqual(body.dailyLimit, 50)
-                XCTAssertEqual(body.weeklyLimit, 200)
+                XCTAssertEqual(body.dailyLimit, 500)
+                XCTAssertEqual(body.weeklyLimit, 2_000)
                 XCTAssertEqual(body.dailyUsed, 0)
                 XCTAssertEqual(body.weeklyUsed, 0)
                 XCTAssertFalse(body.updatedAt.isEmpty)

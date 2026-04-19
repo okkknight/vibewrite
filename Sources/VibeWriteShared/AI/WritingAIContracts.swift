@@ -10,6 +10,42 @@ public enum WritingAIStreamEvent: Sendable, Hashable {
     case completed(WritingAIResponse)
 }
 
+extension WritingAIStreamEvent: Codable {
+    private enum CodingKeys: String, CodingKey {
+        case type
+        case textDelta
+        case response
+    }
+
+    private enum EventType: String, Codable {
+        case textDelta
+        case completed
+    }
+
+    public func encode(to encoder: Encoder) throws {
+        var container = encoder.container(keyedBy: CodingKeys.self)
+        switch self {
+        case .textDelta(let value):
+            try container.encode(EventType.textDelta, forKey: .type)
+            try container.encode(value, forKey: .textDelta)
+        case .completed(let response):
+            try container.encode(EventType.completed, forKey: .type)
+            try container.encode(response, forKey: .response)
+        }
+    }
+
+    public init(from decoder: Decoder) throws {
+        let container = try decoder.container(keyedBy: CodingKeys.self)
+        let eventType = try container.decode(EventType.self, forKey: .type)
+        switch eventType {
+        case .textDelta:
+            self = .textDelta(try container.decode(String.self, forKey: .textDelta))
+        case .completed:
+            self = .completed(try container.decode(WritingAIResponse.self, forKey: .response))
+        }
+    }
+}
+
 public struct WritingAIRequest: Codable, Hashable, Sendable {
     public var action: WritingAIAction
     public var project: WritingProjectSnapshot

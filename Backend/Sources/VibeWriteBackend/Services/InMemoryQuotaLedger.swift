@@ -4,7 +4,8 @@ struct QuotaLimit: Sendable, Equatable {
     let dailyLimit: Int
     let weeklyLimit: Int
 
-    static let `default` = QuotaLimit(dailyLimit: 50, weeklyLimit: 200)
+    static let `default` = QuotaLimit(dailyLimit: 500, weeklyLimit: 2_000)
+    static let legacyDefault = QuotaLimit(dailyLimit: 50, weeklyLimit: 200)
 }
 
 struct QuotaUsageSnapshot: Sendable, Equatable {

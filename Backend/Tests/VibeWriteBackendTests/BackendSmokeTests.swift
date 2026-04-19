@@ -37,8 +37,8 @@ final class BackendSmokeTests: XCTestCase {
 
             XCTAssertContent(BootstrapResponse.self, response) { decoded in
                 XCTAssertEqual(decoded.deviceStatus, .active)
-                XCTAssertEqual(decoded.quotaSummary.dailyLimit, 50)
-                XCTAssertEqual(decoded.quotaSummary.weeklyLimit, 200)
+                XCTAssertEqual(decoded.quotaSummary.dailyLimit, 500)
+                XCTAssertEqual(decoded.quotaSummary.weeklyLimit, 2_000)
                 firstToken = decoded.deviceToken
             }
             XCTAssertFalse(firstToken.isEmpty)
@@ -52,8 +52,8 @@ final class BackendSmokeTests: XCTestCase {
             XCTAssertContent(BootstrapResponse.self, response) { decoded in
                 XCTAssertEqual(decoded.deviceToken, firstToken)
                 XCTAssertEqual(decoded.deviceStatus, .active)
-                XCTAssertEqual(decoded.quotaSummary.dailyLimit, 50)
-                XCTAssertEqual(decoded.quotaSummary.weeklyLimit, 200)
+                XCTAssertEqual(decoded.quotaSummary.dailyLimit, 500)
+                XCTAssertEqual(decoded.quotaSummary.weeklyLimit, 2_000)
             }
         })
     }

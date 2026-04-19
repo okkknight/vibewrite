@@ -41,33 +41,58 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
     }
 
     func streamResponse(for request: WritingAIRequest) -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
-        AsyncThrowingStream { continuation in
+        if request.kind == .metadata {
+            return AsyncThrowingStream { continuation in
+                Task {
+                    do {
+                        let response = try await generateResponse(for: request)
+                        continuation.yield(.completed(response))
+                        continuation.finish()
+                    } catch {
+                        continuation.finish(throwing: error)
+                    }
+                }
+            }
+        }
+
+        return AsyncThrowingStream { continuation in
             Task {
                 do {
-                    let response = try await generateResponse(for: request)
-                    if request.kind == .metadata {
-                        continuation.yield(.completed(response))
-                        continuation.finish()
-                        return
+                    let installationId = await identityStore.installationId()
+                    let deviceToken = try await resolvedDeviceToken(installationId: installationId)
+                    let urlRequest = try makeStreamingWriteRequest(
+                        request,
+                        installationId: installationId,
+                        deviceToken: deviceToken
+                    )
+
+                    let (bytes, response) = try await session.bytes(for: urlRequest)
+                    guard let httpResponse = response as? HTTPURLResponse else {
+                        throw WritingAIClientError.requestFailed("后端写作请求没有返回 HTTP 响应。")
                     }
 
-                    let streamedText = streamedTextDelta(for: request, documentText: response.documentText)
-                    let chunks = MockWritingEngine.streamChunks(for: streamedText)
-
-                    if chunks.isEmpty {
-                        continuation.yield(.completed(response))
-                        continuation.finish()
-                        return
-                    }
-
-                    for (index, chunk) in chunks.enumerated() {
-                        continuation.yield(.textDelta(chunk))
-                        if index < chunks.count - 1 {
-                            try await Task.sleep(nanoseconds: 85_000_000)
+                    guard (200...299).contains(httpResponse.statusCode) else {
+                        let data = try await Self.collectData(from: bytes)
+                        if httpResponse.statusCode == 401 {
+                            await identityStore.clearDeviceToken()
                         }
+                        throw mapHTTPError(
+                            statusCode: httpResponse.statusCode,
+                            body: data,
+                            fallbackMessage: "后端写作请求失败（HTTP \(httpResponse.statusCode)）。"
+                        )
                     }
 
-                    continuation.yield(.completed(response))
+                    for try await line in bytes.lines {
+                        let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+                        guard !trimmed.isEmpty else {
+                            continue
+                        }
+
+                        let event = try decodeStreamEvent(from: trimmed)
+                        continuation.yield(event)
+                    }
+
                     continuation.finish()
                 } catch {
                     continuation.finish(throwing: error)
@@ -236,7 +261,8 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
 
     private func makeURLRequest<T: Encodable>(
         pathComponents: [String],
-        body: T
+        body: T,
+        accept: String = "application/json"
     ) throws -> URLRequest {
         let url = pathComponents.reduce(configuration.baseURL) { partialResult, component in
             partialResult.appendingPathComponent(component)
@@ -244,9 +270,54 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         var request = URLRequest(url: url)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.setValue("application/json", forHTTPHeaderField: "Accept")
+        request.setValue(accept, forHTTPHeaderField: "Accept")
         request.httpBody = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(body)
         return request
+    }
+
+    private func makeStreamingWriteRequest(
+        _ request: WritingAIRequest,
+        installationId: String,
+        deviceToken: String
+    ) throws -> URLRequest {
+        let requestBody = BackendGatewayWriteEnvelope(
+            installationId: installationId,
+            deviceToken: deviceToken,
+            requestId: UUID().uuidString.lowercased(),
+            action: request.action,
+            kind: request.kind,
+            project: request.project,
+            userMessage: request.userMessage,
+            selectionText: request.selectionText,
+            selectionRange: request.selectionRange
+        )
+
+        let urlRequest = try makeURLRequest(
+            pathComponents: ["v3", "writes", routeComponent(for: request.action)],
+            body: requestBody,
+            accept: "application/x-ndjson"
+        )
+        return urlRequest
+    }
+
+    private func decodeStreamEvent(from rawLine: String) throws -> WritingAIStreamEvent {
+        guard let data = rawLine.data(using: .utf8) else {
+            throw WritingAIClientError.invalidResponse("后端流式响应无法转换为 UTF-8。")
+        }
+
+        do {
+            return try JSONDecoder.vibeWriteBackendGatewayResponseDecoder.decode(WritingAIStreamEvent.self, from: data)
+        } catch {
+            throw WritingAIClientError.invalidResponse("后端流式响应格式无效。")
+        }
+    }
+
+    private static func collectData(from bytes: URLSession.AsyncBytes) async throws -> Data {
+        var data = Data()
+        for try await byte in bytes {
+            data.append(byte)
+        }
+        return data
     }
 
     private func routeComponent(for action: WritingAIAction) -> String {

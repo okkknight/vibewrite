@@ -41,6 +41,22 @@ actor WriteService {
         )
     }
 
+    func startDraftStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        try await handleStream(envelope, expectedAction: .startDraft)
+    }
+
+    func continueWritingStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        try await handleStream(envelope, expectedAction: .continueWriting)
+    }
+
+    func editStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        try await handleStream(
+            envelope,
+            expectedAction: .edit,
+            requiresSelectionRange: true
+        )
+    }
+
     private func handle(
         _ envelope: WriteRequestEnvelope,
         expectedAction: WritingAIAction,
@@ -118,6 +134,126 @@ actor WriteService {
                 errorCode: "backend_error"
             )
             throw Abort(.internalServerError, reason: error.localizedDescription)
+        }
+    }
+
+    private func handleStream(
+        _ envelope: WriteRequestEnvelope,
+        expectedAction: WritingAIAction,
+        requiresSelectionRange: Bool = false
+    ) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+        let startedAt = clock.now()
+
+        guard envelope.action == expectedAction else {
+            await recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "invalid_request"
+            )
+            throw Abort(.badRequest, reason: "Only \(expectedAction.rawValue) is supported in this task.")
+        }
+
+        switch try await deviceRegistry.validateDevice(
+            installationId: envelope.installationId,
+            deviceToken: envelope.deviceToken
+        ) {
+        case .valid:
+            break
+        case .blocked:
+            await recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "device_blocked"
+            )
+            throw Abort(.forbidden, reason: "device_blocked")
+        case .unauthorized:
+            await recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "unauthorized"
+            )
+            throw Abort(.unauthorized, reason: "Device token does not match bootstrap registration.")
+        }
+
+        if requiresSelectionRange {
+            guard let selectionRange = envelope.selectionRange,
+                  selectionRange.range(in: envelope.project.documentText) != nil else {
+                await recordRejectedLog(
+                    envelope: envelope,
+                    startedAt: startedAt,
+                    errorCode: "invalid_request"
+                )
+                throw Abort(.badRequest, reason: "A valid selectionRange is required for edit requests.")
+            }
+        }
+
+        guard try await quotaLedger.evaluateAndConsumeIfAllowed(installationId: envelope.installationId) == .allowed else {
+            await recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "quota_exceeded"
+            )
+            throw Abort(.tooManyRequests, reason: "quota_exceeded")
+        }
+
+        let stream: AsyncThrowingStream<WritingAIStreamEvent, Error>
+        do {
+            stream = try await aiExecutor.streamProse(for: envelope)
+        } catch let error as BackendAIError {
+            await recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: error.requestLogCode
+            )
+            throw Abort(error.abortStatus, reason: error.errorDescription ?? "AI request failed.")
+        } catch {
+            await recordRejectedLog(
+                envelope: envelope,
+                startedAt: startedAt,
+                errorCode: "backend_error"
+            )
+            throw Abort(.internalServerError, reason: error.localizedDescription)
+        }
+
+        return AsyncThrowingStream { continuation in
+            Task {
+                var sawCompleted = false
+                do {
+                    for try await event in stream {
+                        if case .completed = event {
+                            sawCompleted = true
+                        }
+                        continuation.yield(event)
+                    }
+
+                    guard sawCompleted else {
+                        await recordRejectedLog(
+                            envelope: envelope,
+                            startedAt: startedAt,
+                            errorCode: "backend_error"
+                        )
+                        continuation.finish(throwing: Abort(.internalServerError, reason: "AI stream did not complete."))
+                        return
+                    }
+
+                    await recordAcceptedLog(envelope: envelope, startedAt: startedAt)
+                    continuation.finish()
+                } catch let error as AbortError {
+                    await recordRejectedLog(
+                        envelope: envelope,
+                        startedAt: startedAt,
+                        errorCode: error.status.reasonPhrase
+                    )
+                    continuation.finish(throwing: error)
+                } catch {
+                    await recordRejectedLog(
+                        envelope: envelope,
+                        startedAt: startedAt,
+                        errorCode: "backend_error"
+                    )
+                    continuation.finish(throwing: error)
+                }
+            }
         }
     }
 

@@ -26,5 +26,5 @@ struct QuotaSummary: Content {
     let dailyLimit: Int
     let weeklyLimit: Int
 
-    static let `default` = QuotaSummary(dailyLimit: 50, weeklyLimit: 200)
+    static let `default` = QuotaSummary(dailyLimit: 500, weeklyLimit: 2_000)
 }
