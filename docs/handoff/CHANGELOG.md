@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Independent review of the backend true-streaming fix passed. `swift test --filter BackendAIProviderClientTests`, `swift test` in `Backend/`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` all passed, and live `POST /v3/writes/start` plus `POST /v3/writes/continue` requests against the running backend both returned multiple incremental `textDelta` events before the final `completed` payload. This confirms the fix is real backend streaming rather than a test-only replay.
+
+# 2026-04-19
 - Restored true end-to-end prose streaming in the backend gateway: the backend now forwards Anthropic-compatible SSE deltas incrementally instead of flattening them at the client boundary, the parser flushes each event on new SSE boundaries so real `content_block_delta` text blocks survive, and the app now receives `textDelta` events before the final `completed` payload. Verification passed with `swift test` in `Backend/`, `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`, and a live `POST /v3/writes/start` stream showing incremental NDJSON chunks before completion.
 
 # 2026-04-19
