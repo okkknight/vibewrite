@@ -685,6 +685,9 @@
 - 建立了本地存储、修订历史、AI 抽象和 UI automation 的基础设施。
 - 这一阶段的目标是把产品跑起来并把主要交互面铺开，后续所有 V2 重构都建立在这套骨架上。
 
+# 2026-04-20
+- The backend prose prompts were relaxed again so `startDraft` now asks for an opening that feels immediately alive and worth continuing, `continueWriting` asks for fresh momentum without forcing a fixed paragraph pattern, and the prose user prompt now stays mostly contextual instead of spelling out paragraph counts or blank-line rules. The backend prompt composer tests were updated to match the softer wording, and verification passed with `swift test --filter BackendPromptComposerTests` in `Backend/`.
+
 ## 2026-04-19
 - The backend prompt seed was re-tuned to stay closer to the old prose cadence: `startDraft` now asks for a short opening paragraph or two, `continueWriting` stays on short paragraph / scene continuation, and `edit` keeps a more literary rewrite tone while interpreting `更画面` / `更克制` / `更抓人` as style shifts rather than new meanings.
 - The latest prompt verification passed in `Backend/`, and the real backend was restarted on the latest binary afterward so the live `/v3` routes now reflect the updated seed.
