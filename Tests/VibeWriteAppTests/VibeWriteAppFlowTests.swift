@@ -804,6 +804,60 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
     }
 
+    func testUndoShortcutPrefersNativeUndoWhenItIsAvailable() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        await flow.startQuickDraft(
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration
+        )
+
+        var aiUndoInvoked = false
+        let outcome = flow.handleUndoShortcut(
+            systemUndo: { true },
+            aiUndo: {
+                aiUndoInvoked = true
+                return flow.undoLastRevision() != nil
+            }
+        )
+
+        XCTAssertEqual(outcome, .nativeUndoHandled)
+        XCTAssertFalse(aiUndoInvoked)
+        XCTAssertEqual(flow.activeProject.revisionHistory.count, 1)
+        XCTAssertFalse(flow.activeProject.documentText.isEmpty)
+    }
+
+    func testUndoShortcutFallsBackToAIRevisionUndoWhenNativeUndoIsUnavailable() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        await flow.startQuickDraft(
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration
+        )
+
+        var aiUndoInvoked = false
+        let outcome = flow.handleUndoShortcut(
+            systemUndo: { false },
+            aiUndo: {
+                aiUndoInvoked = true
+                return flow.undoLastRevision() != nil
+            }
+        )
+
+        XCTAssertEqual(outcome, .aiRevisionUndoHandled)
+        XCTAssertTrue(aiUndoInvoked)
+        XCTAssertTrue(flow.activeProject.revisionHistory.isEmpty)
+        XCTAssertTrue(flow.activeProject.documentText.isEmpty)
+    }
+
     func testEditUsesSelectionAsPatchTarget() async throws {
         let storageURL = try makeTempStorageURL()
         defer {

@@ -95,6 +95,7 @@ struct WritingProjectView: View {
 
             projectWorkspace
         }
+        .focusedSceneValue(\.vibeWriteUndoAction, performUndoLastChange)
         .onChange(of: project.id) { _, _ in
             selectedText = nil
             selectedTextRange = nil
@@ -943,8 +944,13 @@ struct WritingProjectView: View {
     }
 
     private func undoLastChange() {
-        guard !flow.isAIRequestInFlight else { return }
-        guard flow.undoLastRevision() != nil else { return }
+        _ = performUndoLastChange()
+    }
+
+    @discardableResult
+    private func performUndoLastChange() -> Bool {
+        guard !flow.isAIRequestInFlight else { return false }
+        guard flow.undoLastRevision() != nil else { return false }
 
         selectedText = nil
         selectedTextRange = nil
@@ -954,6 +960,7 @@ struct WritingProjectView: View {
         }
         messageDraft = ""
         messageFieldFocused = false
+        return true
     }
 
     private func toggleComparison() {

@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Wired `cmd+z` to the AI revision undo path without stealing native text undo/redo: the app commands now try AppKit undo first, then fall back to the focused project view's revision rollback action, and the history drawer Undo button continues to use the same rollback cleanup. Verification passed with `swift test --filter VibeWriteAppFlowTests/testUndoShortcutPrefersNativeUndoWhenItIsAvailable --filter VibeWriteAppFlowTests/testUndoShortcutFallsBackToAIRevisionUndoWhenNativeUndoIsUnavailable`.
+
+# 2026-04-19
 - Independent review of the post-split runtime found two remaining semantic gaps: the backend current-route metadata prompt still diverges from the pre-split builder with extra intro / user-prompt wording, and AI revision undo is still not wired into the app command system as a `cmd+z`-style shortcut. Stream streaming itself was verified separately and still passes, so these findings are about prompt / interaction parity rather than the transport layer.
 
 # 2026-04-19

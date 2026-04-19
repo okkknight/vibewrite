@@ -270,6 +270,30 @@ final class VibeWriteAppFlow: ObservableObject {
         return revision
     }
 
+    enum VibeWriteUndoShortcutOutcome: String, Equatable {
+        case nativeUndoHandled = "nativeUndoHandled"
+        case aiRevisionUndoHandled = "aiRevisionUndoHandled"
+        case unavailable = "unavailable"
+    }
+
+    @discardableResult
+    func handleUndoShortcut(
+        systemUndo: () -> Bool,
+        aiUndo: (() -> Bool)? = nil
+    ) -> VibeWriteUndoShortcutOutcome {
+        if systemUndo() {
+            return .nativeUndoHandled
+        }
+
+        guard !isAIRequestInFlight,
+              let aiUndo,
+              aiUndo() else {
+            return .unavailable
+        }
+
+        return .aiRevisionUndoHandled
+    }
+
     func performWritingAction(
         _ action: WritingAIAction,
         userMessage: String? = nil,
@@ -525,22 +549,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 after: liveProject.aiSnapshot
             )
             replaceActiveProject(liveProject)
-            let metadataRequest = WritingAIRequest(
-                action: action,
-                project: liveProject.aiSnapshot,
-                userMessage: requestUserMessage,
-                selectionText: normalizedSelectionText ?? selectionText,
-                selectionRange: selectionRange,
-                kind: .metadata
-            )
-            let metadataRequestStartedAt = Date()
-            VibeWriteLog.ai.info(
-                "Flow metadata request start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) docCount=\(metadataRequest.project.documentText.count, privacy: .public) suggestionCount=\(metadataRequest.project.suggestionChips.count, privacy: .public)"
-            )
-            isMetadataRequestInFlight = true
-            let metadataTask = Task {
-                try await aiClient.generateResponse(for: metadataRequest)
-            }
 
             if let currentDocumentURL {
                 _ = saveCurrentDocument(to: currentDocumentURL)
@@ -560,6 +568,23 @@ final class VibeWriteAppFlow: ObservableObject {
             VibeWriteLog.ai.info(
                 "Flow prose playback wait finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) waitSeconds=\(prosePlaybackElapsed, privacy: .public)"
             )
+
+            let metadataRequest = WritingAIRequest(
+                action: action,
+                project: liveProject.aiSnapshot,
+                userMessage: requestUserMessage,
+                selectionText: normalizedSelectionText ?? selectionText,
+                selectionRange: selectionRange,
+                kind: .metadata
+            )
+            let metadataRequestStartedAt = Date()
+            VibeWriteLog.ai.info(
+                "Flow metadata request start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) docCount=\(metadataRequest.project.documentText.count, privacy: .public) suggestionCount=\(metadataRequest.project.suggestionChips.count, privacy: .public)"
+            )
+            isMetadataRequestInFlight = true
+            let metadataTask = Task {
+                try await aiClient.generateResponse(for: metadataRequest)
+            }
 
             do {
                 let metadataResponse = try await metadataTask.value
