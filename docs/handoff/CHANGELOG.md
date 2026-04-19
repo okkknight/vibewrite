@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-19
+- Independent review of `task/TASK_20260419_047.md` passed. I verified the current code path with a standalone runtime probe compiled from the workspace sources: after `performWritingAction(.continueWriting)` the flow recorded one revision, `undoLastRevision()` moved that revision into the redo stack, and `redoLastRevision()` restored the same document text and revision state (`textAfterRedoMatchesWrite=true`, `redoActuallyRestored=true`). This confirms `cmd+shift+z` now restores an actually undone AI revision instead of relying on a live revision snapshot.
+
+# 2026-04-19
+- Implemented `task/TASK_20260419_047.md` for real: `command+shift+z` now restores the last undone AI revision from a dedicated redo stack in the flow layer, new AI actions clear stale redo memory, and the history drawer's retry action keeps its original retry semantics. Verification passed with `swift test --filter VibeWriteAppFlowTests/testRedoLastRevisionRestoresPreviouslyUndoneLinearPatchState`, `swift test --filter VibeWriteAppFlowTests/testRedoShortcutFallsBackToAIRedoWhenNativeRedoIsUnavailable`, `swift test --filter VibeWriteAppFlowTests/testRedoHistoryClearsWhenANewAIActionStarts`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-19
 - Independent review of `task/TASK_20260419_047.md` failed. The new shortcut wiring and focused tests build cleanly, but a direct runtime check against the current model/history flow showed that `undoLastRevision()` leaves the revision history empty, so `cmd+shift+z` only retries the live current revision state and cannot restore an actually undone AI revision. The task still needs a real redo memory or stack before it can pass acceptance.
 
 # 2026-04-19
