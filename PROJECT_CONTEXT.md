@@ -11,6 +11,7 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 
 ## Current state
 - The `Backend/` SwiftPM package now exists as the V3 backend skeleton and has been cut over to PostgreSQL-backed runtime persistence. It depends on the root `VibeWriteShared` package, serves `GET /v3/health`, serves `POST /v3/client/bootstrap`, serves `POST /v3/writes/start`, serves `POST /v3/writes/continue`, serves `POST /v3/writes/edit`, validates write requests against the bootstrap token, keeps the existing admin page / API surface, and stores secret config encrypted at rest with `ADMIN_SECRET_ENCRYPTION_KEY`.
+- `task/TASK_20260419_045.md` is now developed in the repo: the default backend current-route metadata prompt has been realigned to the pre-split builder's structure and semantics on the seed path, custom admin overrides for prompt rules still flow through, and `text01JsonSchema` remains untouched.
 - `task/TASK_20260412_031.md` is now in place in the repo: the backend write chain has an in-memory quota gate across `start` / `continue` / `edit` without introducing persistence, admin UI, or bootstrap shape changes.
 - `task/TASK_20260412_032.md` is now implemented in the repo: the backend request chain has an in-memory request log store across `start` / `continue` / `edit` without introducing persistence or admin query surfaces yet.
 - `task/TASK_20260412_033.md` is now implemented in the repo: it turns the in-memory request log store into a queryable read model for later admin query work, still without persistence or HTTP admin routes.

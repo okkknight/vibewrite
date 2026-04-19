@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Restored the default backend current-route metadata prompt to the pre-split builder's structure and semantics on the seed path without touching `text01JsonSchema`: the current-route system prompt now uses the old intro/action/general shape again, custom admin prompt-rule overrides still take effect, and the backend metadata user prompt keeps the same two-message boundary. Verification passed with `swift test --filter BackendPromptComposerTests`, `swift test --filter AdminSystemPromptTests`, and `swift test` in `Backend/`.
+
+# 2026-04-19
 - Wired `cmd+z` to the AI revision undo path without stealing native text undo/redo: the app commands now try AppKit undo first, then fall back to the focused project view's revision rollback action, and the history drawer Undo button continues to use the same rollback cleanup. Verification passed with `swift test --filter VibeWriteAppFlowTests/testUndoShortcutPrefersNativeUndoWhenItIsAvailable --filter VibeWriteAppFlowTests/testUndoShortcutFallsBackToAIRevisionUndoWhenNativeUndoIsUnavailable`.
 - Added a macOS UI regression for the shortcut path, but the local `xcodebuild test` run hit an automation-mode timeout while enabling UI automation on this machine, so real UI verification still needs to be rerun in a healthier automation environment.
 

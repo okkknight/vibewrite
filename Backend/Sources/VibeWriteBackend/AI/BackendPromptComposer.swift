@@ -82,14 +82,16 @@ struct BackendPromptComposer {
         action: WritingAIAction,
         metadataRoute: BackendAIConfiguration.MetadataRoute
     ) -> String {
-        let introLines = metadataIntroLines(for: metadataRoute)
         switch metadataRoute {
         case .current:
+            let actionLines = promptRules.usesDefaultActionRules
+                ? currentMetadataActionLines(for: action)
+                : promptRules.actionRules.metadata.lines(for: action)
             return composePrompt(
                 leading: promptRules.templateBody,
-                sections: introLines
+                sections: metadataIntroLines(for: metadataRoute)
                     + [""]
-                    + promptRules.actionRules.metadata.lines(for: action)
+                    + actionLines
                     + [""]
                     + promptRules.modelContextRules.metadataRouteLines(for: metadataRoute)
             )
@@ -97,7 +99,7 @@ struct BackendPromptComposer {
         case .text01JsonSchema:
             return composePrompt(
                 leading: promptRules.templateBody,
-                sections: introLines
+                sections: metadataIntroLines(for: metadataRoute)
                     + [""]
                     + promptRules.actionRules.metadata.lines(for: action)
                     + [""]
@@ -120,18 +122,25 @@ struct BackendPromptComposer {
 
     private func resolvedPromptRules(from snapshot: AdminSystemPromptStore.Snapshot) -> ResolvedPromptRules {
         let defaultSnapshot = AdminSystemPromptSeed.makeSnapshot()
+        let resolvedActionRules: PromptActionRules = decodedPromptRules(
+            from: snapshot.actionRulesJson,
+            fallbackJSON: defaultSnapshot.actionRulesJson,
+            field: "actionRulesJson"
+        )
+        let defaultActionRules: PromptActionRules = decodedPromptRules(
+            from: defaultSnapshot.actionRulesJson,
+            fallbackJSON: defaultSnapshot.actionRulesJson,
+            field: "defaultActionRulesJson"
+        )
         return ResolvedPromptRules(
             templateBody: normalizedPromptSection(snapshot.templateBody, fallback: defaultSnapshot.templateBody),
-            actionRules: decodedPromptRules(
-                from: snapshot.actionRulesJson,
-                fallbackJSON: defaultSnapshot.actionRulesJson,
-                field: "actionRulesJson"
-            ),
+            actionRules: resolvedActionRules,
             modelContextRules: decodedPromptRules(
                 from: snapshot.modelContextRulesJson,
                 fallbackJSON: defaultSnapshot.modelContextRulesJson,
                 field: "modelContextRulesJson"
-            )
+            ),
+            usesDefaultActionRules: resolvedActionRules == defaultActionRules
         )
     }
 
@@ -321,8 +330,7 @@ struct BackendPromptComposer {
                 "You are VibeWrite metadata-only response builder.",
                 "Return only a single JSON object.",
                 "Do not output prose, markdown fences, or commentary.",
-                "Do not include any keys other than localSummary, globalSynopsis, nextFocus, and suggestionChips.",
-                "The JSON is incomplete unless all four keys are present."
+                "Do not answer in plain text."
             ]
 
         case .text01JsonSchema:
@@ -331,6 +339,29 @@ struct BackendPromptComposer {
                 "Return only the metadata for the completed prose.",
                 "Do not output prose, markdown fences, tool calls, or commentary.",
                 "Do not answer in plain text."
+            ]
+        }
+    }
+
+    private func currentMetadataActionLines(for action: WritingAIAction) -> [String] {
+        switch action {
+        case .startDraft:
+            return [
+                "- Describe the current opening state.",
+                "- Suggest the next concrete step after the opening exists.",
+                "- Return exactly 3 concise suggestion chips."
+            ]
+        case .continueWriting:
+            return [
+                "- Summarize the completed正文 after the continuation.",
+                "- Suggest the next concrete step after the continuation.",
+                "- Return exactly 3 concise suggestion chips."
+            ]
+        case .edit:
+            return [
+                "- Summarize the completed change.",
+                "- Suggest the next concrete step after the edit.",
+                "- Return exactly 3 concise suggestion chips."
             ]
         }
     }
@@ -387,10 +418,11 @@ private struct ResolvedPromptRules {
     let templateBody: String
     let actionRules: PromptActionRules
     let modelContextRules: PromptModelContextRules
+    let usesDefaultActionRules: Bool
 }
 
-private struct PromptActionRules: Decodable {
-    struct PromptStepRules: Decodable {
+private struct PromptActionRules: Decodable, Equatable {
+    struct PromptStepRules: Decodable, Equatable {
         let startDraft: [String]
         let continueWriting: [String]
         let edit: [String]
