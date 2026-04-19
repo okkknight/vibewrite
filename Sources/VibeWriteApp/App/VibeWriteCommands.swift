@@ -9,9 +9,18 @@ final class VibeWriteUndoActionBox: ObservableObject {
     }
 }
 
+final class VibeWriteRedoActionBox: ObservableObject {
+    var perform: () -> Bool
+
+    init(perform: @escaping () -> Bool) {
+        self.perform = perform
+    }
+}
+
 struct VibeWriteCommands: Commands {
     @ObservedObject var flow: VibeWriteAppFlow
     @FocusedObject private var vibeWriteUndoActionBox: VibeWriteUndoActionBox?
+    @FocusedObject private var vibeWriteRedoActionBox: VibeWriteRedoActionBox?
 
     var body: some Commands {
         CommandGroup(replacing: .undoRedo) {
@@ -35,7 +44,15 @@ struct VibeWriteCommands: Commands {
                 VibeWriteLog.ai.info(
                     "command redo triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
                 )
-                _ = NSApp.sendAction(#selector(UndoManager.redo), to: nil, from: nil)
+                let outcome = flow.handleRedoShortcut(
+                    systemRedo: { NSApp.sendAction(#selector(UndoManager.redo), to: nil, from: nil) },
+                    aiRedo: vibeWriteRedoActionBox.map { box in
+                        { box.perform() }
+                    }
+                )
+                VibeWriteLog.ai.info(
+                    "command redo resolved outcome=\(outcome.rawValue, privacy: .public) activeCount=\(flow.activeDocumentText.count, privacy: .public) revisionCount=\(flow.activeProject.revisionHistory.count, privacy: .public)"
+                )
             }
             .keyboardShortcut("z", modifiers: [.command, .shift])
         }

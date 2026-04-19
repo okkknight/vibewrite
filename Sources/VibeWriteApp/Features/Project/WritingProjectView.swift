@@ -96,6 +96,7 @@ struct WritingProjectView: View {
             projectWorkspace
         }
         .focusedSceneObject(VibeWriteUndoActionBox(perform: performUndoLastChange))
+        .focusedSceneObject(VibeWriteRedoActionBox(perform: performRedoLastChange))
         .onChange(of: project.id) { _, _ in
             selectedText = nil
             selectedTextRange = nil
@@ -446,7 +447,7 @@ struct WritingProjectView: View {
             accessibilityIdentifier: VibeWriteAutomationID.projectHistoryRailShell,
             onToggle: toggleHistoryLayer,
             onUndo: undoLastChange,
-            onRetry: retryLastChange,
+            onRetry: { _ = retryLastChange() },
             onToggleComparison: toggleComparison
         )
     }
@@ -905,9 +906,10 @@ struct WritingProjectView: View {
         localEditFlash = nil
     }
 
-    private func retryLastChange() {
-        guard !flow.isAIRequestInFlight else { return }
-        guard let revision = currentRevision else { return }
+    @discardableResult
+    private func retryLastChange() -> Bool {
+        guard !flow.isAIRequestInFlight else { return false }
+        guard let revision = currentRevision else { return false }
 
         _ = flow.undoLastRevision()
         selectedText = revision.lockedSelectionText
@@ -929,7 +931,7 @@ struct WritingProjectView: View {
                 keepHistoryDrawerOpen: true,
                 composerSessionID: sessionID
             )
-            return
+            return true
         }
 
         applyRevision(
@@ -941,10 +943,16 @@ struct WritingProjectView: View {
             keepHistoryDrawerOpen: true,
             composerSessionID: composerRequestSessionID
         )
+        return true
     }
 
     private func undoLastChange() {
         _ = performUndoLastChange()
+    }
+
+    @discardableResult
+    private func performRedoLastChange() -> Bool {
+        return retryLastChange()
     }
 
     @discardableResult

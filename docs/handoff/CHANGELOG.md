@@ -1,6 +1,12 @@
 # Changelog
 
 # 2026-04-19
+- Implemented `task/TASK_20260419_047.md`: `command+shift+z` now routes through the same AI revision retry path used by the history panel while still letting native text redo run first, and the new shortcut routing is covered by focused `VibeWriteAppFlowTests`. Verification passed with `swift test --filter VibeWriteAppFlowTests/testRedoShortcut` and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'`.
+
+# 2026-04-19
+- Added `task/TASK_20260419_047.md` as the next V3 implementation card for the `command+shift+z` redo path. The new task keeps the scope on AI revision redo only, with native text redo still preserved, and avoids touching backend, prompt, or history-model structure.
+
+# 2026-04-19
 - Restored the default backend current-route metadata prompt to the pre-split builder's structure and semantics on the seed path without touching `text01JsonSchema`: the current-route system prompt now uses the old intro/action/general shape again, custom admin prompt-rule overrides still take effect, and the backend metadata user prompt keeps the same two-message boundary. Verification passed with `swift test --filter BackendPromptComposerTests`, `swift test --filter AdminSystemPromptTests`, and `swift test` in `Backend/`.
 
 # 2026-04-19

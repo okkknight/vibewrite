@@ -858,6 +858,60 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(flow.activeProject.documentText.isEmpty)
     }
 
+    func testRedoShortcutPrefersNativeRedoWhenItIsAvailable() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        await flow.startQuickDraft(
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration
+        )
+
+        var aiRedoInvoked = false
+        let outcome = flow.handleRedoShortcut(
+            systemRedo: { true },
+            aiRedo: {
+                aiRedoInvoked = true
+                return true
+            }
+        )
+
+        XCTAssertEqual(outcome, .nativeRedoHandled)
+        XCTAssertFalse(aiRedoInvoked)
+        XCTAssertEqual(flow.activeProject.revisionHistory.count, 1)
+        XCTAssertFalse(flow.activeProject.documentText.isEmpty)
+    }
+
+    func testRedoShortcutFallsBackToAIRetryWhenNativeRedoIsUnavailable() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        await flow.startQuickDraft(
+            prompt: "写一篇关于成年人孤独感的公众号文章",
+            mode: .collaboration
+        )
+
+        var aiRedoInvoked = false
+        let outcome = flow.handleRedoShortcut(
+            systemRedo: { false },
+            aiRedo: {
+                aiRedoInvoked = true
+                return true
+            }
+        )
+
+        XCTAssertEqual(outcome, .aiRevisionRedoHandled)
+        XCTAssertTrue(aiRedoInvoked)
+        XCTAssertEqual(flow.activeProject.revisionHistory.count, 1)
+        XCTAssertFalse(flow.activeProject.documentText.isEmpty)
+    }
+
     func testEditUsesSelectionAsPatchTarget() async throws {
         let storageURL = try makeTempStorageURL()
         defer {

@@ -270,6 +270,30 @@ final class VibeWriteAppFlow: ObservableObject {
         return revision
     }
 
+    enum VibeWriteRedoShortcutOutcome: String, Equatable {
+        case nativeRedoHandled = "nativeRedoHandled"
+        case aiRevisionRedoHandled = "aiRevisionRedoHandled"
+        case unavailable = "unavailable"
+    }
+
+    @discardableResult
+    func handleRedoShortcut(
+        systemRedo: () -> Bool,
+        aiRedo: (() -> Bool)? = nil
+    ) -> VibeWriteRedoShortcutOutcome {
+        if systemRedo() {
+            return .nativeRedoHandled
+        }
+
+        guard !isAIRequestInFlight,
+              let aiRedo,
+              aiRedo() else {
+            return .unavailable
+        }
+
+        return .aiRevisionRedoHandled
+    }
+
     enum VibeWriteUndoShortcutOutcome: String, Equatable {
         case nativeUndoHandled = "nativeUndoHandled"
         case aiRevisionUndoHandled = "aiRevisionUndoHandled"
