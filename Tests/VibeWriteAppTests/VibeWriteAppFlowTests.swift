@@ -769,7 +769,11 @@ final class VibeWriteAppFlowTests: XCTestCase {
         let originalDocumentText = project.documentText
         flow.openProject(project)
 
-        try await flow.performWritingAction(.continueWriting, userMessage: nil, selectionText: nil)
+        try await flow.performWritingAction(
+            .startDraft,
+            userMessage: "写一篇关于成年人孤独感的公众号文章",
+            selectionText: nil
+        )
 
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.patch.action, .continueWriting)
@@ -801,6 +805,34 @@ final class VibeWriteAppFlowTests: XCTestCase {
 
         try await flow.performWritingAction(.continueWriting, userMessage: nil, selectionText: nil)
         XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
+    }
+
+    func testRedoLastRevisionRestoresPreviouslyUndoneLinearPatchState() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        let originalDocumentText = project.documentText
+        flow.openProject(project)
+
+        try await flow.performWritingAction(.continueWriting, userMessage: nil, selectionText: nil)
+
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
+
+        let undone = flow.undoLastRevision()
+        XCTAssertEqual(undone?.action, .continueWriting)
+        XCTAssertEqual(flow.activeProject.documentText, originalDocumentText)
+        XCTAssertTrue(flow.activeProject.revisionHistory.isEmpty)
+
+        let redone = flow.redoLastRevision()
+        XCTAssertEqual(redone?.action, .continueWriting)
+        XCTAssertEqual(flow.activeProject.revisionHistory.last?.action, .continueWriting)
+        XCTAssertEqual(flow.activeProject.documentText, undone?.after.documentText)
         XCTAssertGreaterThan(flow.activeProject.documentText.count, originalDocumentText.count)
     }
 
@@ -885,7 +917,7 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertFalse(flow.activeProject.documentText.isEmpty)
     }
 
-    func testRedoShortcutFallsBackToAIRetryWhenNativeRedoIsUnavailable() async throws {
+    func testRedoShortcutFallsBackToAIRedoWhenNativeRedoIsUnavailable() async throws {
         let storageURL = try makeTempStorageURL()
         defer {
             try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
@@ -897,12 +929,15 @@ final class VibeWriteAppFlowTests: XCTestCase {
             mode: .collaboration
         )
 
+        XCTAssertNotNil(flow.undoLastRevision())
+        XCTAssertTrue(flow.activeProject.revisionHistory.isEmpty)
+
         var aiRedoInvoked = false
         let outcome = flow.handleRedoShortcut(
             systemRedo: { false },
             aiRedo: {
                 aiRedoInvoked = true
-                return true
+                return flow.redoLastRevision() != nil
             }
         )
 
@@ -910,6 +945,41 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertTrue(aiRedoInvoked)
         XCTAssertEqual(flow.activeProject.revisionHistory.count, 1)
         XCTAssertFalse(flow.activeProject.documentText.isEmpty)
+    }
+
+    func testRedoHistoryClearsWhenANewAIActionStarts() async throws {
+        let storageURL = try makeTempStorageURL()
+        defer {
+            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
+        }
+
+        let flow = VibeWriteAppFlow(storageURL: storageURL, aiClient: StubWritingAIClient())
+        let project = WorkspaceFixtures.bootstrapProjects(now: Date()).first!
+        flow.openProject(project)
+        let selectedText = project.documentText.components(separatedBy: "\n").first!
+        let selectedRange = WritingTextSelectionRange(
+            NSRange(project.documentText.range(of: selectedText)!, in: project.documentText)
+        )
+
+        try await flow.performWritingAction(
+            .edit,
+            userMessage: "请把这段改得更克制一点",
+            selectionText: selectedText,
+            selectionRange: selectedRange
+        )
+
+        XCTAssertNotNil(flow.undoLastRevision())
+        XCTAssertEqual(flow.activeProject.revisionHistory.count, 0)
+
+        try await flow.performWritingAction(
+            .edit,
+            userMessage: "请把这段改得更克制一点",
+            selectionText: selectedText,
+            selectionRange: selectedRange
+        )
+
+        XCTAssertNil(flow.redoLastRevision())
+        XCTAssertEqual(flow.activeProject.revisionHistory.count, 1)
     }
 
     func testEditUsesSelectionAsPatchTarget() async throws {

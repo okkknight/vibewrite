@@ -28,6 +28,7 @@ final class VibeWriteAppFlow: ObservableObject {
     private var savedDocumentContents: String?
     private var documentHydrationProtectedProjectID: UUID?
     private var activeRequestToken: UUID?
+    private var revisionRedoHistory: [WritingProjectRevision] = []
 
     init(
         storageURL: URL? = nil,
@@ -154,6 +155,7 @@ final class VibeWriteAppFlow: ObservableObject {
     }
 
     func openProject(_ project: WritingProject) {
+        clearRevisionRedoHistory()
         replaceActiveProject(project)
     }
 
@@ -238,6 +240,7 @@ final class VibeWriteAppFlow: ObservableObject {
         updatedProjects.remove(at: index)
         projects = updatedProjects
         activeProjectID = nil
+        clearRevisionRedoHistory()
     }
 
     func resetLocalData() {
@@ -257,6 +260,7 @@ final class VibeWriteAppFlow: ObservableObject {
         isProseRequestInFlight = false
         isMetadataRequestInFlight = false
         activeRequestToken = nil
+        clearRevisionRedoHistory()
     }
 
     @discardableResult
@@ -266,6 +270,21 @@ final class VibeWriteAppFlow: ObservableObject {
             return nil
         }
 
+        revisionRedoHistory.append(revision)
+        activeProject = project
+        return revision
+    }
+
+    @discardableResult
+    func redoLastRevision() -> WritingProjectRevision? {
+        guard let revision = revisionRedoHistory.popLast() else {
+            return nil
+        }
+
+        var project = activeEditingProject
+        project.revisionHistory.append(revision)
+        project.apply(snapshot: revision.after)
+        project.refreshUpdatedAt()
         activeProject = project
         return revision
     }
@@ -376,6 +395,8 @@ final class VibeWriteAppFlow: ObservableObject {
                 throw WritingEditPatchError.missingSelection
             }
         }
+
+        clearRevisionRedoHistory()
 
         if action == .edit {
             let request = WritingAIRequest(
@@ -684,6 +705,11 @@ final class VibeWriteAppFlow: ObservableObject {
         isProseRequestInFlight = false
         isMetadataRequestInFlight = false
         activeRequestToken = nil
+        clearRevisionRedoHistory()
+    }
+
+    private func clearRevisionRedoHistory() {
+        revisionRedoHistory.removeAll()
     }
 
     private func isCurrentRequest(_ requestToken: UUID) -> Bool {

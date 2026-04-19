@@ -952,7 +952,11 @@ struct WritingProjectView: View {
 
     @discardableResult
     private func performRedoLastChange() -> Bool {
-        return retryLastChange()
+        guard !flow.isAIRequestInFlight else { return false }
+        guard let revision = flow.redoLastRevision() else { return false }
+
+        applyRestoredRevisionState(revision)
+        return true
     }
 
     @discardableResult
@@ -969,6 +973,25 @@ struct WritingProjectView: View {
         messageDraft = ""
         messageFieldFocused = false
         return true
+    }
+
+    private func applyRestoredRevisionState(_ revision: WritingProjectRevision) {
+        showComparison = false
+        if shouldShowHistorySidebar {
+            showHistoryLayer = true
+        }
+
+        switch revision.action {
+        case .edit:
+            selectedText = revision.lockedSelectionText
+            selectedTextRange = revision.lockedSelectionRange
+        case .startDraft, .continueWriting:
+            selectedText = nil
+            selectedTextRange = WritingTextSelectionRange(
+                location: project.documentText.utf16.count,
+                length: 0
+            )
+        }
     }
 
     private func toggleComparison() {
