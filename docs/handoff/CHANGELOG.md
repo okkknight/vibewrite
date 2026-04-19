@@ -1,6 +1,9 @@
 # Changelog
 
 # 2026-04-19
+- Independent review of the post-split runtime found two remaining semantic gaps: the backend current-route metadata prompt still diverges from the pre-split builder with extra intro / user-prompt wording, and AI revision undo is still not wired into the app command system as a `cmd+z`-style shortcut. Stream streaming itself was verified separately and still passes, so these findings are about prompt / interaction parity rather than the transport layer.
+
+# 2026-04-19
 - Independent review of the backend true-streaming fix passed. `swift test --filter BackendAIProviderClientTests`, `swift test` in `Backend/`, and `xcodebuild build -project VibeWrite.xcodeproj -scheme VibeWrite -destination 'platform=macOS'` all passed, and live `POST /v3/writes/start` plus `POST /v3/writes/continue` requests against the running backend both returned multiple incremental `textDelta` events before the final `completed` payload. This confirms the fix is real backend streaming rather than a test-only replay.
 
 # 2026-04-19
