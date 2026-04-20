@@ -61,7 +61,11 @@ struct ProjectAISidebarView: View {
                                     .fixedSize(horizontal: false, vertical: true)
                             } else {
                                 ForEach(conversationPreview) { message in
-                                    ProjectAIMessageRow(message: message)
+                                    ProjectAIMessageRow(
+                                        role: message.role,
+                                        timestamp: message.timestamp,
+                                        text: displayText(for: message)
+                                    )
                                 }
                             }
                         }
@@ -110,6 +114,14 @@ struct ProjectAISidebarView: View {
         Array(project.conversation.suffix(VibeWriteDocumentMetadataPolicy.conversationMessageLimit))
     }
 
+    private var latestAssistantMessageID: ConversationMessage.ID? {
+        conversationPreview.last(where: { $0.role == .assistant })?.id
+    }
+
+    private var displayLocalSummaryText: String {
+        project.localSummary.trimmingCharacters(in: .whitespacesAndNewlines)
+    }
+
     private var suggestionChips: [String] {
         normalizedSuggestionChips(project.suggestionChips)
     }
@@ -138,6 +150,16 @@ struct ProjectAISidebarView: View {
         }
 
         return cleaned.prefix(2).joined(separator: " · ")
+    }
+
+    private func displayText(for message: ConversationMessage) -> String {
+        guard message.role == .assistant,
+              message.id == latestAssistantMessageID,
+              !displayLocalSummaryText.isEmpty else {
+            return message.text
+        }
+
+        return displayLocalSummaryText
     }
 }
 
@@ -184,27 +206,29 @@ private struct AIContextRow: View {
 }
 
 private struct ProjectAIMessageRow: View {
-    let message: ConversationMessage
+    let role: MessageRole
+    let timestamp: String
+    let text: String
 
     var body: some View {
         HStack(alignment: .top, spacing: 9) {
             Circle()
-                .fill(message.role == .assistant ? Color.vibeCanvasAccent.opacity(0.20) : Color.vibeAccentSoft.opacity(0.18))
+                .fill(role == .assistant ? Color.vibeCanvasAccent.opacity(0.20) : Color.vibeAccentSoft.opacity(0.18))
                 .frame(width: 22, height: 22)
                 .overlay {
-                    Text(message.role == .assistant ? "AI" : "我")
+                    Text(role == .assistant ? "AI" : "我")
                         .font(.system(size: 8.5, weight: .bold, design: .default))
-                        .foregroundStyle(message.role == .assistant ? Color.vibeCanvasAccent : Color.vibeAccentSoft)
+                        .foregroundStyle(role == .assistant ? Color.vibeCanvasAccent : Color.vibeAccentSoft)
                 }
 
             VStack(alignment: .leading, spacing: 4) {
                 HStack(spacing: 7) {
-                    Text(message.timestamp)
+                    Text(timestamp)
                         .font(.system(size: 10.4, weight: .medium, design: .default))
                         .foregroundStyle(Color.vibeCanvasInkMuted)
                 }
 
-                Text(message.text)
+                Text(text)
                     .font(.system(size: 12.5, weight: .medium, design: .default))
                     .foregroundStyle(Color.vibeCanvasInk)
                     .fixedSize(horizontal: false, vertical: true)
