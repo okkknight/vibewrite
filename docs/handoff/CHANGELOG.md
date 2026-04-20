@@ -706,6 +706,7 @@
 - The AI sidebar's recent-reply preview now renders the latest assistant row with the current `localSummary` instead of the generic assistant template line, but it leaves the stored conversation data untouched so history and debug paths stay intact. App-target compilation passed; the broader `VibeWriteAppFlowTests` run still ends on an unrelated pre-existing `lockMismatch` failure.
 - The AI error presentation now keeps only the top toast in `WritingProjectView`: the inline red error text below the composer was removed, the toast title was removed, and the toast visual was softened with a lighter, thinner treatment so the error feels less heavy while preserving the same dismiss behavior.
 - The default `VibeWrite` title in the macOS window chrome is now hidden by clearing the `NSWindow` title and setting `titleVisibility` to hidden in `RootShellView`, while preserving the rest of the title bar chrome.
+- The project title header spacing was tightened by reducing `projectHeaderVerticalPadding` from 7/8 points to 4 points in `WritingProjectView`, which shortens the title block while keeping the existing title and subtitle layout intact.
 
 ## 2026-04-19
 - The backend prompt seed was re-tuned to stay closer to the old prose cadence: `startDraft` now asks for a short opening paragraph or two, `continueWriting` stays on short paragraph / scene continuation, and `edit` keeps a more literary rewrite tone while interpreting `更画面` / `更克制` / `更抓人` as style shifts rather than new meanings.
