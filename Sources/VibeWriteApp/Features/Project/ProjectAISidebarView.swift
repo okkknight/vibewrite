@@ -7,7 +7,6 @@ struct ProjectAISidebarView: View {
     let isExpanded: Bool
     let presentation: ProjectSidebarPresentation
     let isRequestInFlight: Bool
-    let errorMessage: String?
     let accessibilityIdentifier: String
     let onToggle: () -> Void
     let onSuggestionTap: (String) -> Void
@@ -90,13 +89,6 @@ struct ProjectAISidebarView: View {
                         .accessibilityIdentifier(VibeWriteAutomationID.projectAISidebarSuggestions)
                     }
 
-                    if let errorMessage {
-                        Text(errorMessage)
-                            .font(.system(size: 11, weight: .semibold, design: .default))
-                            .foregroundStyle(Color.red.opacity(0.88))
-                            .fixedSize(horizontal: false, vertical: true)
-                            .accessibilityIdentifier(VibeWriteAutomationID.projectAISidebarError)
-                    }
                 }
                 .accessibilityElement(children: .contain)
                 .accessibilityIdentifier(VibeWriteAutomationID.projectAISidebarContent)

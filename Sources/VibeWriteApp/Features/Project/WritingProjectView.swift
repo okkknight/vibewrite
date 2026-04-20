@@ -22,6 +22,8 @@ struct WritingProjectView: View {
     @State private var isComposerLocked = false
     @State private var composerRequestSessionID = UUID()
     @State private var composerFocusRequestID = UUID()
+    @State private var aiErrorToastMessage: String?
+    @State private var aiErrorToastDismissTask: Task<Void, Never>?
     @FocusState private var messageFieldFocused: Bool
 
     private var project: WritingProject { flow.activeEditingProject }
@@ -94,6 +96,18 @@ struct WritingProjectView: View {
                 .ignoresSafeArea()
 
             projectWorkspace
+
+            if let aiErrorToastMessage {
+                AIErrorToastView(
+                    message: aiErrorToastMessage,
+                    appearanceMode: appearanceMode
+                )
+                .padding(.top, shellLayoutMode.isCompact ? 16 : 18)
+                .padding(.horizontal, 18)
+                .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
+                .transition(.opacity.combined(with: .move(edge: .top)))
+                .allowsHitTesting(false)
+            }
         }
         .focusedSceneObject(VibeWriteUndoActionBox(perform: performUndoLastChange))
         .focusedSceneObject(VibeWriteRedoActionBox(perform: performRedoLastChange))
@@ -111,6 +125,13 @@ struct WritingProjectView: View {
             isComposerLocked = false
             messageDraft = ""
             messageFieldFocused = false
+            dismissAIErrorToast()
+        }
+        .onChange(of: flow.aiErrorMessage) { _, newValue in
+            guard let newValue, !newValue.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+                return
+            }
+            presentAIErrorToast(newValue)
         }
         .onChange(of: selectedText) { _, _ in
             logSelectionOverlayState(trigger: "selectedText changed")
@@ -120,6 +141,10 @@ struct WritingProjectView: View {
         }
         .onAppear {
             logSelectionOverlayState(trigger: "writing project appeared")
+            if let aiErrorMessage = flow.aiErrorMessage,
+               !aiErrorMessage.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty {
+                presentAIErrorToast(aiErrorMessage)
+            }
         }
     }
 
@@ -136,6 +161,29 @@ struct WritingProjectView: View {
             }
         }
         .accessibilityIdentifier(VibeWriteAutomationID.projectPaperShell)
+    }
+
+    private func presentAIErrorToast(_ message: String) {
+        aiErrorToastDismissTask?.cancel()
+
+        withAnimation(.easeOut(duration: 0.18)) {
+            aiErrorToastMessage = message
+        }
+
+        aiErrorToastDismissTask = Task { @MainActor in
+            try? await Task.sleep(for: .seconds(2))
+            guard !Task.isCancelled else { return }
+
+            withAnimation(.easeOut(duration: 0.26)) {
+                aiErrorToastMessage = nil
+            }
+        }
+    }
+
+    private func dismissAIErrorToast() {
+        aiErrorToastDismissTask?.cancel()
+        aiErrorToastDismissTask = nil
+        aiErrorToastMessage = nil
     }
 
     private var wideWorkspace: some View {
@@ -430,7 +478,6 @@ struct WritingProjectView: View {
             isExpanded: true,
             presentation: shellLayoutMode.isCompact ? .drawer : .column,
             isRequestInFlight: flow.isBodyThinkingInFlight,
-            errorMessage: flow.aiErrorMessage,
             accessibilityIdentifier: VibeWriteAutomationID.projectAssistantRailShell,
             onToggle: toggleAssistantLayer,
             onSuggestionTap: handleSuggestionTap
@@ -1257,6 +1304,52 @@ private struct SelectionContextRail: View {
             .frame(maxWidth: .infinity, alignment: .leading)
         }
         .accessibilityIdentifier(VibeWriteAutomationID.projectSelectionPopover)
+    }
+}
+
+private struct AIErrorToastView: View {
+    let message: String
+    let appearanceMode: VibeAppearanceMode
+
+    var body: some View {
+        HStack(alignment: .top, spacing: 10) {
+            Image(systemName: "exclamationmark.triangle.fill")
+                .font(.system(size: 13, weight: .semibold, design: .default))
+                .foregroundStyle(Color.vibeCanvasAccent)
+                .padding(.top, 1)
+
+            VStack(alignment: .leading, spacing: 3) {
+                Text("AI 请求失败")
+                    .font(.system(size: 11.2, weight: .semibold, design: .default))
+                    .foregroundStyle(Color.vibeCanvasInkSoft)
+
+                Text(message)
+                    .font(.system(size: 12.5, weight: .medium, design: .default))
+                    .foregroundStyle(Color.vibeCanvasInk)
+                    .lineLimit(2)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+        .padding(.vertical, 11)
+        .padding(.horizontal, 14)
+        .frame(maxWidth: 460, alignment: .leading)
+        .background {
+            RoundedRectangle(cornerRadius: 16, style: .continuous)
+                .fill(Color.vibeCanvasRaised.opacity(appearanceMode == .day ? 0.985 : 0.96))
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.vibeCanvasStroke.opacity(0.30), lineWidth: 1)
+                )
+                .shadow(
+                    color: Color.black.opacity(appearanceMode == .day ? 0.12 : 0.18),
+                    radius: 14,
+                    x: 0,
+                    y: 8
+                )
+        }
+        .accessibilityElement(children: .combine)
+        .accessibilityLabel("AI 请求失败")
+        .accessibilityValue(message)
     }
 }
 @MainActor

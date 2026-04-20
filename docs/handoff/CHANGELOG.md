@@ -75,6 +75,9 @@
 - Restored the assistant suggestion rail back to its single-line overflow cutoff behavior without a hard visible-chip cap, so it can keep up to three suggestions when space allows and drop trailing chips only when width runs out. Added a regression test that covers the three-fit case alongside the existing overflow-cutoff checks.
 
 # 2026-04-20
+- Replaced the inline backend error text with a floating toast banner that auto-dismisses after 2 seconds and fades out, so request failures stay visible above the composer input without looking like a raw red error label. The sidebar no longer renders the same error inline.
+
+# 2026-04-20
 - Updated the assistant suggestion rail so it measures usable width from the outer composer container before applying the single-line overflow cutoff. The rail can still show up to three suggestions when space allows, but it now drops trailing chips reliably when the available width is genuinely too narrow. Kept the regression coverage for the three-fit and overflow-cutoff cases.
 
 # 2026-04-18
