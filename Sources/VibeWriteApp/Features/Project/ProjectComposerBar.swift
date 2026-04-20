@@ -33,6 +33,8 @@ struct ProjectComposerBar: View {
     @ViewBuilder
     private var guidanceRail: some View {
         if shouldShowGuidanceRail {
+            // Keep this rail single-line and let the layout drop trailing chips as width runs out.
+            // Do not hard-cap the chip count here; the first chip should always survive.
             SingleLineOverflowHidingLayout(itemSpacing: 8) {
                 if isSuggestionGenerationInFlight {
                     suggestionLoadingPill

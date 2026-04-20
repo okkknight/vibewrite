@@ -209,12 +209,20 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(line.height, 32)
     }
 
-    func testAssistantSuggestionRailPolicyLimitsVisibleChipsToTwo() {
-        let visibleChips = AssistantSuggestionRailPolicy.visibleChips(
-            from: ["第一条建议", "第二条建议", "第三条建议"]
+    func testSingleLineOverflowHidingLayoutKeepsThreeItemsWhenTheyFit() {
+        let line = SingleLineOverflowHidingLayoutMetrics.line(
+            maxWidth: 278,
+            itemSpacing: 8,
+            sizes: [
+                CGSize(width: 80, height: 32),
+                CGSize(width: 80, height: 32),
+                CGSize(width: 80, height: 32)
+            ]
         )
 
-        XCTAssertEqual(visibleChips, ["第一条建议", "第二条建议"])
+        XCTAssertEqual(line.elements.map(\.index), [0, 1, 2])
+        XCTAssertEqual(line.width, 256)
+        XCTAssertEqual(line.height, 32)
     }
 
     func testForceBlankStartupIgnoresPersistedProjectsAndResetsStore() throws {
