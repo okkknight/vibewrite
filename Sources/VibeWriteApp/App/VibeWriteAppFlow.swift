@@ -602,6 +602,12 @@ final class VibeWriteAppFlow: ObservableObject {
                 "Flow prose response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
             )
 
+            // IMPORTANT:
+            // Start metadata as soon as the full prose response is available.
+            // This is intentionally decoupled from `previewRenderer.waitForCompletion()`
+            // so suggestion generation can overlap the final prose playback tail.
+            // Do not move this back below the playback wait unless the product
+            // requirement explicitly changes the prose/metadata concurrency model.
             let metadataRequest = WritingAIRequest(
                 action: action,
                 project: liveProject.aiSnapshot,
@@ -620,6 +626,9 @@ final class VibeWriteAppFlow: ObservableObject {
             }
 
             let prosePlaybackWaitStartedAt = Date()
+            // The playback wait only gates the visual tail. It must not delay the
+            // metadata request above, or we would reserialize the two phases and
+            // lose the overlap that keeps suggestion generation responsive.
             VibeWriteLog.ai.info(
                 "Flow prose playback wait start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public)"
             )

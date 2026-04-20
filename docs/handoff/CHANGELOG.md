@@ -2,6 +2,7 @@
 
 # 2026-04-20
 - Moved the metadata suggestion request earlier in the app flow so it now starts as soon as the prose result is ready, instead of waiting for prose playback tail completion. This keeps suggestion generation overlapping the final playback tail while leaving正文 streaming, save behavior, and edit behavior unchanged.
+- Added inline comments around the prose/metadata overlap point so future edits preserve the intentional concurrency boundary instead of accidentally serializing the two phases again.
 
 # 2026-04-19
 - Added a local backend startup convention so the machine-specific backend parameters now live in ignored `Backend/.env.local`, with `scripts/backend_up.sh` sourcing that file before building and launching the backend. The checked-in `Backend/.env.local.example` documents the required keys without secrets, so future launches no longer need to rediscover `DATABASE_URL`, `ADMIN_SECRET_ENCRYPTION_KEY`, `MINIMAX_API_KEY`, `ADMIN_USERNAME`, or `ADMIN_PASSWORD` by hand.
