@@ -209,6 +209,14 @@ final class VibeWriteAppFlowTests: XCTestCase {
         XCTAssertEqual(line.height, 32)
     }
 
+    func testAssistantSuggestionRailPolicyLimitsVisibleChipsToTwo() {
+        let visibleChips = AssistantSuggestionRailPolicy.visibleChips(
+            from: ["第一条建议", "第二条建议", "第三条建议"]
+        )
+
+        XCTAssertEqual(visibleChips, ["第一条建议", "第二条建议"])
+    }
+
     func testForceBlankStartupIgnoresPersistedProjectsAndResetsStore() throws {
         let storageURL = try makeTempStorageURL()
         defer {

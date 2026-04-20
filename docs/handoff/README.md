@@ -91,6 +91,7 @@ This directory is the compact handoff layer for VibeWrite.
 - The正文 editor now binds directly to `activeDocumentText` as the live session text, while `WritingProject` keeps the persisted metadata/snapshot shell.
 - Save now writes the live session snapshot (`activeEditingProject`) directly, so `Cmd+S` reads the same正文 the editor shows instead of relying on a last-second window flush.
 - `startDraft` and `continueWriting` now use a two-phase AI flow: prose request first, then a separate metadata request that starts as soon as the backend prose result is available; metadata updates `summary`, `nextFocus`, and `suggestionChips` only after the prose phase succeeds.
+- The metadata request now launches before prose playback tail completion, so suggestion generation can overlap the final tail instead of waiting for the visual playback to finish.
 - The shared-module split is now in place; the frontend gateway switch is now implemented, and the current handoff notes should be read together with the V3 roadmap rather than in isolation.
 
 ## Notes

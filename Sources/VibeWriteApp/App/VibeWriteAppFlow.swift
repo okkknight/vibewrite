@@ -602,18 +602,6 @@ final class VibeWriteAppFlow: ObservableObject {
                 "Flow prose response complete action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) documentCount=\(updatedDocumentText.count, privacy: .public)"
             )
 
-            let prosePlaybackWaitStartedAt = Date()
-            VibeWriteLog.ai.info(
-                "Flow prose playback wait start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public)"
-            )
-            await previewRenderer.waitForCompletion()
-            isPrimaryActionDisplayInFlight = false
-            isProseRequestInFlight = false
-            let prosePlaybackElapsed = Self.elapsedSeconds(since: prosePlaybackWaitStartedAt)
-            VibeWriteLog.ai.info(
-                "Flow prose playback wait finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) waitSeconds=\(prosePlaybackElapsed, privacy: .public)"
-            )
-
             let metadataRequest = WritingAIRequest(
                 action: action,
                 project: liveProject.aiSnapshot,
@@ -630,6 +618,18 @@ final class VibeWriteAppFlow: ObservableObject {
             let metadataTask = Task {
                 try await aiClient.generateResponse(for: metadataRequest)
             }
+
+            let prosePlaybackWaitStartedAt = Date()
+            VibeWriteLog.ai.info(
+                "Flow prose playback wait start action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public)"
+            )
+            await previewRenderer.waitForCompletion()
+            isPrimaryActionDisplayInFlight = false
+            isProseRequestInFlight = false
+            let prosePlaybackElapsed = Self.elapsedSeconds(since: prosePlaybackWaitStartedAt)
+            VibeWriteLog.ai.info(
+                "Flow prose playback wait finished action=\(action.rawValue, privacy: .public) trace=\(traceID, privacy: .public) waitSeconds=\(prosePlaybackElapsed, privacy: .public)"
+            )
 
             do {
                 let metadataResponse = try await metadataTask.value
