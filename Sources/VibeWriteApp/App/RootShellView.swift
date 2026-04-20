@@ -100,6 +100,8 @@ private struct WindowCloseObserver: NSViewRepresentable {
             guard let window else { return }
             self.window = window
             window.delegate = self
+            window.title = ""
+            window.titleVisibility = .hidden
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {
