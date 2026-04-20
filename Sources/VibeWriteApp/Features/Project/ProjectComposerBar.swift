@@ -21,6 +21,7 @@ struct ProjectComposerBar: View {
     let sendButtonIdentifier: String
     let onSubmit: () -> Void
     let onAssistantSuggestionTap: (String) -> Void
+    @State private var guidanceRailAvailableWidth: CGFloat = 0
 
     var body: some View {
         composerBackgroundReserve
@@ -35,21 +36,29 @@ struct ProjectComposerBar: View {
         if shouldShowGuidanceRail {
             // Keep this rail single-line and let the layout drop trailing chips as width runs out.
             // Do not hard-cap the chip count here; the first chip should always survive.
-            SingleLineOverflowHidingLayout(itemSpacing: 8) {
-                if isSuggestionGenerationInFlight {
-                    suggestionLoadingPill
-                } else if isOpeningState {
-                    guidanceExampleChip(title: openingExampleTitle)
-                } else {
-                    ForEach(normalizedAssistantSuggestionChips, id: \.self) { chip in
-                        AssistantSuggestionChip(title: chip) {
-                            onAssistantSuggestionTap(chip)
-                        }
-                    }
-                }
+            SingleLineOverflowHidingLayout(
+                itemSpacing: 8,
+                availableWidth: guidanceRailAvailableWidth > 0 ? guidanceRailAvailableWidth : nil
+            ) {
+                guidanceRailContent
             }
             .frame(maxWidth: .infinity, alignment: .leading)
             .transition(.opacity.combined(with: .move(edge: .top)))
+        }
+    }
+
+    @ViewBuilder
+    private var guidanceRailContent: some View {
+        if isSuggestionGenerationInFlight {
+            suggestionLoadingPill
+        } else if isOpeningState {
+            guidanceExampleChip(title: openingExampleTitle)
+        } else {
+            ForEach(normalizedAssistantSuggestionChips, id: \.self) { chip in
+                AssistantSuggestionChip(title: chip) {
+                    onAssistantSuggestionTap(chip)
+                }
+            }
         }
     }
 
@@ -67,6 +76,17 @@ struct ProjectComposerBar: View {
             composerSurface
         }
         .frame(maxWidth: .infinity, alignment: .leading)
+        .background {
+            GeometryReader { proxy in
+                Color.clear
+                    .preference(key: GuidanceRailAvailableWidthKey.self, value: proxy.size.width)
+            }
+        }
+        .onPreferenceChange(GuidanceRailAvailableWidthKey.self) { width in
+            if guidanceRailAvailableWidth != width {
+                guidanceRailAvailableWidth = width
+            }
+        }
     }
 
     private var composerSurfaceHeight: CGFloat {
@@ -723,9 +743,11 @@ struct TwoRowFlowLayout: Layout {
 
 struct SingleLineOverflowHidingLayout: Layout {
     let itemSpacing: CGFloat
+    let availableWidth: CGFloat?
 
-    init(itemSpacing: CGFloat = 8) {
+    init(itemSpacing: CGFloat = 8, availableWidth: CGFloat? = nil) {
         self.itemSpacing = itemSpacing
+        self.availableWidth = availableWidth
     }
 
     func sizeThatFits(
@@ -733,7 +755,7 @@ struct SingleLineOverflowHidingLayout: Layout {
         subviews: Subviews,
         cache: inout ()
     ) -> CGSize {
-        let maxWidth = proposal.width ?? .greatestFiniteMagnitude
+        let maxWidth = availableWidth ?? proposal.width ?? .greatestFiniteMagnitude
         let sizes = subviews.map { $0.sizeThatFits(.unspecified) }
         let line = SingleLineOverflowHidingLayoutMetrics.line(
             maxWidth: maxWidth,
@@ -765,6 +787,14 @@ struct SingleLineOverflowHidingLayout: Layout {
             )
             x += element.size.width + itemSpacing
         }
+    }
+}
+
+private struct GuidanceRailAvailableWidthKey: PreferenceKey {
+    static let defaultValue: CGFloat = 0
+
+    static func reduce(value: inout CGFloat, nextValue: () -> CGFloat) {
+        value = nextValue()
     }
 }
 

@@ -74,6 +74,9 @@
 # 2026-04-20
 - Restored the assistant suggestion rail back to its single-line overflow cutoff behavior without a hard visible-chip cap, so it can keep up to three suggestions when space allows and drop trailing chips only when width runs out. Added a regression test that covers the three-fit case alongside the existing overflow-cutoff checks.
 
+# 2026-04-20
+- Updated the assistant suggestion rail so it measures usable width from the outer composer container before applying the single-line overflow cutoff. The rail can still show up to three suggestions when space allows, but it now drops trailing chips reliably when the available width is genuinely too narrow. Kept the regression coverage for the three-fit and overflow-cutoff cases.
+
 # 2026-04-18
 - Review result for `Restore backend metadata fallback and fix tests`: fail. The prose/metadata split itself is back in line, but two semantic gaps remain: `systemPromptSnapshot` is still threaded through the backend prompt composer without affecting runtime prompt construction, so the admin system-prompt store is effectively inert; and the backend still keeps an alternate `text01_json_schema` metadata branch whose prompt wording diverges from the original direct-provider path. The visible write flow tests pass, but these residual branches still mean the split is not a pure relocation of the old logic.
 
