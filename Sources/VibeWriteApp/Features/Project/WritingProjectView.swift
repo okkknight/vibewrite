@@ -263,7 +263,11 @@ struct WritingProjectView: View {
             .padding(.bottom, shellLayoutMode.isCompact ? 14 : 16)
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .top)
-        .frame(maxWidth: shellLayoutMode.isCompact ? .infinity : 872, alignment: .top)
+        .frame(
+            maxWidth: shellLayoutMode.isCompact ? .infinity : 872,
+            maxHeight: shellLayoutMode.isCompact ? 460 : 520,
+            alignment: .top
+        )
         .background {
             RoundedRectangle(cornerRadius: shellLayoutMode.isCompact ? 28 : 34, style: .continuous)
                 .fill(Color.vibeCanvasRaised.opacity(0.98))
