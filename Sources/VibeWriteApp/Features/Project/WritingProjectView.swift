@@ -421,11 +421,6 @@ struct WritingProjectView: View {
             }
             .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
 
-            if let errorMessage = flow.aiErrorMessage {
-                Text(errorMessage)
-                    .font(.system(size: 11.5, weight: .medium, design: .default))
-                    .foregroundStyle(.red)
-            }
         }
         .frame(maxWidth: .infinity, maxHeight: .infinity, alignment: .topLeading)
     }
@@ -1312,44 +1307,51 @@ private struct AIErrorToastView: View {
     let appearanceMode: VibeAppearanceMode
 
     var body: some View {
-        HStack(alignment: .top, spacing: 10) {
+        HStack(alignment: .top, spacing: 9) {
             Image(systemName: "exclamationmark.triangle.fill")
-                .font(.system(size: 13, weight: .semibold, design: .default))
-                .foregroundStyle(Color.vibeCanvasAccent)
+                .font(.system(size: 12, weight: .semibold, design: .default))
+                .foregroundStyle(Color.vibeCanvasAccent.opacity(0.88))
                 .padding(.top, 1)
 
-            VStack(alignment: .leading, spacing: 3) {
-                Text("AI 请求失败")
-                    .font(.system(size: 11.2, weight: .semibold, design: .default))
-                    .foregroundStyle(Color.vibeCanvasInkSoft)
-
-                Text(message)
-                    .font(.system(size: 12.5, weight: .medium, design: .default))
-                    .foregroundStyle(Color.vibeCanvasInk)
-                    .lineLimit(2)
-                    .fixedSize(horizontal: false, vertical: true)
-            }
+            Text(message)
+                .font(.system(size: 12.4, weight: .medium, design: .default))
+                .foregroundStyle(Color.vibeCanvasInk)
+                .lineLimit(2)
+                .fixedSize(horizontal: false, vertical: true)
         }
-        .padding(.vertical, 11)
-        .padding(.horizontal, 14)
-        .frame(maxWidth: 460, alignment: .leading)
+        .padding(.vertical, 10)
+        .padding(.horizontal, 13)
+        .frame(maxWidth: 440, alignment: .leading)
         .background {
             RoundedRectangle(cornerRadius: 16, style: .continuous)
-                .fill(Color.vibeCanvasRaised.opacity(appearanceMode == .day ? 0.985 : 0.96))
+                .fill(.ultraThinMaterial)
                 .overlay(
                     RoundedRectangle(cornerRadius: 16, style: .continuous)
-                        .strokeBorder(Color.vibeCanvasStroke.opacity(0.30), lineWidth: 1)
+                        .fill(
+                            LinearGradient(
+                                colors: [
+                                    Color.white.opacity(appearanceMode == .day ? 0.10 : 0.06),
+                                    .clear
+                                ],
+                                startPoint: .topLeading,
+                                endPoint: .bottomTrailing
+                            )
+                        )
+                        .blendMode(.softLight)
+                )
+                .overlay(
+                    RoundedRectangle(cornerRadius: 16, style: .continuous)
+                        .strokeBorder(Color.vibeCanvasStroke.opacity(0.18), lineWidth: 0.9)
                 )
                 .shadow(
-                    color: Color.black.opacity(appearanceMode == .day ? 0.12 : 0.18),
-                    radius: 14,
+                    color: Color.black.opacity(appearanceMode == .day ? 0.08 : 0.12),
+                    radius: 10,
                     x: 0,
-                    y: 8
+                    y: 5
                 )
         }
         .accessibilityElement(children: .combine)
-        .accessibilityLabel("AI 请求失败")
-        .accessibilityValue(message)
+        .accessibilityLabel(message)
     }
 }
 @MainActor
