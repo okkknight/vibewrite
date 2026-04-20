@@ -34,17 +34,23 @@ func routes(
     }
 
     app.post("v3", "writes", "start") { req async throws -> Response in
+        logIncomingWriteRequest(req, action: .startDraft)
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
+        logDecodedWriteRequest(req, envelope: envelope, action: .startDraft)
         return try await writeResponse(for: envelope, action: .startDraft, request: req, writeService: writeService)
     }
 
     app.post("v3", "writes", "continue") { req async throws -> Response in
+        logIncomingWriteRequest(req, action: .continueWriting)
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
+        logDecodedWriteRequest(req, envelope: envelope, action: .continueWriting)
         return try await writeResponse(for: envelope, action: .continueWriting, request: req, writeService: writeService)
     }
 
     app.post("v3", "writes", "edit") { req async throws -> Response in
+        logIncomingWriteRequest(req, action: .edit)
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
+        logDecodedWriteRequest(req, envelope: envelope, action: .edit)
         return try await writeResponse(for: envelope, action: .edit, request: req, writeService: writeService)
     }
 
@@ -58,6 +64,44 @@ func routes(
         adminSessionStore: adminSessionStore,
         aiConfiguration: aiConfiguration,
         clock: clock
+    )
+}
+
+private func logIncomingWriteRequest(_ request: Request, action: WritingAIAction) {
+    let contentLength = request.headers.first(name: "Content-Length") ?? "nil"
+    request.logger.info(
+        "write request incoming action=\(action.rawValue) path=\(request.url.path) contentLength=\(contentLength)"
+    )
+}
+
+private func logDecodedWriteRequest(_ request: Request, envelope: WriteRequestEnvelope, action: WritingAIAction) {
+    let documentBytes = envelope.project.documentText.utf8.count
+    let conversationBytes = envelope.project.conversation.reduce(0) { partialResult, message in
+        partialResult + message.text.utf8.count
+    }
+    let conversationCount = envelope.project.conversation.count
+    let globalSynopsisBytes = envelope.project.globalSynopsis.utf8.count
+    let localSummaryBytes = envelope.project.localSummary.utf8.count
+    let intentSummaryBytes = envelope.project.context.intentSummary.utf8.count
+    let currentGoalBytes = envelope.project.context.currentGoal.utf8.count
+    let nextFocusBytes = envelope.project.context.nextFocus.utf8.count
+    let workingMemoryBytes = envelope.project.context.workingMemory.reduce(0) { partialResult, value in
+        partialResult + value.utf8.count
+    }
+    let recentDecisionsBytes = envelope.project.context.recentDecisions.reduce(0) { partialResult, value in
+        partialResult + value.utf8.count
+    }
+    let styleConstraintsBytes = envelope.project.context.styleConstraints.reduce(0) { partialResult, value in
+        partialResult + value.utf8.count
+    }
+    let userMessageBytes = envelope.userMessage?.utf8.count ?? 0
+    let selectionTextBytes = envelope.selectionText?.utf8.count ?? 0
+    let suggestionChipsBytes = envelope.project.suggestionChips.reduce(0) { partialResult, value in
+        partialResult + value.utf8.count
+    }
+
+    request.logger.info(
+        "write request decoded action=\(action.rawValue) requestId=\(envelope.requestId) kind=\(envelope.kind.rawValue) documentBytes=\(documentBytes) conversationBytes=\(conversationBytes) conversationCount=\(conversationCount) globalSynopsisBytes=\(globalSynopsisBytes) localSummaryBytes=\(localSummaryBytes) intentSummaryBytes=\(intentSummaryBytes) currentGoalBytes=\(currentGoalBytes) nextFocusBytes=\(nextFocusBytes) workingMemoryBytes=\(workingMemoryBytes) recentDecisionsBytes=\(recentDecisionsBytes) styleConstraintsBytes=\(styleConstraintsBytes) suggestionChipsBytes=\(suggestionChipsBytes) userMessageBytes=\(userMessageBytes) selectionTextBytes=\(selectionTextBytes)"
     )
 }
 

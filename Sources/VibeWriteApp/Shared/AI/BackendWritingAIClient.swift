@@ -60,10 +60,11 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                 do {
                     let installationId = await identityStore.installationId()
                     let deviceToken = try await resolvedDeviceToken(installationId: installationId)
-                    let urlRequest = try makeStreamingWriteRequest(
+                    let urlRequest = try makeWriteRequest(
                         request,
                         installationId: installationId,
-                        deviceToken: deviceToken
+                        deviceToken: deviceToken,
+                        accept: "application/x-ndjson"
                     )
 
                     let (bytes, response) = try await session.bytes(for: urlRequest)
@@ -168,9 +169,10 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
             platform: configuration.platform,
             deviceName: configuration.deviceName
         )
-        let urlRequest = try makeURLRequest(
+        let requestBodyData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(requestBody)
+        let urlRequest = makeURLRequest(
             pathComponents: ["v3", "client", "bootstrap"],
-            body: requestBody
+            bodyData: requestBodyData
         )
 
         let (data, response) = try await performRequest(urlRequest)
@@ -203,21 +205,11 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         installationId: String,
         deviceToken: String
     ) async throws -> WritingAIResponse {
-        let requestBody = BackendGatewayWriteEnvelope(
+        let urlRequest = try makeWriteRequest(
+            request,
             installationId: installationId,
             deviceToken: deviceToken,
-            requestId: UUID().uuidString.lowercased(),
-            action: request.action,
-            kind: request.kind,
-            project: request.project,
-            userMessage: request.userMessage,
-            selectionText: request.selectionText,
-            selectionRange: request.selectionRange
-        )
-
-        let urlRequest = try makeURLRequest(
-            pathComponents: ["v3", "writes", routeComponent(for: request.action)],
-            body: requestBody
+            accept: "application/json"
         )
 
         let (data, response) = try await performRequest(urlRequest)
@@ -264,6 +256,15 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         body: T,
         accept: String = "application/json"
     ) throws -> URLRequest {
+        let bodyData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(body)
+        return makeURLRequest(pathComponents: pathComponents, bodyData: bodyData, accept: accept)
+    }
+
+    private func makeURLRequest(
+        pathComponents: [String],
+        bodyData: Data,
+        accept: String = "application/json"
+    ) -> URLRequest {
         let url = pathComponents.reduce(configuration.baseURL) { partialResult, component in
             partialResult.appendingPathComponent(component)
         }
@@ -271,19 +272,21 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.setValue(accept, forHTTPHeaderField: "Accept")
-        request.httpBody = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(body)
+        request.httpBody = bodyData
         return request
     }
 
-    private func makeStreamingWriteRequest(
+    private func makeWriteRequest(
         _ request: WritingAIRequest,
         installationId: String,
-        deviceToken: String
+        deviceToken: String,
+        accept: String
     ) throws -> URLRequest {
+        let requestId = UUID().uuidString.lowercased()
         let requestBody = BackendGatewayWriteEnvelope(
             installationId: installationId,
             deviceToken: deviceToken,
-            requestId: UUID().uuidString.lowercased(),
+            requestId: requestId,
             action: request.action,
             kind: request.kind,
             project: request.project,
@@ -291,13 +294,20 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
             selectionText: request.selectionText,
             selectionRange: request.selectionRange
         )
-
-        let urlRequest = try makeURLRequest(
-            pathComponents: ["v3", "writes", routeComponent(for: request.action)],
-            body: requestBody,
-            accept: "application/x-ndjson"
+        let requestBodyData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(requestBody)
+        let projectData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(request.project)
+        logWriteRequestMetrics(
+            request: request,
+            requestId: requestId,
+            requestBodyBytes: requestBodyData.count,
+            projectBytes: projectData.count
         )
-        return urlRequest
+
+        return makeURLRequest(
+            pathComponents: ["v3", "writes", routeComponent(for: request.action)],
+            bodyData: requestBodyData,
+            accept: accept
+        )
     }
 
     private func decodeStreamEvent(from rawLine: String) throws -> WritingAIStreamEvent {
@@ -329,6 +339,42 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         case .edit:
             return "edit"
         }
+    }
+
+    private func logWriteRequestMetrics(
+        request: WritingAIRequest,
+        requestId: String,
+        requestBodyBytes: Int,
+        projectBytes: Int
+    ) {
+        let documentTextBytes = request.project.documentText.utf8.count
+        let conversationBytes = request.project.conversation.reduce(0) { partialResult, message in
+            partialResult + message.text.utf8.count
+        }
+        let conversationCount = request.project.conversation.count
+        let globalSynopsisBytes = request.project.globalSynopsis.utf8.count
+        let localSummaryBytes = request.project.localSummary.utf8.count
+        let intentSummaryBytes = request.project.context.intentSummary.utf8.count
+        let currentGoalBytes = request.project.context.currentGoal.utf8.count
+        let nextFocusBytes = request.project.context.nextFocus.utf8.count
+        let workingMemoryBytes = request.project.context.workingMemory.reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
+        let recentDecisionsBytes = request.project.context.recentDecisions.reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
+        let styleConstraintsBytes = request.project.context.styleConstraints.reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
+        let userMessageBytes = request.userMessage?.utf8.count ?? 0
+        let selectionTextBytes = request.selectionText?.utf8.count ?? 0
+        let suggestionChipsBytes = request.project.suggestionChips.reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
+
+        VibeWriteLog.ai.info(
+            "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public) documentBytes=\(documentTextBytes, privacy: .public) conversationBytes=\(conversationBytes, privacy: .public) conversationCount=\(conversationCount, privacy: .public) globalSynopsisBytes=\(globalSynopsisBytes, privacy: .public) localSummaryBytes=\(localSummaryBytes, privacy: .public) intentSummaryBytes=\(intentSummaryBytes, privacy: .public) currentGoalBytes=\(currentGoalBytes, privacy: .public) nextFocusBytes=\(nextFocusBytes, privacy: .public) workingMemoryBytes=\(workingMemoryBytes, privacy: .public) recentDecisionsBytes=\(recentDecisionsBytes, privacy: .public) styleConstraintsBytes=\(styleConstraintsBytes, privacy: .public) suggestionChipsBytes=\(suggestionChipsBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public)"
+        )
     }
 
     private func mapHTTPError(
