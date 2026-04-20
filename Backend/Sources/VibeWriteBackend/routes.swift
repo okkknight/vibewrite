@@ -69,8 +69,12 @@ func routes(
 
 private func logIncomingWriteRequest(_ request: Request, action: WritingAIAction) {
     let contentLength = request.headers.first(name: "Content-Length") ?? "nil"
+    let transferEncoding = request.headers.first(name: "Transfer-Encoding") ?? "nil"
+    let contentEncoding = request.headers.first(name: "Content-Encoding") ?? "nil"
+    let accept = request.headers.first(name: "Accept") ?? "nil"
+    let expect = request.headers.first(name: "Expect") ?? "nil"
     request.logger.info(
-        "write request incoming action=\(action.rawValue) path=\(request.url.path) contentLength=\(contentLength)"
+        "write request incoming action=\(action.rawValue) path=\(request.url.path) contentLength=\(contentLength) transferEncoding=\(transferEncoding) contentEncoding=\(contentEncoding) accept=\(accept) expect=\(expect)"
     )
 }
 

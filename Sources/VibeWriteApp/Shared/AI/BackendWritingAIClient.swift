@@ -60,23 +60,54 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                 do {
                     let installationId = await identityStore.installationId()
                     let deviceToken = try await resolvedDeviceToken(installationId: installationId)
-                    let urlRequest = try makeWriteRequest(
+                    let preparedRequest = try makeWriteRequest(
                         request,
                         installationId: installationId,
                         deviceToken: deviceToken,
                         accept: "application/x-ndjson"
                     )
 
-                    let (bytes, response) = try await session.bytes(for: urlRequest)
+                    let (bytes, response) = try await session.bytes(for: preparedRequest.urlRequest)
                     guard let httpResponse = response as? HTTPURLResponse else {
+                        logWriteRequestOutcome(
+                            request: request,
+                            requestId: preparedRequest.requestId,
+                            statusCode: nil,
+                            responseBytes: 0,
+                            responsePreview: nil,
+                            requestBytes: preparedRequest.requestBodyBytes,
+                            projectBytes: preparedRequest.projectBytes,
+                            payloadFingerprint: preparedRequest.payloadFingerprint
+                        )
                         throw WritingAIClientError.requestFailed("后端写作请求没有返回 HTTP 响应。")
                     }
+
+                    logWriteRequestOutcome(
+                        request: request,
+                        requestId: preparedRequest.requestId,
+                        statusCode: httpResponse.statusCode,
+                        responseBytes: 0,
+                        responsePreview: nil,
+                        requestBytes: preparedRequest.requestBodyBytes,
+                        projectBytes: preparedRequest.projectBytes,
+                        payloadFingerprint: preparedRequest.payloadFingerprint
+                    )
 
                     guard (200...299).contains(httpResponse.statusCode) else {
                         let data = try await Self.collectData(from: bytes)
                         if httpResponse.statusCode == 401 {
                             await identityStore.clearDeviceToken()
                         }
+                        logWriteRequestOutcome(
+                            request: request,
+                            requestId: preparedRequest.requestId,
+                            statusCode: httpResponse.statusCode,
+                            responseBytes: data.count,
+                            responsePreview: data.vibewriteResponsePreview(maxLength: 240),
+                            requestBytes: preparedRequest.requestBodyBytes,
+                            projectBytes: preparedRequest.projectBytes,
+                            payloadFingerprint: preparedRequest.payloadFingerprint
+                        )
                         throw mapHTTPError(
                             statusCode: httpResponse.statusCode,
                             body: data,
@@ -147,10 +178,15 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
     private func performWriteRequest(for request: WritingAIRequest) async throws -> WritingAIResponse {
         let installationId = await identityStore.installationId()
         let deviceToken = try await resolvedDeviceToken(installationId: installationId)
-        return try await sendWriteRequest(
+        let preparedRequest = try makeWriteRequest(
             request,
             installationId: installationId,
-            deviceToken: deviceToken
+            deviceToken: deviceToken,
+            accept: "application/json"
+        )
+        return try await sendWriteRequest(
+            request,
+            preparedRequest: preparedRequest
         )
     }
 
@@ -202,20 +238,33 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
 
     private func sendWriteRequest(
         _ request: WritingAIRequest,
-        installationId: String,
-        deviceToken: String
+        preparedRequest: BackendGatewayPreparedWriteRequest
     ) async throws -> WritingAIResponse {
-        let urlRequest = try makeWriteRequest(
-            request,
-            installationId: installationId,
-            deviceToken: deviceToken,
-            accept: "application/json"
-        )
-
-        let (data, response) = try await performRequest(urlRequest)
+        let (data, response) = try await performRequest(preparedRequest.urlRequest)
         guard let httpResponse = response as? HTTPURLResponse else {
+            logWriteRequestOutcome(
+                request: request,
+                requestId: preparedRequest.requestId,
+                statusCode: nil,
+                responseBytes: data.count,
+                responsePreview: data.vibewriteResponsePreview(maxLength: 240),
+                requestBytes: preparedRequest.requestBodyBytes,
+                projectBytes: preparedRequest.projectBytes,
+                payloadFingerprint: preparedRequest.payloadFingerprint
+            )
             throw WritingAIClientError.requestFailed("后端写作请求没有返回 HTTP 响应。")
         }
+
+        logWriteRequestOutcome(
+            request: request,
+            requestId: preparedRequest.requestId,
+            statusCode: httpResponse.statusCode,
+            responseBytes: data.count,
+            responsePreview: httpResponse.statusCode < 200 || httpResponse.statusCode >= 300 ? data.vibewriteResponsePreview(maxLength: 240) : nil,
+            requestBytes: preparedRequest.requestBodyBytes,
+            projectBytes: preparedRequest.projectBytes,
+            payloadFingerprint: preparedRequest.payloadFingerprint
+        )
 
         guard (200...299).contains(httpResponse.statusCode) else {
             if httpResponse.statusCode == 401 {
@@ -281,7 +330,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         installationId: String,
         deviceToken: String,
         accept: String
-    ) throws -> URLRequest {
+    ) throws -> BackendGatewayPreparedWriteRequest {
         let requestId = UUID().uuidString.lowercased()
         let requestBody = BackendGatewayWriteEnvelope(
             installationId: installationId,
@@ -296,17 +345,25 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         )
         let requestBodyData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(requestBody)
         let projectData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(request.project)
+        let payloadFingerprint = requestBodyData.vibewriteRequestFingerprint()
         logWriteRequestMetrics(
             request: request,
             requestId: requestId,
             requestBodyBytes: requestBodyData.count,
-            projectBytes: projectData.count
+            projectBytes: projectData.count,
+            payloadFingerprint: payloadFingerprint
         )
 
-        return makeURLRequest(
-            pathComponents: ["v3", "writes", routeComponent(for: request.action)],
-            bodyData: requestBodyData,
-            accept: accept
+        return BackendGatewayPreparedWriteRequest(
+            urlRequest: makeURLRequest(
+                pathComponents: ["v3", "writes", routeComponent(for: request.action)],
+                bodyData: requestBodyData,
+                accept: accept
+            ),
+            requestId: requestId,
+            requestBodyBytes: requestBodyData.count,
+            projectBytes: projectData.count,
+            payloadFingerprint: payloadFingerprint
         )
     }
 
@@ -345,7 +402,8 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         request: WritingAIRequest,
         requestId: String,
         requestBodyBytes: Int,
-        projectBytes: Int
+        projectBytes: Int,
+        payloadFingerprint: String
     ) {
         let documentTextBytes = request.project.documentText.utf8.count
         let conversationBytes = request.project.conversation.reduce(0) { partialResult, message in
@@ -373,7 +431,31 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
 
         VibeWriteLog.ai.info(
-            "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public) documentBytes=\(documentTextBytes, privacy: .public) conversationBytes=\(conversationBytes, privacy: .public) conversationCount=\(conversationCount, privacy: .public) globalSynopsisBytes=\(globalSynopsisBytes, privacy: .public) localSummaryBytes=\(localSummaryBytes, privacy: .public) intentSummaryBytes=\(intentSummaryBytes, privacy: .public) currentGoalBytes=\(currentGoalBytes, privacy: .public) nextFocusBytes=\(nextFocusBytes, privacy: .public) workingMemoryBytes=\(workingMemoryBytes, privacy: .public) recentDecisionsBytes=\(recentDecisionsBytes, privacy: .public) styleConstraintsBytes=\(styleConstraintsBytes, privacy: .public) suggestionChipsBytes=\(suggestionChipsBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public)"
+            "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public) documentBytes=\(documentTextBytes, privacy: .public) conversationBytes=\(conversationBytes, privacy: .public) conversationCount=\(conversationCount, privacy: .public) globalSynopsisBytes=\(globalSynopsisBytes, privacy: .public) localSummaryBytes=\(localSummaryBytes, privacy: .public) intentSummaryBytes=\(intentSummaryBytes, privacy: .public) currentGoalBytes=\(currentGoalBytes, privacy: .public) nextFocusBytes=\(nextFocusBytes, privacy: .public) workingMemoryBytes=\(workingMemoryBytes, privacy: .public) recentDecisionsBytes=\(recentDecisionsBytes, privacy: .public) styleConstraintsBytes=\(styleConstraintsBytes, privacy: .public) suggestionChipsBytes=\(suggestionChipsBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public)"
+        )
+    }
+
+    private func logWriteRequestOutcome(
+        request: WritingAIRequest,
+        requestId: String,
+        statusCode: Int?,
+        responseBytes: Int,
+        responsePreview: String?,
+        requestBytes: Int,
+        projectBytes: Int,
+        payloadFingerprint: String
+    ) {
+        let statusText = statusCode.map { String($0) } ?? "nil"
+        let responsePreviewText = responsePreview ?? "nil"
+        if let responsePreview, !responsePreview.isEmpty {
+            VibeWriteLog.ai.warning(
+                "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreview, privacy: .public) requestBytes=\(requestBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public)"
+            )
+            return
+        }
+
+        VibeWriteLog.ai.info(
+            "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreviewText, privacy: .public) requestBytes=\(requestBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public)"
         )
     }
 
@@ -427,6 +509,40 @@ private struct BackendGatewayWriteEnvelope: Codable {
     let userMessage: String?
     let selectionText: String?
     let selectionRange: WritingTextSelectionRange?
+}
+
+private struct BackendGatewayPreparedWriteRequest {
+    let urlRequest: URLRequest
+    let requestId: String
+    let requestBodyBytes: Int
+    let projectBytes: Int
+    let payloadFingerprint: String
+}
+
+private extension Data {
+    func vibewriteRequestFingerprint() -> String {
+        var hash: UInt64 = 0xcbf29ce484222325
+        for byte in self {
+            hash ^= UInt64(byte)
+            hash &*= 0x100000001b3
+        }
+        return String(hash, radix: 16, uppercase: false)
+    }
+
+    func vibewriteResponsePreview(maxLength: Int) -> String {
+        guard let rawText = String(data: self, encoding: .utf8) else {
+            return "\(count) bytes non-UTF8"
+        }
+
+        let collapsed = rawText.replacingOccurrences(of: "\n", with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        if collapsed.isEmpty {
+            return "\(count) bytes empty"
+        }
+        if collapsed.count <= maxLength {
+            return collapsed
+        }
+        return String(collapsed.prefix(maxLength - 1)) + "…"
+    }
 }
 
 private struct BackendGatewayUnauthorizedError: Error {}
