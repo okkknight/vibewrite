@@ -433,6 +433,9 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         VibeWriteLog.ai.info(
             "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public) documentBytes=\(documentTextBytes, privacy: .public) conversationBytes=\(conversationBytes, privacy: .public) conversationCount=\(conversationCount, privacy: .public) globalSynopsisBytes=\(globalSynopsisBytes, privacy: .public) localSummaryBytes=\(localSummaryBytes, privacy: .public) intentSummaryBytes=\(intentSummaryBytes, privacy: .public) currentGoalBytes=\(currentGoalBytes, privacy: .public) nextFocusBytes=\(nextFocusBytes, privacy: .public) workingMemoryBytes=\(workingMemoryBytes, privacy: .public) recentDecisionsBytes=\(recentDecisionsBytes, privacy: .public) styleConstraintsBytes=\(styleConstraintsBytes, privacy: .public) suggestionChipsBytes=\(suggestionChipsBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public)"
         )
+        VibeWriteRequestTrace.append(
+            "backend write request metrics action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) envelopeBytes=\(requestBodyBytes) projectBytes=\(projectBytes) documentBytes=\(documentTextBytes) conversationBytes=\(conversationBytes) conversationCount=\(conversationCount) globalSynopsisBytes=\(globalSynopsisBytes) localSummaryBytes=\(localSummaryBytes) intentSummaryBytes=\(intentSummaryBytes) currentGoalBytes=\(currentGoalBytes) nextFocusBytes=\(nextFocusBytes) workingMemoryBytes=\(workingMemoryBytes) recentDecisionsBytes=\(recentDecisionsBytes) styleConstraintsBytes=\(styleConstraintsBytes) suggestionChipsBytes=\(suggestionChipsBytes) userMessageBytes=\(userMessageBytes) selectionTextBytes=\(selectionTextBytes)"
+        )
     }
 
     private func logWriteRequestOutcome(
@@ -451,11 +454,17 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
             VibeWriteLog.ai.warning(
                 "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreview, privacy: .public) requestBytes=\(requestBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public)"
             )
+            VibeWriteRequestTrace.append(
+                "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreview) requestBytes=\(requestBytes) projectBytes=\(projectBytes)"
+            )
             return
         }
 
         VibeWriteLog.ai.info(
             "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreviewText, privacy: .public) requestBytes=\(requestBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public)"
+        )
+        VibeWriteRequestTrace.append(
+            "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreviewText) requestBytes=\(requestBytes) projectBytes=\(projectBytes)"
         )
     }
 

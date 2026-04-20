@@ -1,6 +1,7 @@
 # Changelog
 
 # 2026-04-20
+- Added a dedicated request-trace file for intermittent HTTP 413 diagnosis. The app now writes only backend write request metrics and response summaries to `~/Library/Application Support/VibeWrite/diagnostics/backend-gateway-request-trace.log`, so the next repro can compare success and failure payloads without scraping the noisy system log stream.
 - Moved the metadata suggestion request earlier in the app flow so it now starts as soon as the prose result is ready, instead of waiting for prose playback tail completion. This keeps suggestion generation overlapping the final playback tail while leaving正文 streaming, save behavior, and edit behavior unchanged.
 - Added inline comments around the prose/metadata overlap point so future edits preserve the intentional concurrency boundary instead of accidentally serializing the two phases again.
 - Temporarily capped the center writing card height in `WritingProjectView` so the current UI can visually confirm whether the tall title background is being driven by the full-stage body container instead of header padding alone.
