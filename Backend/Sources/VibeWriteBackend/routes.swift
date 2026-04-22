@@ -2,6 +2,8 @@ import Foundation
 import Vapor
 import VibeWriteShared
 
+private let writeRouteMaxBodySize: ByteCount = "256kb"
+
 func routes(
     _ app: Application,
     deviceRegistry: any VibeWriteDeviceRegistryStore,
@@ -33,21 +35,21 @@ func routes(
         )
     }
 
-    app.post("v3", "writes", "start") { req async throws -> Response in
+    app.on(.POST, "v3", "writes", "start", body: .collect(maxSize: writeRouteMaxBodySize)) { req async throws -> Response in
         logIncomingWriteRequest(req, action: .startDraft)
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
         logDecodedWriteRequest(req, envelope: envelope, action: .startDraft)
         return try await writeResponse(for: envelope, action: .startDraft, request: req, writeService: writeService)
     }
 
-    app.post("v3", "writes", "continue") { req async throws -> Response in
+    app.on(.POST, "v3", "writes", "continue", body: .collect(maxSize: writeRouteMaxBodySize)) { req async throws -> Response in
         logIncomingWriteRequest(req, action: .continueWriting)
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
         logDecodedWriteRequest(req, envelope: envelope, action: .continueWriting)
         return try await writeResponse(for: envelope, action: .continueWriting, request: req, writeService: writeService)
     }
 
-    app.post("v3", "writes", "edit") { req async throws -> Response in
+    app.on(.POST, "v3", "writes", "edit", body: .collect(maxSize: writeRouteMaxBodySize)) { req async throws -> Response in
         logIncomingWriteRequest(req, action: .edit)
         let envelope = try req.content.decode(WriteRequestEnvelope.self)
         logDecodedWriteRequest(req, envelope: envelope, action: .edit)

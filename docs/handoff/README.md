@@ -51,13 +51,14 @@ This directory is the compact handoff layer for VibeWrite.
 46. `task/TASK_20260419_045.md`
 47. `task/TASK_20260419_046.md`
 48. `task/TASK_20260419_047.md`
-49. `docs/V3/FRONTEND3.0.md`
-50. `docs/V3/BACKEND3.0.md`
-51. `docs/V3/DATA3.0.md`
-52. `docs/V3/API3.0.md`
-53. `docs/V3/ADMIN3.0.md`
-54. `docs/V3/DEPLOY3.0.md`
-55. `docs/V3/MIGRATION3.0.md`
+49. `task/TASK_20260420_048.md`
+50. `docs/V3/FRONTEND3.0.md`
+51. `docs/V3/BACKEND3.0.md`
+52. `docs/V3/DATA3.0.md`
+53. `docs/V3/API3.0.md`
+54. `docs/V3/ADMIN3.0.md`
+55. `docs/V3/DEPLOY3.0.md`
+56. `docs/V3/MIGRATION3.0.md`
 
 ## Purpose
 - keep the project easy to resume

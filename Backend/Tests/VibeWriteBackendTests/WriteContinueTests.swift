@@ -4,6 +4,94 @@ import XCTVapor
 import VibeWriteShared
 
 final class WriteContinueTests: XCTestCase {
+    func testContinueDraftAcceptsKnownLengthStreamingBodyAboveFrameworkDefaultLimit() throws {
+        let app = Application(.testing)
+        defer { app.shutdown() }
+
+        try configure(app)
+
+        let bootstrapRequest = BootstrapRequest(
+            installationId: "installation-continue-large-001",
+            appVersion: "3.0.0",
+            platform: "macOS",
+            deviceName: "QA Mac"
+        )
+
+        var issuedToken = ""
+        try app.test(.POST, "v3/client/bootstrap", beforeRequest: { request in
+            try request.content.encode(bootstrapRequest)
+        }, afterResponse: { response in
+            XCTAssertEqual(response.status, .ok)
+            XCTAssertContent(BootstrapResponse.self, response) { bootstrap in
+                issuedToken = bootstrap.deviceToken
+            }
+        })
+
+        let largeDocument = String(repeating: "a", count: 49_000)
+        let continueRequest = WriteRequestEnvelope(
+            installationId: bootstrapRequest.installationId,
+            deviceToken: issuedToken,
+            requestId: "request-continue-large-001",
+            action: .continueWriting,
+            kind: .prose,
+            project: sampleProjectSnapshot(
+                automationKey: "task48-large-stream",
+                documentText: largeDocument
+            ),
+            userMessage: "继续写下去",
+            selectionText: nil,
+            selectionRange: nil
+        )
+
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        let requestBodyData = try encoder.encode(continueRequest)
+        XCTAssertGreaterThan(requestBodyData.count, 16 * 1024)
+
+        try app.server.start(address: .hostname("127.0.0.1", port: 0))
+        defer { app.server.shutdown() }
+
+        guard let port = app.http.server.shared.localAddress?.port else {
+            XCTFail("Expected test server to bind an ephemeral port.")
+            return
+        }
+
+        let client = HTTPClient(eventLoopGroupProvider: .createNew)
+        defer { XCTAssertNoThrow(try client.syncShutdown()) }
+
+        var headers = HTTPHeaders()
+        headers.contentType = .json
+        headers.replaceOrAdd(name: .accept, value: "application/json")
+        let url = "http://127.0.0.1:\(port)/v3/writes/continue"
+        var request = try HTTPClient.Request(
+            url: url,
+            method: .POST,
+            headers: headers
+        )
+
+        let splitIndex = requestBodyData.count / 2
+        let firstChunk = Array(requestBodyData[..<splitIndex])
+        let secondChunk = Array(requestBodyData[splitIndex...])
+        request.body = .stream(contentLength: Int64(requestBodyData.count)) { writer in
+            writer.write(.byteBuffer(ByteBuffer(bytes: firstChunk))).flatMap {
+                writer.write(.byteBuffer(ByteBuffer(bytes: secondChunk)))
+            }
+        }
+
+        let response = try client.execute(request: request).wait()
+        XCTAssertEqual(response.status, .ok)
+        XCTAssertNotNil(response.headers.first(name: .contentType))
+
+        guard var responseBody = response.body else {
+            XCTFail("Expected JSON response body for large streamed continue request.")
+            return
+        }
+
+        let bodyString = responseBody.readString(length: responseBody.readableBytes)
+        XCTAssertNotNil(bodyString)
+        XCTAssertTrue(bodyString?.contains("\"assistantMessage\"") == true)
+    }
+
     func testContinueDraftAcceptsMatchingBootstrapTokenAndKeepsStartRouteWorking() throws {
         let app = Application(.testing)
         defer { app.shutdown() }
@@ -122,7 +210,10 @@ final class WriteContinueTests: XCTestCase {
         })
     }
 
-    private func sampleProjectSnapshot(automationKey: String) -> WritingProjectSnapshot {
+    private func sampleProjectSnapshot(
+        automationKey: String,
+        documentText: String = "开头正文"
+    ) -> WritingProjectSnapshot {
         WritingProjectSnapshot(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000029") ?? UUID(),
             automationKey: automationKey,
@@ -142,7 +233,7 @@ final class WriteContinueTests: XCTestCase {
             conversation: [
                 ConversationMessage(role: .user, text: "继续写下去", timestamp: "2026-04-12T00:00:00Z")
             ],
-            documentText: "开头正文",
+            documentText: documentText,
             suggestionChips: ["继续", "收紧"],
             updatedAt: Date(timeIntervalSince1970: 1_719_000_000)
         )
