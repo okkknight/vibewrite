@@ -260,6 +260,34 @@ final class SelectableTextEditorTests: XCTestCase {
         XCTAssertEqual(box.value, "abef")
     }
 
+    func testProgrammaticSyncPreservesNonEmptySelectionAcrossReplacement() {
+        let editor = SelectableTextEditor(
+            text: .constant(""),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let textView = StyledTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.string = "abcdef"
+        textView.setSelectedRange(NSRange(location: 2, length: 2))
+        window.contentView = NSView(frame: window.contentView?.bounds ?? .zero)
+        window.contentView?.addSubview(textView)
+        _ = window.makeFirstResponder(textView)
+
+        XCTAssertTrue(coordinator.syncText("abZef", in: textView))
+        XCTAssertEqual(textView.selectedRange(), NSRange(location: 2, length: 1))
+    }
+
     func testProgrammaticSyncClearsBodyUndoHistory() {
         let editor = SelectableTextEditor(
             text: .constant(""),

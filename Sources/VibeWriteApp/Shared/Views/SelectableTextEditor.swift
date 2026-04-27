@@ -470,6 +470,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             let oldText = textView.string as NSString
             let newTextString = newText as NSString
             let existingSelection = textView.selectedRange()
+            var adjustedSelectionAfterSync = existingSelection
             let undoManager = textView.undoManager
             let didDisableUndoRegistration = undoManager?.isUndoRegistrationEnabled == true
 
@@ -499,23 +500,27 @@ struct SelectableTextEditor: NSViewRepresentable {
                 textStorage.replaceCharacters(in: replacementRange, with: replacement)
                 textStorage.endEditing()
 
-                let adjustedSelection = adjustedSelection(
+                adjustedSelectionAfterSync = adjustedSelection(
                     existingSelection,
                     newTextLength: newTextString.length,
                     replacementRange: replacementRange,
                     replacementLength: newMiddleLength
                 )
-                if adjustedSelection != existingSelection {
-                    textView.setSelectedRange(adjustedSelection)
-                }
             } else {
                 textView.string = newText
+                adjustedSelectionAfterSync = NSRange(
+                    location: min(existingSelection.location, newTextString.length),
+                    length: 0
+                )
             }
 
             needsFullTextRestyle = true
             ensureReadableTextAttributes(in: textView)
             textView.setAccessibilityValue(newText as NSString)
             lastAppliedAccessibilityValue = newText
+            if textView.selectedRange() != adjustedSelectionAfterSync {
+                textView.setSelectedRange(adjustedSelectionAfterSync)
+            }
             pendingUserTextChange = nil
             undoManager?.removeAllActions()
             logTextEvent(
@@ -1117,25 +1122,55 @@ struct SelectableTextEditor: NSViewRepresentable {
             replacementRange: NSRange,
             replacementLength: Int
         ) -> NSRange {
-            guard existingSelection.length == 0 else {
-                let clampedLocation = min(existingSelection.location, max(newTextLength, 0))
-                return NSRange(location: clampedLocation, length: 0)
-            }
-
             let oldReplacementEnd = replacementRange.location + replacementRange.length
             let delta = replacementLength - replacementRange.length
+            let clampedNewTextLength = max(newTextLength, 0)
+
+            func clampLocation(_ location: Int) -> Int {
+                min(max(location, 0), clampedNewTextLength)
+            }
+
+            guard existingSelection.length == 0 else {
+                let selectionStart = existingSelection.location
+                let selectionEnd = existingSelection.location + existingSelection.length
+
+                let adjustedStart: Int
+                if selectionStart < replacementRange.location {
+                    adjustedStart = selectionStart
+                } else if selectionStart >= oldReplacementEnd {
+                    adjustedStart = selectionStart + delta
+                } else {
+                    adjustedStart = replacementRange.location
+                }
+
+                let adjustedEnd: Int
+                if selectionEnd <= replacementRange.location {
+                    adjustedEnd = selectionEnd
+                } else if selectionEnd >= oldReplacementEnd {
+                    adjustedEnd = selectionEnd + delta
+                } else {
+                    adjustedEnd = replacementRange.location + replacementLength
+                }
+
+                let clampedStart = clampLocation(adjustedStart)
+                let clampedEnd = max(clampedStart, clampLocation(adjustedEnd))
+                return NSRange(
+                    location: clampedStart,
+                    length: clampedEnd - clampedStart
+                )
+            }
 
             if existingSelection.location >= oldReplacementEnd {
-                let adjustedLocation = min(max(existingSelection.location + delta, 0), max(newTextLength, 0))
+                let adjustedLocation = clampLocation(existingSelection.location + delta)
                 return NSRange(location: adjustedLocation, length: 0)
             }
 
             if existingSelection.location >= replacementRange.location {
-                let adjustedLocation = min(replacementRange.location + replacementLength, max(newTextLength, 0))
+                let adjustedLocation = clampLocation(replacementRange.location + replacementLength)
                 return NSRange(location: adjustedLocation, length: 0)
             }
 
-            let clampedLocation = min(existingSelection.location, max(newTextLength, 0))
+            let clampedLocation = clampLocation(existingSelection.location)
             return NSRange(location: clampedLocation, length: 0)
         }
 
