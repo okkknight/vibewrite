@@ -208,6 +208,58 @@ final class SelectableTextEditorTests: XCTestCase {
         XCTAssertEqual(box.value, "")
     }
 
+    func testSelectionChangeStagesPendingTextBeforeTextDidChangeForCutLikeMutation() {
+        final class Box {
+            var value: String
+
+            init(_ value: String) {
+                self.value = value
+            }
+        }
+
+        let box = Box("abcdef")
+        let editor = SelectableTextEditor(
+            text: Binding(
+                get: { box.value },
+                set: { box.value = $0 }
+            ),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let textView = StyledTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.isEditable = true
+        textView.isSelectable = true
+        textView.string = "abcdef"
+        let scrollView = NSScrollView(frame: window.contentView?.bounds ?? .zero)
+        scrollView.documentView = textView
+        window.contentView = NSView(frame: window.contentView?.bounds ?? .zero)
+        window.contentView?.addSubview(scrollView)
+        coordinator.installObservers(for: scrollView, textView: textView)
+        _ = window.makeFirstResponder(textView)
+
+        textView.string = "abef"
+        textView.setSelectedRange(NSRange(location: 2, length: 0))
+        NotificationCenter.default.post(
+            name: NSTextView.didChangeSelectionNotification,
+            object: textView
+        )
+
+        XCTAssertTrue(coordinator.shouldPreserveLiveUserText(in: textView, bindingText: box.value))
+
+        coordinator.syncLiveUserTextFromView(textView)
+
+        XCTAssertEqual(box.value, "abef")
+    }
+
     func testProgrammaticSyncClearsBodyUndoHistory() {
         let editor = SelectableTextEditor(
             text: .constant(""),

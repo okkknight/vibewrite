@@ -339,6 +339,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             }
 
             guard !isApplyingProgrammaticChange else { return }
+            stagePendingUserTextFromSelectionChangeIfNeeded(in: textView)
 
             if !isPerformingLayoutSync {
                 lockedViewportOrigin = nil
@@ -352,6 +353,20 @@ struct SelectableTextEditor: NSViewRepresentable {
 
             logSelectionEvent("selection notification changed selection=\(debugRange(textView.selectedRange())) editable=\(textView.isEditable)")
             syncSelectionOverlayState(from: textView)
+        }
+
+        private func stagePendingUserTextFromSelectionChangeIfNeeded(in textView: NSTextView) {
+            guard textView.isEditable else { return }
+            guard !shouldIgnoreBootstrapEmptyUserTextMutation(in: textView) else { return }
+
+            let currentText = textView.string
+            guard currentText != text else { return }
+            guard pendingUserTextChange != currentText else { return }
+
+            pendingUserTextChange = currentText
+            logTextEvent(
+                "selection change staged pending user text count=\(currentText.utf16.count) selection=\(debugRange(textView.selectedRange()))"
+            )
         }
 
         func syncTypography(
@@ -854,6 +869,10 @@ struct SelectableTextEditor: NSViewRepresentable {
                 return false
             }
 
+            return shouldIgnoreBootstrapEmptyUserTextMutation(in: textView)
+        }
+
+        private func shouldIgnoreBootstrapEmptyUserTextMutation(in textView: NSTextView) -> Bool {
             guard textView.string.isEmpty else {
                 return false
             }
