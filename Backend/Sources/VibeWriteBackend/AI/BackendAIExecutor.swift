@@ -69,20 +69,13 @@ actor BackendAIExecutor {
         self.systemPromptStore = systemPromptStore
     }
 
-    func execute(for envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+    func execute(for envelope: WriteRequestEnvelope) async throws -> WritingGatewayResponse {
+        let request = try gatewayRequest(from: envelope)
         switch envelope.kind {
         case .prose:
-            return try await executeProse(for: envelope)
+            return try await executeProse(for: request)
 
         case .metadata:
-            let request = WritingAIRequest(
-                action: envelope.action,
-                project: envelope.project,
-                userMessage: envelope.userMessage,
-                selectionText: envelope.selectionText,
-                selectionRange: envelope.selectionRange,
-                kind: envelope.kind
-            )
             let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
             let apiKey = try await resolvedProviderApiKey()
             return try await executeMetadata(
@@ -93,15 +86,8 @@ actor BackendAIExecutor {
         }
     }
 
-    func streamProse(for envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
-        let request = WritingAIRequest(
-            action: envelope.action,
-            project: envelope.project,
-            userMessage: envelope.userMessage,
-            selectionText: envelope.selectionText,
-            selectionRange: envelope.selectionRange,
-            kind: envelope.kind
-        )
+    func streamProse(for envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingGatewayStreamEvent, Error> {
+        let request = try gatewayRequest(from: envelope)
         let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
         let apiKey = try await resolvedProviderApiKey()
 
@@ -134,14 +120,9 @@ actor BackendAIExecutor {
                         continuation.yield(.textDelta(delta))
                     }
 
-                    let documentText = try responseBuilder.appliedDocumentText(
-                        for: request,
-                        proseText: proseText
-                    )
-
                     let response = responseBuilder.response(
                         for: request,
-                        documentText: documentText,
+                        proseText: proseText,
                         metadata: nil,
                         assistantMessage: responseBuilder.assistantLine(for: request.action)
                     )
@@ -158,16 +139,8 @@ actor BackendAIExecutor {
     }
 
     private func executeProse(
-        for envelope: WriteRequestEnvelope
-    ) async throws -> WritingAIResponse {
-        let request = WritingAIRequest(
-            action: envelope.action,
-            project: envelope.project,
-            userMessage: envelope.userMessage,
-            selectionText: envelope.selectionText,
-            selectionRange: envelope.selectionRange,
-            kind: envelope.kind
-        )
+        for request: WritingAIRequest
+    ) async throws -> WritingGatewayResponse {
         let systemPromptSnapshot = try await systemPromptStore.systemPromptCurrentSnapshot()
         let apiKey = try await resolvedProviderApiKey()
 
@@ -198,21 +171,9 @@ actor BackendAIExecutor {
             throw BackendAIError.providerError(error.localizedDescription)
         }
 
-        let documentText: String
-        do {
-            documentText = try responseBuilder.appliedDocumentText(
-                for: request,
-                proseText: proseText
-            )
-        } catch let error as BackendAIError {
-            throw error
-        } catch {
-            throw BackendAIError.backendError(error.localizedDescription)
-        }
-
         return responseBuilder.response(
             for: request,
-            documentText: documentText,
+            proseText: proseText,
             metadata: nil,
             assistantMessage: responseBuilder.assistantLine(for: request.action)
         )
@@ -233,7 +194,7 @@ actor BackendAIExecutor {
         for request: WritingAIRequest,
         systemPromptSnapshot: AdminSystemPromptStore.Snapshot,
         apiKey: String
-    ) async throws -> WritingAIResponse {
+    ) async throws -> WritingGatewayResponse {
         let metadataMessages: [WritingAIChatMessage]
         do {
             metadataMessages = try promptComposer.metadataMessages(
@@ -263,9 +224,80 @@ actor BackendAIExecutor {
 
         return responseBuilder.response(
             for: request,
-            documentText: request.project.documentText,
+            proseText: nil,
             metadata: metadata,
             assistantMessage: responseBuilder.assistantLine(for: request.action)
+        )
+    }
+
+    private func gatewayRequest(from envelope: WriteRequestEnvelope) throws -> WritingAIRequest {
+        switch envelope.action {
+        case .startDraft:
+            guard let project = envelope.startProject else {
+                throw BackendAIError.invalidRequest("A valid startProject is required for start requests.")
+            }
+            return WritingAIRequest(
+                action: envelope.action,
+                project: project,
+                userMessage: envelope.userMessage,
+                selectionText: nil,
+                selectionRange: nil,
+                kind: envelope.kind
+            )
+
+        case .continueWriting:
+            guard let sessionContext = envelope.sessionContext,
+                  let continueWindow = envelope.continueWindow else {
+                throw BackendAIError.invalidRequest("A valid continueWindow is required for continue requests.")
+            }
+            return WritingAIRequest(
+                action: envelope.action,
+                project: gatewayProjectSnapshot(
+                    sessionContext: sessionContext,
+                    documentText: continueWindow.tailText
+                ),
+                userMessage: envelope.userMessage,
+                selectionText: nil,
+                selectionRange: nil,
+                kind: envelope.kind
+            )
+
+        case .edit:
+            guard let sessionContext = envelope.sessionContext,
+                  let editWindow = envelope.editWindow else {
+                throw BackendAIError.invalidRequest("A valid editWindow is required for edit requests.")
+            }
+            return WritingAIRequest(
+                action: envelope.action,
+                project: gatewayProjectSnapshot(
+                    sessionContext: sessionContext,
+                    documentText: editWindow.windowText
+                ),
+                userMessage: envelope.userMessage,
+                selectionText: editWindow.selectionText,
+                selectionRange: editWindow.localSelectionRange,
+                kind: envelope.kind
+            )
+        }
+    }
+
+    private func gatewayProjectSnapshot(
+        sessionContext: WritingGatewaySessionContext,
+        documentText: String
+    ) -> WritingProjectSnapshot {
+        WritingProjectSnapshot(
+            id: UUID(uuidString: "00000000-0000-0000-0000-00000000BEEF") ?? UUID(),
+            automationKey: "backend.gateway.window",
+            title: sessionContext.title,
+            prompt: sessionContext.prompt,
+            mode: sessionContext.mode,
+            localSummary: sessionContext.localSummary,
+            globalSynopsis: sessionContext.globalSynopsis,
+            context: sessionContext.context,
+            conversation: [],
+            documentText: documentText,
+            suggestionChips: sessionContext.suggestionChips,
+            updatedAt: Date(timeIntervalSince1970: 0)
         )
     }
 }

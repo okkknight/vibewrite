@@ -81,33 +81,54 @@ private func logIncomingWriteRequest(_ request: Request, action: WritingAIAction
 }
 
 private func logDecodedWriteRequest(_ request: Request, envelope: WriteRequestEnvelope, action: WritingAIAction) {
-    let documentBytes = envelope.project.documentText.utf8.count
-    let conversationBytes = envelope.project.conversation.reduce(0) { partialResult, message in
-        partialResult + message.text.utf8.count
-    }
-    let conversationCount = envelope.project.conversation.count
-    let globalSynopsisBytes = envelope.project.globalSynopsis.utf8.count
-    let localSummaryBytes = envelope.project.localSummary.utf8.count
-    let intentSummaryBytes = envelope.project.context.intentSummary.utf8.count
-    let currentGoalBytes = envelope.project.context.currentGoal.utf8.count
-    let nextFocusBytes = envelope.project.context.nextFocus.utf8.count
-    let workingMemoryBytes = envelope.project.context.workingMemory.reduce(0) { partialResult, value in
-        partialResult + value.utf8.count
-    }
-    let recentDecisionsBytes = envelope.project.context.recentDecisions.reduce(0) { partialResult, value in
-        partialResult + value.utf8.count
-    }
-    let styleConstraintsBytes = envelope.project.context.styleConstraints.reduce(0) { partialResult, value in
-        partialResult + value.utf8.count
-    }
+    let documentBytes = envelope.startProject?.documentText.utf8.count ?? 0
+    let tailBytes = envelope.continueWindow?.tailText.utf8.count ?? 0
+    let beforeContextBytes = envelope.editWindow?.beforeContextText.utf8.count ?? 0
+    let selectionTextBytes = envelope.editWindow?.selectionText.utf8.count ?? 0
+    let afterContextBytes = envelope.editWindow?.afterContextText.utf8.count ?? 0
+    let totalDocumentCharacters = envelope.continueWindow?.totalCharacterCount
+        ?? envelope.editWindow?.totalCharacterCount
+        ?? envelope.startProject?.documentText.count
+        ?? 0
+    let globalSynopsisBytes = envelope.sessionContext?.globalSynopsis.utf8.count
+        ?? envelope.startProject?.globalSynopsis.utf8.count
+        ?? 0
+    let localSummaryBytes = envelope.sessionContext?.localSummary.utf8.count
+        ?? envelope.startProject?.localSummary.utf8.count
+        ?? 0
+    let intentSummaryBytes = envelope.sessionContext?.context.intentSummary.utf8.count
+        ?? envelope.startProject?.context.intentSummary.utf8.count
+        ?? 0
+    let currentGoalBytes = envelope.sessionContext?.context.currentGoal.utf8.count
+        ?? envelope.startProject?.context.currentGoal.utf8.count
+        ?? 0
+    let nextFocusBytes = envelope.sessionContext?.context.nextFocus.utf8.count
+        ?? envelope.startProject?.context.nextFocus.utf8.count
+        ?? 0
+    let workingMemoryBytes = (envelope.sessionContext?.context.workingMemory
+        ?? envelope.startProject?.context.workingMemory
+        ?? []).reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
+    let recentDecisionsBytes = (envelope.sessionContext?.context.recentDecisions
+        ?? envelope.startProject?.context.recentDecisions
+        ?? []).reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
+    let styleConstraintsBytes = (envelope.sessionContext?.context.styleConstraints
+        ?? envelope.startProject?.context.styleConstraints
+        ?? []).reduce(0) { partialResult, value in
+            partialResult + value.utf8.count
+        }
     let userMessageBytes = envelope.userMessage?.utf8.count ?? 0
-    let selectionTextBytes = envelope.selectionText?.utf8.count ?? 0
-    let suggestionChipsBytes = envelope.project.suggestionChips.reduce(0) { partialResult, value in
+    let suggestionChipsBytes = (envelope.sessionContext?.suggestionChips
+        ?? envelope.startProject?.suggestionChips
+        ?? []).reduce(0) { partialResult, value in
         partialResult + value.utf8.count
     }
 
     request.logger.info(
-        "write request decoded action=\(action.rawValue) requestId=\(envelope.requestId) kind=\(envelope.kind.rawValue) documentBytes=\(documentBytes) conversationBytes=\(conversationBytes) conversationCount=\(conversationCount) globalSynopsisBytes=\(globalSynopsisBytes) localSummaryBytes=\(localSummaryBytes) intentSummaryBytes=\(intentSummaryBytes) currentGoalBytes=\(currentGoalBytes) nextFocusBytes=\(nextFocusBytes) workingMemoryBytes=\(workingMemoryBytes) recentDecisionsBytes=\(recentDecisionsBytes) styleConstraintsBytes=\(styleConstraintsBytes) suggestionChipsBytes=\(suggestionChipsBytes) userMessageBytes=\(userMessageBytes) selectionTextBytes=\(selectionTextBytes)"
+        "write request decoded action=\(action.rawValue) requestId=\(envelope.requestId) kind=\(envelope.kind.rawValue) totalDocumentCharacters=\(totalDocumentCharacters) documentBytes=\(documentBytes) tailBytes=\(tailBytes) beforeContextBytes=\(beforeContextBytes) selectionTextBytes=\(selectionTextBytes) afterContextBytes=\(afterContextBytes) globalSynopsisBytes=\(globalSynopsisBytes) localSummaryBytes=\(localSummaryBytes) intentSummaryBytes=\(intentSummaryBytes) currentGoalBytes=\(currentGoalBytes) nextFocusBytes=\(nextFocusBytes) workingMemoryBytes=\(workingMemoryBytes) recentDecisionsBytes=\(recentDecisionsBytes) styleConstraintsBytes=\(styleConstraintsBytes) suggestionChipsBytes=\(suggestionChipsBytes) userMessageBytes=\(userMessageBytes)"
     )
 }
 
@@ -122,7 +143,7 @@ private func writeResponse(
     }
 
     if request.prefersStreamingWrites {
-        let stream: AsyncThrowingStream<WritingAIStreamEvent, Error>
+        let stream: AsyncThrowingStream<WritingGatewayStreamEvent, Error>
         switch action {
         case .startDraft:
             stream = try await writeService.startDraftStream(envelope)
@@ -134,7 +155,7 @@ private func writeResponse(
         return try streamingWriteResponse(for: stream)
     }
 
-    let response: WritingAIResponse
+    let response: WritingGatewayResponse
     switch action {
     case .startDraft:
         response = try await writeService.startDraft(envelope)
@@ -155,7 +176,7 @@ private func jsonResponse<T: Encodable>(_ value: T, status: HTTPResponseStatus =
 }
 
 private func streamingWriteResponse(
-    for stream: AsyncThrowingStream<WritingAIStreamEvent, Error>
+    for stream: AsyncThrowingStream<WritingGatewayStreamEvent, Error>
 ) throws -> Response {
     var headers = HTTPHeaders()
     headers.add(name: .contentType, value: "application/x-ndjson; charset=utf-8")

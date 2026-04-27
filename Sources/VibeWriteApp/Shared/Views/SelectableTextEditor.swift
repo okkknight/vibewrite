@@ -455,6 +455,18 @@ struct SelectableTextEditor: NSViewRepresentable {
             let oldText = textView.string as NSString
             let newTextString = newText as NSString
             let existingSelection = textView.selectedRange()
+            let undoManager = textView.undoManager
+            let didDisableUndoRegistration = undoManager?.isUndoRegistrationEnabled == true
+
+            if didDisableUndoRegistration {
+                undoManager?.disableUndoRegistration()
+            }
+            defer {
+                if didDisableUndoRegistration,
+                   undoManager?.isUndoRegistrationEnabled == false {
+                    undoManager?.enableUndoRegistration()
+                }
+            }
 
             if let textStorage = textView.textStorage {
                 let prefixLength = commonPrefixLength(between: oldText, and: newTextString)
@@ -490,6 +502,7 @@ struct SelectableTextEditor: NSViewRepresentable {
             textView.setAccessibilityValue(newText as NSString)
             lastAppliedAccessibilityValue = newText
             pendingUserTextChange = nil
+            undoManager?.removeAllActions()
             logTextEvent(
                 "sync text applied oldCount=\(oldText.length) newCount=\(newTextString.length) didMutate=true selection=\(debugRange(textView.selectedRange())) pendingUserCount=\(pendingUserTextChange?.utf16.count ?? -1)"
             )
@@ -1343,8 +1356,14 @@ private final class LocalEditFlashOverlayView: NSView {
     }
 }
 
-private final class StyledTextView: NSTextView {
+final class StyledTextView: NSTextView {
     var onLiveTextMutation: ((NSTextView) -> Void)?
+    private let localUndoManager = UndoManager()
+
+    override var undoManager: UndoManager? {
+        guard allowsUndo else { return nil }
+        return localUndoManager
+    }
 
     override func keyDown(with event: NSEvent) {
         let chars = debugEventString(event.characters)

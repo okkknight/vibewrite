@@ -29,28 +29,24 @@ final class WriteEditTests: XCTestCase {
 
         let project = sampleProjectSnapshot()
         let selectionRange = WritingTextSelectionRange(location: 4, length: 4)
-        let editRequest = WriteRequestEnvelope(
+        let editRequest = makeGatewayEditRequest(
             installationId: bootstrapRequest.installationId,
             deviceToken: issuedToken,
             requestId: "request-edit-001",
-            action: .edit,
-            kind: .prose,
             project: project,
-            userMessage: "把选中内容改得更克制",
-            selectionText: selectionRange.substring(in: project.documentText),
-            selectionRange: selectionRange
+            selectionRange: selectionRange,
+            userMessage: "把选中内容改得更克制"
         )
 
         try app.test(.POST, "v3/writes/edit", beforeRequest: { request in
             try request.content.encode(editRequest)
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
-            XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
+            XCTAssertContent(WritingGatewayResponse.self, response) { writeResponse in
                 XCTAssertEqual(writeResponse.assistantMessage, "我按你选中的那段改了一版。")
-                XCTAssertEqual(
-                    writeResponse.documentText,
-                    "前文正文这里不用说得太满，留白会更好。后文正文"
-                )
+                XCTAssertEqual(writeResponse.replacementText, "这里不用说得太满，留白会更好。")
+                XCTAssertNil(writeResponse.documentText)
+                XCTAssertNil(writeResponse.appendedText)
                 XCTAssertEqual(writeResponse.localSummary, "")
                 XCTAssertEqual(writeResponse.globalSynopsis, "")
                 XCTAssertEqual(
@@ -63,7 +59,7 @@ final class WriteEditTests: XCTestCase {
                 XCTAssertEqual(writeResponse.workingMemory, ["当前在改选中文段", "先局部处理，再回到整体"])
                 XCTAssertEqual(writeResponse.nextFocus, "")
                 XCTAssertEqual(writeResponse.suggestionChips, [])
-                XCTAssertEqual(writeResponse.mode, editRequest.project.mode)
+                XCTAssertEqual(writeResponse.mode, project.mode)
             }
         })
     }
@@ -97,10 +93,16 @@ final class WriteEditTests: XCTestCase {
             requestId: "request-edit-002",
             action: .edit,
             kind: .prose,
-            project: sampleProjectSnapshot(),
-            userMessage: "把这段改一下",
-            selectionText: "不存在的选区",
-            selectionRange: WritingTextSelectionRange(location: 999, length: 5)
+            sessionContext: makeGatewaySessionContext(from: sampleProjectSnapshot()),
+            editWindow: WritingGatewayEditWindow(
+                beforeContextText: "前文正文",
+                selectionText: "",
+                afterContextText: "后文正文",
+                totalCharacterCount: 999,
+                windowCharacterCount: 8,
+                strategy: .focused
+            ),
+            userMessage: "把这段改一下"
         )
 
         try app.test(.POST, "v3/writes/edit", beforeRequest: { request in
@@ -116,15 +118,11 @@ final class WriteEditTests: XCTestCase {
 
         try configure(app)
 
-        let editRequest = WriteRequestEnvelope(
+        let editRequest = makeGatewayEditRequest(
             installationId: "installation-edit-003",
             deviceToken: "not-a-real-token",
             requestId: "request-edit-003",
-            action: .edit,
-            kind: .prose,
             project: sampleProjectSnapshot(),
-            userMessage: nil,
-            selectionText: "选中文段",
             selectionRange: WritingTextSelectionRange(location: 4, length: 4)
         )
 

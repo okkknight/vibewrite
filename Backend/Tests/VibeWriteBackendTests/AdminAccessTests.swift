@@ -363,16 +363,12 @@ final class AdminAccessTests: XCTestCase {
         )
 
         try app.test(.POST, "v3/writes/continue", beforeRequest: { request in
-            try request.content.encode(WriteRequestEnvelope(
+            try request.content.encode(makeGatewayContinueRequest(
                 installationId: bootstrap.installationId,
                 deviceToken: bootstrap.deviceToken,
                 requestId: "request-overview-quota",
-                action: .continueWriting,
-                kind: .prose,
                 project: project,
-                userMessage: "继续写",
-                selectionText: nil,
-                selectionRange: nil
+                userMessage: "继续写"
             ))
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .tooManyRequests)
@@ -444,32 +440,24 @@ final class AdminAccessTests: XCTestCase {
         XCTAssertEqual(bootstrap.deviceToken.isEmpty, false)
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { request in
-            try request.content.encode(WriteRequestEnvelope(
+            try request.content.encode(makeGatewayStartRequest(
                 installationId: bootstrap.installationId,
                 deviceToken: bootstrap.deviceToken,
                 requestId: "request-quota-admin-start",
-                action: .startDraft,
-                kind: .prose,
                 project: sampleProjectSnapshot(documentText: "prefix middle suffix"),
-                userMessage: "先写开头",
-                selectionText: nil,
-                selectionRange: nil
+                userMessage: "先写开头"
             ))
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
         })
 
         try app.test(.POST, "v3/writes/continue", beforeRequest: { request in
-            try request.content.encode(WriteRequestEnvelope(
+            try request.content.encode(makeGatewayContinueRequest(
                 installationId: bootstrap.installationId,
                 deviceToken: bootstrap.deviceToken,
                 requestId: "request-quota-admin-continue",
-                action: .continueWriting,
-                kind: .prose,
                 project: sampleProjectSnapshot(documentText: "prefix middle suffix"),
-                userMessage: "继续写",
-                selectionText: nil,
-                selectionRange: nil
+                userMessage: "继续写"
             ))
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .tooManyRequests)
@@ -574,16 +562,12 @@ final class AdminAccessTests: XCTestCase {
         })
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { request in
-            try request.content.encode(WriteRequestEnvelope(
+            try request.content.encode(makeGatewayStartRequest(
                 installationId: bootstrap.installationId,
                 deviceToken: bootstrap.deviceToken,
                 requestId: "request-device-blocked",
-                action: .startDraft,
-                kind: .prose,
                 project: project,
-                userMessage: "先写开头",
-                selectionText: nil,
-                selectionRange: nil
+                userMessage: "先写开头"
             ))
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .forbidden)
@@ -633,16 +617,12 @@ final class AdminAccessTests: XCTestCase {
         })
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { request in
-            try request.content.encode(WriteRequestEnvelope(
+            try request.content.encode(makeGatewayStartRequest(
                 installationId: bootstrap.installationId,
                 deviceToken: bootstrap.deviceToken,
                 requestId: "request-device-unblocked",
-                action: .startDraft,
-                kind: .prose,
                 project: project,
-                userMessage: "先写开头",
-                selectionText: nil,
-                selectionRange: nil
+                userMessage: "先写开头"
             ))
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
@@ -710,16 +690,12 @@ final class AdminAccessTests: XCTestCase {
         project: WritingProjectSnapshot,
         requestId: String
     ) throws {
-        let request = WriteRequestEnvelope(
+        let request = makeGatewayStartRequest(
             installationId: installationId,
             deviceToken: deviceToken,
             requestId: requestId,
-            action: .startDraft,
-            kind: .prose,
             project: project,
-            userMessage: "先写开头",
-            selectionText: nil,
-            selectionRange: nil
+            userMessage: "先写开头"
         )
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { req in
@@ -734,16 +710,12 @@ final class AdminAccessTests: XCTestCase {
         installationId: String,
         requestId: String
     ) throws {
-        let request = WriteRequestEnvelope(
+        let request = makeGatewayContinueRequest(
             installationId: installationId,
             deviceToken: "invalid-token",
             requestId: requestId,
-            action: .continueWriting,
-            kind: .prose,
             project: sampleProjectSnapshot(documentText: "prefix middle suffix"),
-            userMessage: "继续写",
-            selectionText: nil,
-            selectionRange: nil
+            userMessage: "继续写"
         )
 
         try app.test(.POST, "v3/writes/continue", beforeRequest: { req in
@@ -761,16 +733,13 @@ final class AdminAccessTests: XCTestCase {
         requestId: String
     ) throws {
         let selectionRange = WritingTextSelectionRange(location: 7, length: 6)
-        let request = WriteRequestEnvelope(
+        let request = makeGatewayEditRequest(
             installationId: installationId,
             deviceToken: deviceToken,
             requestId: requestId,
-            action: .edit,
-            kind: .prose,
             project: project,
-            userMessage: "把中间改得更克制",
-            selectionText: selectionRange.substring(in: project.documentText),
-            selectionRange: selectionRange
+            selectionRange: selectionRange,
+            userMessage: "把中间改得更克制"
         )
 
         try app.test(.POST, "v3/writes/edit", beforeRequest: { req in

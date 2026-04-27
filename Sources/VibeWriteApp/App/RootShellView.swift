@@ -3,7 +3,7 @@ import SwiftUI
 
 @MainActor
 struct RootShellView: View {
-    @ObservedObject var flow: VibeWriteAppFlow
+    let flow: VibeWriteAppFlow
     @State private var appearanceMode: VibeAppearanceMode = .day
     @State private var didRequestActivation = false
     private let isRunningInPreview = ProcessInfo.processInfo.environment["XCODE_RUNNING_FOR_PREVIEWS"] == "1"
@@ -70,21 +70,33 @@ struct RootShellView: View {
 private struct WindowCloseObserver: NSViewRepresentable {
     let shouldClose: () -> Bool
 
+    final class ObserverView: NSView {
+        var onWindowChange: ((NSWindow?) -> Void)?
+
+        override func viewDidMoveToWindow() {
+            super.viewDidMoveToWindow()
+            onWindowChange?(window)
+        }
+    }
+
     func makeCoordinator() -> Coordinator {
         Coordinator(shouldClose: shouldClose)
     }
 
-    func makeNSView(context: Context) -> NSView {
-        let view = NSView(frame: .zero)
-        context.coordinator.attach(to: view.window)
+    func makeNSView(context: Context) -> ObserverView {
+        let view = ObserverView(frame: .zero)
+        view.onWindowChange = { [weak coordinator = context.coordinator] window in
+            coordinator?.attach(to: window)
+        }
         return view
     }
 
-    func updateNSView(_ nsView: NSView, context: Context) {
+    func updateNSView(_ nsView: ObserverView, context: Context) {
         context.coordinator.shouldClose = shouldClose
-        DispatchQueue.main.async {
-            context.coordinator.attach(to: nsView.window)
+        nsView.onWindowChange = { [weak coordinator = context.coordinator] window in
+            coordinator?.attach(to: window)
         }
+        context.coordinator.attach(to: nsView.window)
     }
 
     @MainActor
@@ -100,8 +112,26 @@ private struct WindowCloseObserver: NSViewRepresentable {
             guard let window else { return }
             self.window = window
             window.delegate = self
-            window.title = ""
-            window.titleVisibility = .hidden
+            applyWindowChrome(to: window)
+        }
+
+        private func applyWindowChrome(to window: NSWindow) {
+            if !window.title.isEmpty {
+                window.title = ""
+            }
+            if window.titleVisibility != .hidden {
+                window.titleVisibility = .hidden
+            }
+        }
+
+        func windowDidBecomeMain(_ notification: Notification) {
+            guard let window = notification.object as? NSWindow else { return }
+            applyWindowChrome(to: window)
+        }
+
+        func windowDidBecomeKey(_ notification: Notification) {
+            guard let window = notification.object as? NSWindow else { return }
+            applyWindowChrome(to: window)
         }
 
         func windowShouldClose(_ sender: NSWindow) -> Bool {

@@ -22,6 +22,50 @@ struct VibeWriteCommands: Commands {
     @FocusedObject private var vibeWriteUndoActionBox: VibeWriteUndoActionBox?
     @FocusedObject private var vibeWriteRedoActionBox: VibeWriteRedoActionBox?
 
+    @MainActor
+    static func performNativeUndo(
+        undoManagerProvider: @MainActor () -> UndoManager? = currentUndoManager
+    ) -> Bool {
+        guard let undoManager = undoManagerProvider(),
+              undoManager.canUndo else {
+            return false
+        }
+
+        undoManager.undo()
+        return true
+    }
+
+    @MainActor
+    static func performNativeRedo(
+        undoManagerProvider: @MainActor () -> UndoManager? = currentUndoManager
+    ) -> Bool {
+        guard let undoManager = undoManagerProvider(),
+              undoManager.canRedo else {
+            return false
+        }
+
+        undoManager.redo()
+        return true
+    }
+
+    private static func currentUndoManager() -> UndoManager? {
+        if let keyResponder = NSApp.keyWindow?.firstResponder as? NSResponder,
+           let undoManager = keyResponder.undoManager {
+            return undoManager
+        }
+
+        if let mainResponder = NSApp.mainWindow?.firstResponder as? NSResponder,
+           let undoManager = mainResponder.undoManager {
+            return undoManager
+        }
+
+        if let keyUndoManager = NSApp.keyWindow?.undoManager {
+            return keyUndoManager
+        }
+
+        return NSApp.mainWindow?.undoManager
+    }
+
     var body: some Commands {
         CommandGroup(replacing: .undoRedo) {
             Button("Undo") {
@@ -29,7 +73,7 @@ struct VibeWriteCommands: Commands {
                     "command undo triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public) revisionCount=\(flow.activeProject.revisionHistory.count, privacy: .public)"
                 )
                 let outcome = flow.handleUndoShortcut(
-                    systemUndo: { NSApp.sendAction(#selector(UndoManager.undo), to: nil, from: nil) },
+                    systemUndo: { Self.performNativeUndo() },
                     aiUndo: vibeWriteUndoActionBox.map { box in
                         { box.perform() }
                     }
@@ -45,7 +89,7 @@ struct VibeWriteCommands: Commands {
                     "command redo triggered activeCount=\(flow.activeDocumentText.count, privacy: .public) dirty=\(flow.isCurrentDocumentDirty, privacy: .public)"
                 )
                 let outcome = flow.handleRedoShortcut(
-                    systemRedo: { NSApp.sendAction(#selector(UndoManager.redo), to: nil, from: nil) },
+                    systemRedo: { Self.performNativeRedo() },
                     aiRedo: vibeWriteRedoActionBox.map { box in
                         { box.perform() }
                     }

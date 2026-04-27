@@ -173,16 +173,12 @@ final class RequestLogTests: XCTestCase {
         requestId: String,
         expectedStatus: HTTPStatus = .ok
     ) throws {
-        let request = WriteRequestEnvelope(
+        let request = makeGatewayStartRequest(
             installationId: installationId,
             deviceToken: deviceToken,
             requestId: requestId,
-            action: .startDraft,
-            kind: .prose,
             project: project,
-            userMessage: "先写开头",
-            selectionText: nil,
-            selectionRange: nil
+            userMessage: "先写开头"
         )
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { req in
@@ -200,16 +196,12 @@ final class RequestLogTests: XCTestCase {
         requestId: String,
         expectedStatus: HTTPStatus = .ok
     ) throws {
-        let request = WriteRequestEnvelope(
+        let request = makeGatewayContinueRequest(
             installationId: installationId,
             deviceToken: deviceToken,
             requestId: requestId,
-            action: .continueWriting,
-            kind: .prose,
             project: project,
-            userMessage: "继续写",
-            selectionText: nil,
-            selectionRange: nil
+            userMessage: "继续写"
         )
 
         try app.test(.POST, "v3/writes/continue", beforeRequest: { req in
@@ -228,16 +220,13 @@ final class RequestLogTests: XCTestCase {
         expectedStatus: HTTPStatus = .ok
     ) throws {
         let selectionRange = WritingTextSelectionRange(location: 7, length: 6)
-        let request = WriteRequestEnvelope(
+        let request = makeGatewayEditRequest(
             installationId: installationId,
             deviceToken: deviceToken,
             requestId: requestId,
-            action: .edit,
-            kind: .prose,
             project: project,
-            userMessage: "把中间改得更克制",
-            selectionText: selectionRange.substring(in: project.documentText),
-            selectionRange: selectionRange
+            selectionRange: selectionRange,
+            userMessage: "把中间改得更克制"
         )
 
         try app.test(.POST, "v3/writes/edit", beforeRequest: { req in

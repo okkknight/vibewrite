@@ -26,6 +26,18 @@ enum BackendGatewayClientFactory {
 }
 
 final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
+    private static let preferredContinueWindowCharacterCount = 1_200
+    private static let maximumContinueWindowCharacterCount = 1_500
+    private static let focusedEditWindowCharacterCount = 1_200
+    private static let maximumFocusedEditWindowCharacterCount = 1_800
+    private static let expandedEditWindowCharacterCount = 2_200
+    private static let maximumExpandedEditWindowCharacterCount = 2_800
+    private static let expandedEditSelectionThreshold = 500
+    private static let expandedEditKeywords = [
+        "全文", "整篇", "全篇", "整体", "统一", "前后呼应", "前后照应",
+        "通篇", "人称", "时态", "伏笔", "回收", "语气统一", "整体语气"
+    ]
+
     private let configuration: BackendGatewayConfiguration
     private let identityStore: BackendGatewayIdentityStore
     private let session: URLSession
@@ -76,7 +88,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                             responseBytes: 0,
                             responsePreview: nil,
                             requestBytes: preparedRequest.requestBodyBytes,
-                            projectBytes: preparedRequest.projectBytes,
+                            contextBytes: preparedRequest.contextBytes,
                             payloadFingerprint: preparedRequest.payloadFingerprint
                         )
                         throw WritingAIClientError.requestFailed("后端写作请求没有返回 HTTP 响应。")
@@ -89,7 +101,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                         responseBytes: 0,
                         responsePreview: nil,
                         requestBytes: preparedRequest.requestBodyBytes,
-                        projectBytes: preparedRequest.projectBytes,
+                        contextBytes: preparedRequest.contextBytes,
                         payloadFingerprint: preparedRequest.payloadFingerprint
                     )
 
@@ -105,7 +117,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                             responseBytes: data.count,
                             responsePreview: data.vibewriteResponsePreview(maxLength: 240),
                             requestBytes: preparedRequest.requestBodyBytes,
-                            projectBytes: preparedRequest.projectBytes,
+                            contextBytes: preparedRequest.contextBytes,
                             payloadFingerprint: preparedRequest.payloadFingerprint
                         )
                         throw mapHTTPError(
@@ -121,7 +133,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                             continue
                         }
 
-                        let event = try decodeStreamEvent(from: trimmed)
+                        let event = try decodeStreamEvent(from: trimmed, originalRequest: request)
                         continuation.yield(event)
                     }
 
@@ -130,39 +142,6 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                     continuation.finish(throwing: error)
                 }
             }
-        }
-    }
-
-    private func streamedTextDelta(
-        for request: WritingAIRequest,
-        documentText: String
-    ) -> String {
-        switch request.action {
-        case .startDraft:
-            return documentText
-
-        case .continueWriting:
-            let prefix = request.project.documentText
-            guard documentText.hasPrefix(prefix) else {
-                return documentText
-            }
-            return String(documentText.dropFirst(prefix.count))
-
-        case .edit:
-            guard let selectionRange = request.selectionRange,
-                  let targetRange = selectionRange.range(in: request.project.documentText) else {
-                return documentText
-            }
-
-            let prefix = String(request.project.documentText[..<targetRange.lowerBound])
-            let suffix = String(request.project.documentText[targetRange.upperBound...])
-            guard documentText.hasPrefix(prefix), documentText.hasSuffix(suffix) else {
-                return documentText
-            }
-
-            let lowerBound = documentText.index(documentText.startIndex, offsetBy: prefix.count)
-            let upperBound = documentText.index(documentText.endIndex, offsetBy: -suffix.count)
-            return String(documentText[lowerBound..<upperBound])
         }
     }
 
@@ -249,7 +228,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
                 responseBytes: data.count,
                 responsePreview: data.vibewriteResponsePreview(maxLength: 240),
                 requestBytes: preparedRequest.requestBodyBytes,
-                projectBytes: preparedRequest.projectBytes,
+                contextBytes: preparedRequest.contextBytes,
                 payloadFingerprint: preparedRequest.payloadFingerprint
             )
             throw WritingAIClientError.requestFailed("后端写作请求没有返回 HTTP 响应。")
@@ -262,7 +241,7 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
             responseBytes: data.count,
             responsePreview: httpResponse.statusCode < 200 || httpResponse.statusCode >= 300 ? data.vibewriteResponsePreview(maxLength: 240) : nil,
             requestBytes: preparedRequest.requestBodyBytes,
-            projectBytes: preparedRequest.projectBytes,
+            contextBytes: preparedRequest.contextBytes,
             payloadFingerprint: preparedRequest.payloadFingerprint
         )
 
@@ -279,7 +258,8 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
 
         do {
-            return try JSONDecoder.vibeWriteBackendGatewayResponseDecoder.decode(WritingAIResponse.self, from: data)
+            let gatewayResponse = try JSONDecoder.vibeWriteBackendGatewayResponseDecoder.decode(WritingGatewayResponse.self, from: data)
+            return try translatedResponse(from: gatewayResponse, originalRequest: request)
         } catch {
             throw WritingAIClientError.invalidResponse("后端写作响应格式无效。")
         }
@@ -332,25 +312,21 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         accept: String
     ) throws -> BackendGatewayPreparedWriteRequest {
         let requestId = UUID().uuidString.lowercased()
-        let requestBody = BackendGatewayWriteEnvelope(
+        let requestBody = try gatewayEnvelope(
+            for: request,
             installationId: installationId,
             deviceToken: deviceToken,
-            requestId: requestId,
-            action: request.action,
-            kind: request.kind,
-            project: request.project,
-            userMessage: request.userMessage,
-            selectionText: request.selectionText,
-            selectionRange: request.selectionRange
+            requestId: requestId
         )
         let requestBodyData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(requestBody)
-        let projectData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(request.project)
+        let contextData = try JSONEncoder.vibeWriteBackendGatewayRequestEncoder.encode(requestBody)
         let payloadFingerprint = requestBodyData.vibewriteRequestFingerprint()
         logWriteRequestMetrics(
             request: request,
+            envelope: requestBody,
             requestId: requestId,
             requestBodyBytes: requestBodyData.count,
-            projectBytes: projectData.count,
+            contextBytes: contextData.count,
             payloadFingerprint: payloadFingerprint
         )
 
@@ -362,18 +338,124 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
             ),
             requestId: requestId,
             requestBodyBytes: requestBodyData.count,
-            projectBytes: projectData.count,
+            contextBytes: contextData.count,
             payloadFingerprint: payloadFingerprint
         )
     }
 
-    private func decodeStreamEvent(from rawLine: String) throws -> WritingAIStreamEvent {
+    private func gatewayEnvelope(
+        for request: WritingAIRequest,
+        installationId: String,
+        deviceToken: String,
+        requestId: String
+    ) throws -> WritingGatewayWriteEnvelope {
+        switch request.action {
+        case .startDraft:
+            return WritingGatewayWriteEnvelope(
+                installationId: installationId,
+                deviceToken: deviceToken,
+                requestId: requestId,
+                action: request.action,
+                kind: request.kind,
+                startProject: request.project,
+                userMessage: request.userMessage
+            )
+
+        case .continueWriting:
+            return WritingGatewayWriteEnvelope(
+                installationId: installationId,
+                deviceToken: deviceToken,
+                requestId: requestId,
+                action: request.action,
+                kind: request.kind,
+                sessionContext: gatewaySessionContext(for: request.project),
+                continueWindow: continueWindow(for: request.project.documentText),
+                userMessage: request.userMessage
+            )
+
+        case .edit:
+            return WritingGatewayWriteEnvelope(
+                installationId: installationId,
+                deviceToken: deviceToken,
+                requestId: requestId,
+                action: request.action,
+                kind: request.kind,
+                sessionContext: gatewaySessionContext(for: request.project),
+                editWindow: try editWindow(for: request),
+                userMessage: request.userMessage
+            )
+        }
+    }
+
+    private func translatedResponse(
+        from gatewayResponse: WritingGatewayResponse,
+        originalRequest: WritingAIRequest
+    ) throws -> WritingAIResponse {
+        let resolvedDocumentText: String
+        switch originalRequest.action {
+        case .startDraft:
+            if originalRequest.kind == .prose {
+                guard let documentText = gatewayResponse.documentText else {
+                    throw WritingAIClientError.invalidResponse("后端起稿响应缺少完整正文。")
+                }
+                resolvedDocumentText = documentText
+            } else {
+                resolvedDocumentText = originalRequest.project.documentText
+            }
+
+        case .continueWriting:
+            if let appendedText = gatewayResponse.appendedText {
+                resolvedDocumentText = originalRequest.project.documentText + appendedText
+            } else {
+                resolvedDocumentText = originalRequest.project.documentText
+            }
+
+        case .edit:
+            if let replacementText = gatewayResponse.replacementText {
+                guard let targetRange = originalRequest.selectionRange?.range(in: originalRequest.project.documentText) else {
+                    throw WritingAIClientError.invalidResponse("后端编辑响应缺少可用的本地选区。")
+                }
+
+                var revisedDocument = originalRequest.project.documentText
+                revisedDocument.replaceSubrange(targetRange, with: replacementText)
+                resolvedDocumentText = revisedDocument
+            } else {
+                resolvedDocumentText = originalRequest.project.documentText
+            }
+        }
+
+        return WritingAIResponse(
+            assistantMessage: gatewayResponse.assistantMessage,
+            documentText: resolvedDocumentText,
+            localSummary: gatewayResponse.localSummary,
+            globalSynopsis: gatewayResponse.globalSynopsis,
+            intentSummary: gatewayResponse.intentSummary,
+            styleConstraints: gatewayResponse.styleConstraints,
+            currentGoal: gatewayResponse.currentGoal,
+            recentDecisions: gatewayResponse.recentDecisions,
+            workingMemory: gatewayResponse.workingMemory,
+            nextFocus: gatewayResponse.nextFocus,
+            suggestionChips: gatewayResponse.suggestionChips,
+            mode: gatewayResponse.mode
+        )
+    }
+
+    func decodeStreamEvent(
+        from rawLine: String,
+        originalRequest: WritingAIRequest
+    ) throws -> WritingAIStreamEvent {
         guard let data = rawLine.data(using: .utf8) else {
             throw WritingAIClientError.invalidResponse("后端流式响应无法转换为 UTF-8。")
         }
 
         do {
-            return try JSONDecoder.vibeWriteBackendGatewayResponseDecoder.decode(WritingAIStreamEvent.self, from: data)
+            let event = try JSONDecoder.vibeWriteBackendGatewayResponseDecoder.decode(WritingGatewayStreamEvent.self, from: data)
+            switch event {
+            case .textDelta(let delta):
+                return .textDelta(delta)
+            case .completed(let response):
+                return .completed(try translatedResponse(from: response, originalRequest: originalRequest))
+            }
         } catch {
             throw WritingAIClientError.invalidResponse("后端流式响应格式无效。")
         }
@@ -398,43 +480,218 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         }
     }
 
-    private func logWriteRequestMetrics(
-        request: WritingAIRequest,
-        requestId: String,
-        requestBodyBytes: Int,
-        projectBytes: Int,
-        payloadFingerprint: String
-    ) {
-        let documentTextBytes = request.project.documentText.utf8.count
-        let conversationBytes = request.project.conversation.reduce(0) { partialResult, message in
-            partialResult + message.text.utf8.count
-        }
-        let conversationCount = request.project.conversation.count
-        let globalSynopsisBytes = request.project.globalSynopsis.utf8.count
-        let localSummaryBytes = request.project.localSummary.utf8.count
-        let intentSummaryBytes = request.project.context.intentSummary.utf8.count
-        let currentGoalBytes = request.project.context.currentGoal.utf8.count
-        let nextFocusBytes = request.project.context.nextFocus.utf8.count
-        let workingMemoryBytes = request.project.context.workingMemory.reduce(0) { partialResult, value in
-            partialResult + value.utf8.count
-        }
-        let recentDecisionsBytes = request.project.context.recentDecisions.reduce(0) { partialResult, value in
-            partialResult + value.utf8.count
-        }
-        let styleConstraintsBytes = request.project.context.styleConstraints.reduce(0) { partialResult, value in
-            partialResult + value.utf8.count
-        }
-        let userMessageBytes = request.userMessage?.utf8.count ?? 0
-        let selectionTextBytes = request.selectionText?.utf8.count ?? 0
-        let suggestionChipsBytes = request.project.suggestionChips.reduce(0) { partialResult, value in
-            partialResult + value.utf8.count
+    private func gatewaySessionContext(for project: WritingProjectSnapshot) -> WritingGatewaySessionContext {
+        WritingGatewaySessionContext(
+            title: project.title,
+            prompt: project.prompt,
+            mode: project.mode,
+            localSummary: project.localSummary,
+            globalSynopsis: project.globalSynopsis,
+            context: project.context,
+            suggestionChips: project.suggestionChips
+        )
+    }
+
+    private func continueWindow(for documentText: String) -> WritingGatewayTailWindow {
+        let trimmed = documentText.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !trimmed.isEmpty else {
+            return WritingGatewayTailWindow(
+                tailText: "",
+                totalCharacterCount: 0,
+                tailCharacterCount: 0,
+                isTruncated: false
+            )
         }
 
+        let paragraphs = trimmed
+            .components(separatedBy: "\n\n")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+            .filter { !$0.isEmpty }
+
+        let tailText: String
+        if paragraphs.isEmpty {
+            tailText = String(trimmed.suffix(Self.maximumContinueWindowCharacterCount))
+        } else {
+            var selected: [String] = []
+            var characterCount = 0
+            for paragraph in paragraphs.reversed() {
+                selected.insert(paragraph, at: 0)
+                characterCount += paragraph.count
+                if characterCount >= Self.preferredContinueWindowCharacterCount && selected.count >= 2 {
+                    break
+                }
+            }
+
+            let joined = selected.joined(separator: "\n\n")
+            if joined.count <= Self.maximumContinueWindowCharacterCount {
+                tailText = joined
+            } else {
+                tailText = String(joined.suffix(Self.maximumContinueWindowCharacterCount))
+            }
+        }
+
+        return WritingGatewayTailWindow(
+            tailText: tailText,
+            totalCharacterCount: trimmed.count,
+            tailCharacterCount: tailText.count,
+            isTruncated: tailText != trimmed
+        )
+    }
+
+    private func editWindow(for request: WritingAIRequest) throws -> WritingGatewayEditWindow {
+        guard let selectionRange = request.selectionRange,
+              let targetRange = selectionRange.range(in: request.project.documentText) else {
+            throw WritingAIClientError.requestFailed("当前编辑请求缺少有效选区。")
+        }
+
+        let selectionText = String(request.project.documentText[targetRange])
+        guard !selectionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
+            throw WritingAIClientError.requestFailed("当前编辑请求缺少有效选区。")
+        }
+
+        let strategy = resolvedEditWindowStrategy(for: request, selectionText: selectionText)
+        let preferredCharacterCount = strategy == .focused
+            ? Self.focusedEditWindowCharacterCount
+            : Self.expandedEditWindowCharacterCount
+        let maximumCharacterCount = strategy == .focused
+            ? Self.maximumFocusedEditWindowCharacterCount
+            : Self.maximumExpandedEditWindowCharacterCount
+
+        let documentText = request.project.documentText
+        let selectionCount = selectionText.count
+        let remainingBudget = max(preferredCharacterCount - selectionCount, 0)
+        let lowerBound = boundedLowerIndex(
+            in: documentText,
+            around: targetRange.lowerBound,
+            characterCount: remainingBudget / 2
+        )
+        let upperBound = boundedUpperIndex(
+            in: documentText,
+            around: targetRange.upperBound,
+            characterCount: remainingBudget - (remainingBudget / 2)
+        )
+
+        let expandedLowerBound = expandLowerBoundToParagraphBreak(
+            in: documentText,
+            currentLowerBound: lowerBound,
+            targetUpperBound: upperBound,
+            maximumCharacterCount: maximumCharacterCount
+        )
+        let expandedUpperBound = expandUpperBoundToParagraphBreak(
+            in: documentText,
+            currentUpperBound: upperBound,
+            targetLowerBound: expandedLowerBound,
+            maximumCharacterCount: maximumCharacterCount
+        )
+
+        let beforeContextText = String(documentText[expandedLowerBound..<targetRange.lowerBound])
+        let afterContextText = String(documentText[targetRange.upperBound..<expandedUpperBound])
+        let windowText = beforeContextText + selectionText + afterContextText
+
+        return WritingGatewayEditWindow(
+            beforeContextText: beforeContextText,
+            selectionText: selectionText,
+            afterContextText: afterContextText,
+            totalCharacterCount: documentText.count,
+            windowCharacterCount: windowText.count,
+            strategy: strategy
+        )
+    }
+
+    private func resolvedEditWindowStrategy(
+        for request: WritingAIRequest,
+        selectionText: String
+    ) -> WritingGatewayEditWindowStrategy {
+        let message = request.userMessage?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+        if selectionText.count >= Self.expandedEditSelectionThreshold {
+            return .expanded
+        }
+        if Self.expandedEditKeywords.contains(where: { message.contains($0) }) {
+            return .expanded
+        }
+        let paragraphCount = selectionText.components(separatedBy: "\n\n").filter { !$0.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty }.count
+        if paragraphCount >= 3 {
+            return .expanded
+        }
+        return .focused
+    }
+
+    private func boundedLowerIndex(
+        in text: String,
+        around anchor: String.Index,
+        characterCount: Int
+    ) -> String.Index {
+        text.index(anchor, offsetBy: -characterCount, limitedBy: text.startIndex) ?? text.startIndex
+    }
+
+    private func boundedUpperIndex(
+        in text: String,
+        around anchor: String.Index,
+        characterCount: Int
+    ) -> String.Index {
+        text.index(anchor, offsetBy: characterCount, limitedBy: text.endIndex) ?? text.endIndex
+    }
+
+    private func expandLowerBoundToParagraphBreak(
+        in text: String,
+        currentLowerBound: String.Index,
+        targetUpperBound: String.Index,
+        maximumCharacterCount: Int
+    ) -> String.Index {
+        guard currentLowerBound > text.startIndex,
+              let breakRange = text.range(
+                of: "\n\n",
+                options: .backwards,
+                range: text.startIndex..<currentLowerBound
+              ) else {
+            return currentLowerBound
+        }
+
+        let candidateLowerBound = breakRange.upperBound
+        let candidateCount = text.distance(from: candidateLowerBound, to: targetUpperBound)
+        return candidateCount <= maximumCharacterCount ? candidateLowerBound : currentLowerBound
+    }
+
+    private func expandUpperBoundToParagraphBreak(
+        in text: String,
+        currentUpperBound: String.Index,
+        targetLowerBound: String.Index,
+        maximumCharacterCount: Int
+    ) -> String.Index {
+        guard currentUpperBound < text.endIndex,
+              let breakRange = text.range(
+                of: "\n\n",
+                options: [],
+                range: currentUpperBound..<text.endIndex
+              ) else {
+            return currentUpperBound
+        }
+
+        let candidateUpperBound = breakRange.lowerBound
+        let candidateCount = text.distance(from: targetLowerBound, to: candidateUpperBound)
+        return candidateCount <= maximumCharacterCount ? candidateUpperBound : currentUpperBound
+    }
+
+    private func logWriteRequestMetrics(
+        request: WritingAIRequest,
+        envelope: WritingGatewayWriteEnvelope,
+        requestId: String,
+        requestBodyBytes: Int,
+        contextBytes: Int,
+        payloadFingerprint: String
+    ) {
+        let userMessageBytes = request.userMessage?.utf8.count ?? 0
+        let tailBytes = envelope.continueWindow?.tailText.utf8.count ?? 0
+        let selectionTextBytes = envelope.editWindow?.selectionText.utf8.count ?? 0
+        let beforeContextBytes = envelope.editWindow?.beforeContextText.utf8.count ?? 0
+        let afterContextBytes = envelope.editWindow?.afterContextText.utf8.count ?? 0
+        let totalDocumentCharacters = request.project.documentText.count
+
         VibeWriteLog.ai.info(
-            "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public) documentBytes=\(documentTextBytes, privacy: .public) conversationBytes=\(conversationBytes, privacy: .public) conversationCount=\(conversationCount, privacy: .public) globalSynopsisBytes=\(globalSynopsisBytes, privacy: .public) localSummaryBytes=\(localSummaryBytes, privacy: .public) intentSummaryBytes=\(intentSummaryBytes, privacy: .public) currentGoalBytes=\(currentGoalBytes, privacy: .public) nextFocusBytes=\(nextFocusBytes, privacy: .public) workingMemoryBytes=\(workingMemoryBytes, privacy: .public) recentDecisionsBytes=\(recentDecisionsBytes, privacy: .public) styleConstraintsBytes=\(styleConstraintsBytes, privacy: .public) suggestionChipsBytes=\(suggestionChipsBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public)"
+            "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) contextBytes=\(contextBytes, privacy: .public) totalDocumentCharacters=\(totalDocumentCharacters, privacy: .public) tailBytes=\(tailBytes, privacy: .public) beforeContextBytes=\(beforeContextBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public) afterContextBytes=\(afterContextBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public)"
         )
         VibeWriteRequestTrace.append(
-            "backend write request metrics action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) envelopeBytes=\(requestBodyBytes) projectBytes=\(projectBytes) documentBytes=\(documentTextBytes) conversationBytes=\(conversationBytes) conversationCount=\(conversationCount) globalSynopsisBytes=\(globalSynopsisBytes) localSummaryBytes=\(localSummaryBytes) intentSummaryBytes=\(intentSummaryBytes) currentGoalBytes=\(currentGoalBytes) nextFocusBytes=\(nextFocusBytes) workingMemoryBytes=\(workingMemoryBytes) recentDecisionsBytes=\(recentDecisionsBytes) styleConstraintsBytes=\(styleConstraintsBytes) suggestionChipsBytes=\(suggestionChipsBytes) userMessageBytes=\(userMessageBytes) selectionTextBytes=\(selectionTextBytes)"
+            "backend write request metrics action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) envelopeBytes=\(requestBodyBytes) contextBytes=\(contextBytes) totalDocumentCharacters=\(totalDocumentCharacters) tailBytes=\(tailBytes) beforeContextBytes=\(beforeContextBytes) selectionTextBytes=\(selectionTextBytes) afterContextBytes=\(afterContextBytes) userMessageBytes=\(userMessageBytes)"
         )
     }
 
@@ -445,26 +702,26 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         responseBytes: Int,
         responsePreview: String?,
         requestBytes: Int,
-        projectBytes: Int,
+        contextBytes: Int,
         payloadFingerprint: String
     ) {
         let statusText = statusCode.map { String($0) } ?? "nil"
         let responsePreviewText = responsePreview ?? "nil"
         if let responsePreview, !responsePreview.isEmpty {
             VibeWriteLog.ai.warning(
-                "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreview, privacy: .public) requestBytes=\(requestBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public)"
+                "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreview, privacy: .public) requestBytes=\(requestBytes, privacy: .public) contextBytes=\(contextBytes, privacy: .public)"
             )
             VibeWriteRequestTrace.append(
-                "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreview) requestBytes=\(requestBytes) projectBytes=\(projectBytes)"
+                "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreview) requestBytes=\(requestBytes) contextBytes=\(contextBytes)"
             )
             return
         }
 
         VibeWriteLog.ai.info(
-            "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreviewText, privacy: .public) requestBytes=\(requestBytes, privacy: .public) projectBytes=\(projectBytes, privacy: .public)"
+            "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreviewText, privacy: .public) requestBytes=\(requestBytes, privacy: .public) contextBytes=\(contextBytes, privacy: .public)"
         )
         VibeWriteRequestTrace.append(
-            "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreviewText) requestBytes=\(requestBytes) projectBytes=\(projectBytes)"
+            "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreviewText) requestBytes=\(requestBytes) contextBytes=\(contextBytes)"
         )
     }
 
@@ -508,23 +765,11 @@ private struct BackendGatewayQuotaSummary: Codable {
     let weeklyLimit: Int
 }
 
-private struct BackendGatewayWriteEnvelope: Codable {
-    let installationId: String
-    let deviceToken: String
-    let requestId: String
-    let action: WritingAIAction
-    let kind: WritingAIRequestKind
-    let project: WritingProjectSnapshot
-    let userMessage: String?
-    let selectionText: String?
-    let selectionRange: WritingTextSelectionRange?
-}
-
 private struct BackendGatewayPreparedWriteRequest {
     let urlRequest: URLRequest
     let requestId: String
     let requestBodyBytes: Int
-    let projectBytes: Int
+    let contextBytes: Int
     let payloadFingerprint: String
 }
 

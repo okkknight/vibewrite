@@ -25,15 +25,15 @@ actor WriteService {
         self.clock = clock
     }
 
-    func startDraft(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+    func startDraft(_ envelope: WriteRequestEnvelope) async throws -> WritingGatewayResponse {
         try await handle(envelope, expectedAction: .startDraft)
     }
 
-    func continueWriting(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+    func continueWriting(_ envelope: WriteRequestEnvelope) async throws -> WritingGatewayResponse {
         try await handle(envelope, expectedAction: .continueWriting)
     }
 
-    func edit(_ envelope: WriteRequestEnvelope) async throws -> WritingAIResponse {
+    func edit(_ envelope: WriteRequestEnvelope) async throws -> WritingGatewayResponse {
         try await handle(
             envelope,
             expectedAction: .edit,
@@ -41,15 +41,15 @@ actor WriteService {
         )
     }
 
-    func startDraftStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+    func startDraftStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingGatewayStreamEvent, Error> {
         try await handleStream(envelope, expectedAction: .startDraft)
     }
 
-    func continueWritingStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+    func continueWritingStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingGatewayStreamEvent, Error> {
         try await handleStream(envelope, expectedAction: .continueWriting)
     }
 
-    func editStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+    func editStream(_ envelope: WriteRequestEnvelope) async throws -> AsyncThrowingStream<WritingGatewayStreamEvent, Error> {
         try await handleStream(
             envelope,
             expectedAction: .edit,
@@ -61,7 +61,7 @@ actor WriteService {
         _ envelope: WriteRequestEnvelope,
         expectedAction: WritingAIAction,
         requiresSelectionRange: Bool = false
-    ) async throws -> WritingAIResponse {
+    ) async throws -> WritingGatewayResponse {
         let startedAt = clock.now()
 
         guard envelope.action == expectedAction else {
@@ -96,16 +96,18 @@ actor WriteService {
         }
 
         if requiresSelectionRange {
-            guard let selectionRange = envelope.selectionRange,
-                  selectionRange.range(in: envelope.project.documentText) != nil else {
+            guard let editWindow = envelope.editWindow,
+                  !editWindow.selectionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 await recordRejectedLog(
                     envelope: envelope,
                     startedAt: startedAt,
                     errorCode: "invalid_request"
                 )
-                throw Abort(.badRequest, reason: "A valid selectionRange is required for edit requests.")
+                throw Abort(.badRequest, reason: "A valid editWindow.selectionText is required for edit requests.")
             }
         }
+
+        try validateEnvelopeStructure(envelope)
 
         guard try await quotaLedger.evaluateAndConsumeIfAllowed(installationId: envelope.installationId) == .allowed else {
             await recordRejectedLog(
@@ -141,7 +143,7 @@ actor WriteService {
         _ envelope: WriteRequestEnvelope,
         expectedAction: WritingAIAction,
         requiresSelectionRange: Bool = false
-    ) async throws -> AsyncThrowingStream<WritingAIStreamEvent, Error> {
+    ) async throws -> AsyncThrowingStream<WritingGatewayStreamEvent, Error> {
         let startedAt = clock.now()
 
         guard envelope.action == expectedAction else {
@@ -176,16 +178,18 @@ actor WriteService {
         }
 
         if requiresSelectionRange {
-            guard let selectionRange = envelope.selectionRange,
-                  selectionRange.range(in: envelope.project.documentText) != nil else {
+            guard let editWindow = envelope.editWindow,
+                  !editWindow.selectionText.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else {
                 await recordRejectedLog(
                     envelope: envelope,
                     startedAt: startedAt,
                     errorCode: "invalid_request"
                 )
-                throw Abort(.badRequest, reason: "A valid selectionRange is required for edit requests.")
+                throw Abort(.badRequest, reason: "A valid editWindow.selectionText is required for edit requests.")
             }
         }
+
+        try validateEnvelopeStructure(envelope)
 
         guard try await quotaLedger.evaluateAndConsumeIfAllowed(installationId: envelope.installationId) == .allowed else {
             await recordRejectedLog(
@@ -196,7 +200,7 @@ actor WriteService {
             throw Abort(.tooManyRequests, reason: "quota_exceeded")
         }
 
-        let stream: AsyncThrowingStream<WritingAIStreamEvent, Error>
+        let stream: AsyncThrowingStream<WritingGatewayStreamEvent, Error>
         do {
             stream = try await aiExecutor.streamProse(for: envelope)
         } catch let error as BackendAIError {
@@ -309,5 +313,26 @@ actor WriteService {
     private static func durationMilliseconds(from start: Date, to end: Date) -> Int {
         let duration = end.timeIntervalSince(start) * 1000
         return max(0, Int(duration.rounded(.down)))
+    }
+
+    private func validateEnvelopeStructure(_ envelope: WriteRequestEnvelope) throws {
+        switch envelope.action {
+        case .startDraft:
+            guard envelope.startProject != nil else {
+                throw Abort(.badRequest, reason: "A valid startProject is required for start requests.")
+            }
+
+        case .continueWriting:
+            guard envelope.sessionContext != nil,
+                  envelope.continueWindow != nil else {
+                throw Abort(.badRequest, reason: "A valid continueWindow is required for continue requests.")
+            }
+
+        case .edit:
+            guard envelope.sessionContext != nil,
+                  envelope.editWindow != nil else {
+                throw Abort(.badRequest, reason: "A valid editWindow is required for edit requests.")
+            }
+        }
     }
 }

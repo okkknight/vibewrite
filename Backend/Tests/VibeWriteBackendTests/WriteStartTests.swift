@@ -27,31 +27,29 @@ final class WriteStartTests: XCTestCase {
             }
         })
 
-        let writeRequest = WriteRequestEnvelope(
+        let writeRequest = makeGatewayStartRequest(
             installationId: bootstrapRequest.installationId,
             deviceToken: issuedToken,
             requestId: "request-001",
-            action: .startDraft,
-            kind: .prose,
             project: sampleProjectSnapshot(),
-            userMessage: "先写一个开头",
-            selectionText: nil,
-            selectionRange: nil
+            userMessage: "先写一个开头"
         )
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { request in
             try request.content.encode(writeRequest)
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
-            XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
+            XCTAssertContent(WritingGatewayResponse.self, response) { writeResponse in
                 XCTAssertEqual(writeResponse.assistantMessage, "我已经根据你的方向起了一版第一稿。")
                 XCTAssertEqual(
-                    writeResponse.documentText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    writeResponse.documentText?.trimmingCharacters(in: .whitespacesAndNewlines),
                     """
                     在你给出的方向里，最重要的不是把情绪讲满，而是先把它停在一个合适的位置。
                     这篇文字先不急着给结论，而是从一个更具体的开头进入，让内容慢慢往前走。
                     """
                 )
+                XCTAssertNil(writeResponse.appendedText)
+                XCTAssertNil(writeResponse.replacementText)
                 XCTAssertEqual(writeResponse.localSummary, "")
                 XCTAssertEqual(writeResponse.globalSynopsis, "")
                 XCTAssertEqual(
@@ -75,16 +73,11 @@ final class WriteStartTests: XCTestCase {
 
         try configure(app)
 
-        let writeRequest = WriteRequestEnvelope(
+        let writeRequest = makeGatewayStartRequest(
             installationId: "installation-002",
             deviceToken: "not-a-real-token",
             requestId: "request-002",
-            action: .startDraft,
-            kind: .prose,
-            project: sampleProjectSnapshot(),
-            userMessage: nil,
-            selectionText: nil,
-            selectionRange: nil
+            project: sampleProjectSnapshot()
         )
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { request in

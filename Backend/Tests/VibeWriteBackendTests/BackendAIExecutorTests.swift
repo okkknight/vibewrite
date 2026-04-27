@@ -21,27 +21,26 @@ final class BackendAIExecutorTests: XCTestCase {
             systemPromptStore: systemPromptStore
         )
 
-        let request = WriteRequestEnvelope(
+        let project = sampleProjectSnapshot()
+        let request = makeGatewayContinueRequest(
             installationId: "installation-prose-001",
             deviceToken: "token-prose-001",
             requestId: "request-prose-001",
-            action: .continueWriting,
-            kind: .prose,
-            project: sampleProjectSnapshot(),
-            userMessage: "继续写下去",
-            selectionText: "开头正文",
-            selectionRange: WritingTextSelectionRange(location: 0, length: 4)
+            project: project,
+            userMessage: "继续写下去"
         )
 
         let response = try await executor.execute(for: request)
 
         XCTAssertEqual(
-            response.documentText,
+            response.appendedText,
             """
-            开头正文
+            
             接下来可以顺着这个主线，再补一段更自然的推进。
             """
         )
+        XCTAssertNil(response.documentText)
+        XCTAssertNil(response.replacementText)
         XCTAssertEqual(response.localSummary, "")
         XCTAssertEqual(response.globalSynopsis, "")
         XCTAssertEqual(response.nextFocus, "")
@@ -66,21 +65,21 @@ final class BackendAIExecutorTests: XCTestCase {
             systemPromptStore: systemPromptStore
         )
 
-        let request = WriteRequestEnvelope(
+        let project = sampleProjectSnapshot()
+        let request = makeGatewayContinueRequest(
             installationId: "installation-metadata-001",
             deviceToken: "token-metadata-001",
             requestId: "request-metadata-001",
-            action: .continueWriting,
+            project: project,
             kind: .metadata,
-            project: sampleProjectSnapshot(),
-            userMessage: "继续写下去",
-            selectionText: "开头正文",
-            selectionRange: WritingTextSelectionRange(location: 0, length: 4)
+            userMessage: "继续写下去"
         )
 
         let response = try await executor.execute(for: request)
 
-        XCTAssertEqual(response.documentText, request.project.documentText)
+        XCTAssertNil(response.documentText)
+        XCTAssertNil(response.appendedText)
+        XCTAssertNil(response.replacementText)
         XCTAssertEqual(response.localSummary, "已续写一段")
         XCTAssertEqual(response.globalSynopsis, "已续写一段总览")
         XCTAssertEqual(response.nextFocus, "继续顺着当前主线往下写")

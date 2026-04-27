@@ -28,25 +28,24 @@ final class WriteContinueTests: XCTestCase {
         })
 
         let largeDocument = String(repeating: "a", count: 49_000)
-        let continueRequest = WriteRequestEnvelope(
+        let project = sampleProjectSnapshot(
+            automationKey: "task48-large-stream",
+            documentText: largeDocument
+        )
+        let continueRequest = makeGatewayContinueRequest(
             installationId: bootstrapRequest.installationId,
             deviceToken: issuedToken,
             requestId: "request-continue-large-001",
-            action: .continueWriting,
-            kind: .prose,
-            project: sampleProjectSnapshot(
-                automationKey: "task48-large-stream",
-                documentText: largeDocument
-            ),
+            project: project,
             userMessage: "继续写下去",
-            selectionText: nil,
-            selectionRange: nil
+            tailText: String(largeDocument.suffix(1_500))
         )
 
         let encoder = JSONEncoder()
         encoder.dateEncodingStrategy = .iso8601
         let requestBodyData = try encoder.encode(continueRequest)
-        XCTAssertGreaterThan(requestBodyData.count, 16 * 1024)
+        XCTAssertLessThan(requestBodyData.count, 16 * 1024)
+        XCTAssertLessThan(requestBodyData.count, largeDocument.utf8.count / 4)
 
         try app.server.start(address: .hostname("127.0.0.1", port: 0))
         defer { app.server.shutdown() }
@@ -115,59 +114,57 @@ final class WriteContinueTests: XCTestCase {
             }
         })
 
-        let startRequest = WriteRequestEnvelope(
+        let startProject = sampleProjectSnapshot(automationKey: "task29-start")
+        let startRequest = makeGatewayStartRequest(
             installationId: bootstrapRequest.installationId,
             deviceToken: issuedToken,
             requestId: "request-start-001",
-            action: .startDraft,
-            kind: .prose,
-            project: sampleProjectSnapshot(automationKey: "task29-start"),
-            userMessage: "先写一个开头",
-            selectionText: nil,
-            selectionRange: nil
+            project: startProject,
+            userMessage: "先写一个开头"
         )
 
         try app.test(.POST, "v3/writes/start", beforeRequest: { request in
             try request.content.encode(startRequest)
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
-            XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
+            XCTAssertContent(WritingGatewayResponse.self, response) { writeResponse in
                 XCTAssertEqual(writeResponse.assistantMessage, "我已经根据你的方向起了一版第一稿。")
                 XCTAssertEqual(
-                    writeResponse.documentText.trimmingCharacters(in: .whitespacesAndNewlines),
+                    writeResponse.documentText?.trimmingCharacters(in: .whitespacesAndNewlines),
                     """
                     在你给出的方向里，最重要的不是把情绪讲满，而是先把它停在一个合适的位置。
                     这篇文字先不急着给结论，而是从一个更具体的开头进入，让内容慢慢往前走。
                     """
                 )
+                XCTAssertNil(writeResponse.appendedText)
+                XCTAssertNil(writeResponse.replacementText)
             }
         })
 
-        let continueRequest = WriteRequestEnvelope(
+        let continueProject = sampleProjectSnapshot(automationKey: "task29-continue")
+        let continueRequest = makeGatewayContinueRequest(
             installationId: bootstrapRequest.installationId,
             deviceToken: issuedToken,
             requestId: "request-continue-001",
-            action: .continueWriting,
-            kind: .prose,
-            project: sampleProjectSnapshot(automationKey: "task29-continue"),
-            userMessage: "继续写下去",
-            selectionText: "开头正文",
-            selectionRange: WritingTextSelectionRange(location: 0, length: 4)
+            project: continueProject,
+            userMessage: "继续写下去"
         )
 
         try app.test(.POST, "v3/writes/continue", beforeRequest: { request in
             try request.content.encode(continueRequest)
         }, afterResponse: { response in
             XCTAssertEqual(response.status, .ok)
-            XCTAssertContent(WritingAIResponse.self, response) { writeResponse in
+            XCTAssertContent(WritingGatewayResponse.self, response) { writeResponse in
                 XCTAssertEqual(writeResponse.assistantMessage, "我接着往下写了一段，让主线继续往前走。")
                 XCTAssertEqual(
-                    writeResponse.documentText,
+                    writeResponse.appendedText,
                     """
-                    开头正文
+                    
                     接下来可以顺着这个主线，再补一段更自然的推进。
                     """
                 )
+                XCTAssertNil(writeResponse.documentText)
+                XCTAssertNil(writeResponse.replacementText)
                 XCTAssertEqual(writeResponse.localSummary, "")
                 XCTAssertEqual(writeResponse.globalSynopsis, "")
                 XCTAssertEqual(
@@ -180,7 +177,7 @@ final class WriteContinueTests: XCTestCase {
                 XCTAssertEqual(writeResponse.workingMemory, ["继续沿当前正文推进", "优先保持节奏稳定"])
                 XCTAssertEqual(writeResponse.nextFocus, "")
                 XCTAssertEqual(writeResponse.suggestionChips, [])
-                XCTAssertEqual(writeResponse.mode, continueRequest.project.mode)
+                XCTAssertEqual(writeResponse.mode, continueProject.mode)
             }
         })
     }
@@ -191,16 +188,11 @@ final class WriteContinueTests: XCTestCase {
 
         try configure(app)
 
-        let continueRequest = WriteRequestEnvelope(
+        let continueRequest = makeGatewayContinueRequest(
             installationId: "installation-continue-002",
             deviceToken: "not-a-real-token",
             requestId: "request-continue-002",
-            action: .continueWriting,
-            kind: .prose,
-            project: sampleProjectSnapshot(automationKey: "task29-invalid"),
-            userMessage: nil,
-            selectionText: nil,
-            selectionRange: nil
+            project: sampleProjectSnapshot(automationKey: "task29-invalid")
         )
 
         try app.test(.POST, "v3/writes/continue", beforeRequest: { request in

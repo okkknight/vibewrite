@@ -111,10 +111,11 @@ final class WritingAITests: XCTestCase {
                 writeCount += 1
                 let envelope = try self.decodeBackendGatewayWriteEnvelope(from: request)
                 XCTAssertEqual(envelope.deviceToken, "device-token-1")
-                let backendRequest = self.makeBackendGatewayWritingRequest(from: envelope)
-                let response = WritingProjectResponseBuilder.response(
+                XCTAssertNotNil(envelope.startProject)
+                XCTAssertNil(envelope.sessionContext)
+                let backendRequest = try self.makeBackendGatewayWritingRequest(from: envelope)
+                let response = self.makeGatewayResponse(
                     for: backendRequest,
-                    documentText: MockWritingEngine.streamedDocumentText(for: backendRequest),
                     metadata: MockWritingEngine.completionMetadata(for: backendRequest)
                 )
                 let body = try JSONEncoder().encode(response)
@@ -203,10 +204,11 @@ final class WritingAITests: XCTestCase {
                 }
 
                 XCTAssertEqual(envelope.deviceToken, "device-token-2")
-                let backendRequest = self.makeBackendGatewayWritingRequest(from: envelope)
-                let response = WritingProjectResponseBuilder.response(
+                XCTAssertNotNil(envelope.startProject)
+                XCTAssertNil(envelope.sessionContext)
+                let backendRequest = try self.makeBackendGatewayWritingRequest(from: envelope)
+                let response = self.makeGatewayResponse(
                     for: backendRequest,
-                    documentText: MockWritingEngine.streamedDocumentText(for: backendRequest),
                     metadata: MockWritingEngine.completionMetadata(for: backendRequest)
                 )
                 let body = try JSONEncoder().encode(response)
@@ -239,15 +241,7 @@ final class WritingAITests: XCTestCase {
         XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/start", "/v3/client/bootstrap", "/v3/writes/start"])
     }
 
-    func testBackendGatewayClientStreamsContinueWritingAsIncrementalDelta() async throws {
-        let storageURL = try makeBackendGatewayTempStorageURL()
-        defer {
-            try? FileManager.default.removeItem(at: storageURL.deletingLastPathComponent())
-        }
-
-        let identityStore = BackendGatewayIdentityStore(storageURL: storageURL)
-        let requestsLock = NSLock()
-        var recordedPaths: [String] = []
+    func testBackendGatewayClientTranslatesContinueWritingStreamEventsToIncrementalDelta() async throws {
         let prompt = "继续写下去"
         let project = WritingProjectSnapshot(
             id: UUID(uuidString: "00000000-0000-0000-0000-000000000012") ?? UUID(),
@@ -279,46 +273,6 @@ final class WritingAITests: XCTestCase {
             selectionText: "开头正文"
         )
 
-        let session = makeAnthropicMockSession { request in
-            requestsLock.lock()
-            defer { requestsLock.unlock() }
-
-            recordedPaths.append(request.url?.path ?? "")
-
-            switch request.url?.path {
-            case "/v3/client/bootstrap":
-                let body = try JSONEncoder().encode(
-                    BackendGatewayBootstrapResponseEnvelope(
-                        deviceToken: "device-token-1",
-                        deviceStatus: "active",
-                        quotaSummary: .init(dailyLimit: 50, weeklyLimit: 200)
-                    )
-                )
-                return (self.makeHTTPResponse(statusCode: 200), body)
-
-            case "/v3/writes/continue":
-                let envelope = try self.decodeBackendGatewayWriteEnvelope(from: request)
-                XCTAssertEqual(envelope.kind, .prose)
-                let backendRequest = self.makeBackendGatewayWritingRequest(from: envelope)
-                let streamedText = MockWritingEngine.streamedTextDelta(for: backendRequest)
-                let documentText = MockWritingEngine.finalDocumentText(
-                    for: backendRequest,
-                    streamedText: streamedText
-                )
-                let response = WritingProjectResponseBuilder.response(
-                    for: backendRequest,
-                    documentText: documentText,
-                    metadata: nil
-                )
-                let body = try JSONEncoder().encode(response)
-                return (self.makeHTTPResponse(statusCode: 200), body)
-
-            default:
-                XCTFail("Unexpected backend gateway request path \(request.url?.path ?? "nil")")
-                return (self.makeHTTPResponse(statusCode: 500), Data())
-            }
-        }
-
         let client = BackendWritingAIClient(
             configuration: BackendGatewayConfiguration.configuration(
                 from: [
@@ -326,19 +280,31 @@ final class WritingAITests: XCTestCase {
                     "VIBEWRITE_BACKEND_BASE_URL": "http://127.0.0.1:8080"
                 ]
             ),
-            identityStore: identityStore,
-            session: session
+            identityStore: BackendGatewayIdentityStore(storageURL: try makeBackendGatewayTempStorageURL()),
+            session: .shared
         )
 
         var streamedText = ""
         var finalResponse: WritingAIResponse?
-        for try await event in client.streamResponse(for: request) {
+
+        let streamedDelta = MockWritingEngine.streamedTextDelta(for: request)
+        for chunk in MockWritingEngine.streamChunks(for: streamedDelta) {
+            let rawLine = try encodeGatewayStreamEvent(.textDelta(chunk))
+            let event = try client.decodeStreamEvent(from: rawLine, originalRequest: request)
             switch event {
             case .textDelta(let delta):
                 streamedText += delta
             case .completed(let response):
                 finalResponse = response
             }
+        }
+
+        let completionResponse = makeGatewayResponse(for: request, metadata: nil)
+        let completionLine = try encodeGatewayStreamEvent(.completed(completionResponse))
+        if case .completed(let response) = try client.decodeStreamEvent(from: completionLine, originalRequest: request) {
+            finalResponse = response
+        } else {
+            XCTFail("Expected completed stream event.")
         }
 
         XCTAssertFalse(streamedText.hasPrefix(project.documentText))
@@ -348,7 +314,6 @@ final class WritingAITests: XCTestCase {
 
         接下来可以顺着现在的主线，再补一段更自然的推进。
         """)
-        XCTAssertEqual(recordedPaths, ["/v3/client/bootstrap", "/v3/writes/continue"])
     }
 
     func testBackendGatewayClientMapsNetworkUnavailableErrors() async throws {
@@ -687,35 +652,129 @@ final class WritingAITests: XCTestCase {
         return directory.appendingPathComponent("backend-gateway-identity.json")
     }
 
-    private func decodeBackendGatewayWriteEnvelope(from request: URLRequest) throws -> BackendGatewayWriteEnvelopeSnapshot {
+    private func decodeBackendGatewayWriteEnvelope(from request: URLRequest) throws -> WritingGatewayWriteEnvelope {
         let body = try XCTUnwrap(requestBodyData(from: request))
         let decoder = JSONDecoder()
         decoder.dateDecodingStrategy = .iso8601
-        return try decoder.decode(BackendGatewayWriteEnvelopeSnapshot.self, from: body)
+        return try decoder.decode(WritingGatewayWriteEnvelope.self, from: body)
     }
 
-    private func makeBackendGatewayWritingRequest(from envelope: BackendGatewayWriteEnvelopeSnapshot) -> WritingAIRequest {
-        WritingAIRequest(
+    private func makeBackendGatewayWritingRequest(from envelope: WritingGatewayWriteEnvelope) throws -> WritingAIRequest {
+        let project: WritingProjectSnapshot
+        let selectionText: String?
+        let selectionRange: WritingTextSelectionRange?
+
+        switch envelope.action {
+        case .startDraft:
+            project = try XCTUnwrap(envelope.startProject)
+            selectionText = nil
+            selectionRange = nil
+
+        case .continueWriting:
+            let sessionContext = try XCTUnwrap(envelope.sessionContext)
+            let continueWindow = try XCTUnwrap(envelope.continueWindow)
+            project = makeProjectSnapshot(
+                from: sessionContext,
+                documentText: continueWindow.tailText
+            )
+            selectionText = nil
+            selectionRange = nil
+
+        case .edit:
+            let sessionContext = try XCTUnwrap(envelope.sessionContext)
+            let editWindow = try XCTUnwrap(envelope.editWindow)
+            project = makeProjectSnapshot(
+                from: sessionContext,
+                documentText: editWindow.windowText
+            )
+            selectionText = editWindow.selectionText
+            selectionRange = editWindow.localSelectionRange
+        }
+
+        return WritingAIRequest(
             action: envelope.action,
-            project: envelope.project,
+            project: project,
             userMessage: envelope.userMessage,
-            selectionText: envelope.selectionText,
-            selectionRange: envelope.selectionRange,
+            selectionText: selectionText,
+            selectionRange: selectionRange,
             kind: envelope.kind
         )
     }
-}
 
-private struct BackendGatewayWriteEnvelopeSnapshot: Decodable {
-    let installationId: String
-    let deviceToken: String
-    let requestId: String
-    let action: WritingAIAction
-    let kind: WritingAIRequestKind
-    let project: WritingProjectSnapshot
-    let userMessage: String?
-    let selectionText: String?
-    let selectionRange: WritingTextSelectionRange?
+    private func makeProjectSnapshot(
+        from sessionContext: WritingGatewaySessionContext,
+        documentText: String
+    ) -> WritingProjectSnapshot {
+        WritingProjectSnapshot(
+            id: UUID(uuidString: "33333333-3333-3333-3333-333333333333") ?? UUID(),
+            automationKey: "backend.gateway.test",
+            title: sessionContext.title,
+            prompt: sessionContext.prompt,
+            mode: sessionContext.mode,
+            localSummary: sessionContext.localSummary,
+            globalSynopsis: sessionContext.globalSynopsis,
+            context: sessionContext.context,
+            conversation: [],
+            documentText: documentText,
+            suggestionChips: sessionContext.suggestionChips,
+            updatedAt: Date(timeIntervalSince1970: 1_719_000_000)
+        )
+    }
+
+    private func makeGatewayResponse(
+        for request: WritingAIRequest,
+        metadata: WritingAICompletionMetadata?
+    ) -> WritingGatewayResponse {
+        let proseText: String?
+        let resolvedDocumentText: String
+
+        if request.kind == .metadata {
+            proseText = nil
+            resolvedDocumentText = request.project.documentText
+        } else {
+            switch request.action {
+            case .startDraft:
+                let draftText = MockWritingEngine.streamedDocumentText(for: request)
+                proseText = draftText
+                resolvedDocumentText = draftText
+            case .continueWriting, .edit:
+                let patchText = MockWritingEngine.streamedTextDelta(for: request)
+                proseText = patchText
+                resolvedDocumentText = MockWritingEngine.finalDocumentText(
+                    for: request,
+                    streamedText: patchText
+                )
+            }
+        }
+
+        let appResponse = WritingProjectResponseBuilder.response(
+            for: request,
+            documentText: resolvedDocumentText,
+            metadata: metadata
+        )
+
+        return WritingGatewayResponse(
+            assistantMessage: appResponse.assistantMessage,
+            documentText: request.kind == .prose && request.action == .startDraft ? proseText : nil,
+            appendedText: request.kind == .prose && request.action == .continueWriting ? proseText : nil,
+            replacementText: request.kind == .prose && request.action == .edit ? proseText : nil,
+            localSummary: appResponse.localSummary,
+            globalSynopsis: appResponse.globalSynopsis,
+            intentSummary: appResponse.intentSummary,
+            styleConstraints: appResponse.styleConstraints,
+            currentGoal: appResponse.currentGoal,
+            recentDecisions: appResponse.recentDecisions,
+            workingMemory: appResponse.workingMemory,
+            nextFocus: appResponse.nextFocus,
+            suggestionChips: appResponse.suggestionChips,
+            mode: appResponse.mode
+        )
+    }
+
+    private func encodeGatewayStreamEvent(_ event: WritingGatewayStreamEvent) throws -> String {
+        let data = try JSONEncoder().encode(event)
+        return try XCTUnwrap(String(data: data, encoding: .utf8))
+    }
 }
 
 private struct BackendGatewayBootstrapResponseEnvelope: Codable {

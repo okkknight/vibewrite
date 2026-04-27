@@ -204,7 +204,7 @@ struct BackendPromptComposer {
             lines.append(documentTail(for: request.project.documentText))
 
         case .startDraft, .edit:
-            lines.append("Current document:")
+            lines.append(request.action == .edit ? "Local edit window:" : "Current document:")
             lines.append(request.project.documentText.isEmpty ? "(empty)" : request.project.documentText)
         }
 
@@ -221,6 +221,7 @@ struct BackendPromptComposer {
             lines.append("Do not restart from the beginning of the article.")
         } else if request.action == .edit {
             lines.append("Return only the replacement text for the selected segment.")
+            lines.append("Treat the local edit window as context, not as the whole article.")
             lines.append("Rewrite only the selected passage or local region whenever practical.")
         } else {
             lines.append("Write the opening prose for the first draft.")
@@ -254,7 +255,7 @@ struct BackendPromptComposer {
             lines.append(nonEmptyText(request.project.globalSynopsis, fallback: "(empty)"))
 
         case .edit:
-            lines.append("Completed prose:")
+            lines.append("Edited local window:")
             lines.append(documentExcerpt(for: request.project.documentText))
             lines.append("Current global synopsis:")
             lines.append(nonEmptyText(request.project.globalSynopsis, fallback: "(empty)"))

@@ -207,4 +207,67 @@ final class SelectableTextEditorTests: XCTestCase {
 
         XCTAssertEqual(box.value, "")
     }
+
+    func testProgrammaticSyncClearsBodyUndoHistory() {
+        let editor = SelectableTextEditor(
+            text: .constant(""),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let textView = StyledTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.allowsUndo = true
+        window.contentView = NSView(frame: window.contentView?.bounds ?? .zero)
+        window.contentView?.addSubview(textView)
+        _ = window.makeFirstResponder(textView)
+
+        textView.insertText("手输", replacementRange: textView.selectedRange())
+        textView.undoManager?.undo()
+        textView.undoManager?.redo()
+        XCTAssertTrue(textView.undoManager?.canUndo == true)
+
+        XCTAssertTrue(coordinator.syncText("第一段\n\n第二段", in: textView))
+        XCTAssertFalse(textView.undoManager?.canUndo == true)
+        XCTAssertFalse(textView.undoManager?.canRedo == true)
+    }
+
+    func testUserEditAfterProgrammaticSyncRemainsUndoableWithoutStaleUndoEntries() {
+        let editor = SelectableTextEditor(
+            text: .constant(""),
+            selectedText: .constant(nil),
+            selectedTextRange: .constant(nil),
+            selectionPopoverOrigin: .constant(nil)
+        )
+        let coordinator = editor.makeCoordinator()
+
+        let window = NSWindow(
+            contentRect: NSRect(x: 0, y: 0, width: 600, height: 400),
+            styleMask: [.titled],
+            backing: .buffered,
+            defer: false
+        )
+        let textView = StyledTextView(frame: NSRect(x: 0, y: 0, width: 600, height: 400))
+        textView.allowsUndo = true
+        window.contentView = NSView(frame: window.contentView?.bounds ?? .zero)
+        window.contentView?.addSubview(textView)
+        _ = window.makeFirstResponder(textView)
+
+        XCTAssertTrue(coordinator.syncText("第一段\n\n第二段", in: textView))
+        textView.setSelectedRange(NSRange(location: textView.string.utf16.count, length: 0))
+        textView.insertText("补字", replacementRange: textView.selectedRange())
+
+        XCTAssertTrue(textView.undoManager?.canUndo == true)
+        textView.undoManager?.undo()
+
+        XCTAssertEqual(textView.string, "第一段\n\n第二段")
+        XCTAssertFalse(textView.undoManager?.canUndo == true)
+    }
 }

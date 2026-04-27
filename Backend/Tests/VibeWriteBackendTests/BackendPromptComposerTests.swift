@@ -191,12 +191,13 @@ final class BackendPromptComposerTests: XCTestCase {
             joined(
                 "Action: edit",
                 "Project title: 润色测试",
-                "Current document:",
+                "Local edit window:",
                 documentText,
                 "User message: 把这一段写得更克制",
                 "Selection: \(selectionText)",
                 "Return only the replacement text for the selected segment.",
-                "Rewrite only the selected passage or local region whenever practical.",
+                "Treat the local edit window as context, not as the whole article.",
+                "Rewrite only the selected passage or local region whenever practical."
             )
         )
     }

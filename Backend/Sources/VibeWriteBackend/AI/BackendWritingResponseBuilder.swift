@@ -4,10 +4,10 @@ import VibeWriteShared
 struct BackendWritingResponseBuilder {
     func response(
         for request: WritingAIRequest,
-        documentText: String,
+        proseText: String? = nil,
         metadata: WritingAICompletionMetadata? = nil,
         assistantMessage: String? = nil
-    ) -> WritingAIResponse {
+    ) -> WritingGatewayResponse {
         let action = request.action
         let resolvedAssistantMessage = assistantMessage ?? assistantLine(for: action)
         let resolvedLocalSummary = normalizedMetadataValue(metadata?.localSummary)
@@ -15,9 +15,30 @@ struct BackendWritingResponseBuilder {
         let resolvedNextFocus = normalizedMetadataValue(metadata?.nextFocus)
         let resolvedSuggestionChips = normalizedSuggestionChips(metadata?.suggestionChips ?? [])
 
-        return WritingAIResponse(
+        let documentText: String?
+        let appendedText: String?
+        let replacementText: String?
+
+        switch action {
+        case .startDraft:
+            documentText = proseText
+            appendedText = nil
+            replacementText = nil
+        case .continueWriting:
+            documentText = nil
+            appendedText = proseText
+            replacementText = nil
+        case .edit:
+            documentText = nil
+            appendedText = nil
+            replacementText = proseText
+        }
+
+        return WritingGatewayResponse(
             assistantMessage: resolvedAssistantMessage,
             documentText: documentText,
+            appendedText: appendedText,
+            replacementText: replacementText,
             localSummary: resolvedLocalSummary,
             globalSynopsis: resolvedGlobalSynopsis,
             intentSummary: intentSummary(for: request),
@@ -42,25 +63,6 @@ struct BackendWritingResponseBuilder {
         }
     }
 
-    func updatedProjectSnapshot(
-        for request: WritingAIRequest,
-        documentText: String,
-        assistantMessage: String? = nil
-    ) -> WritingProjectSnapshot {
-        var snapshot = request.project
-        snapshot.documentText = documentText
-        if let assistantMessage {
-            snapshot.conversation.append(
-                ConversationMessage(
-                    role: .assistant,
-                    text: assistantMessage,
-                    timestamp: "AI · 刚刚"
-                )
-            )
-        }
-        return snapshot
-    }
-
     func fallbackMetadata(for request: WritingAIRequest) -> WritingAICompletionMetadata {
         WritingAICompletionMetadata(
             localSummary: normalizedMetadataValue(request.project.localSummary),
@@ -68,30 +70,6 @@ struct BackendWritingResponseBuilder {
             nextFocus: normalizedMetadataValue(request.project.context.nextFocus),
             suggestionChips: normalizedSuggestionChips(request.project.suggestionChips)
         )
-    }
-
-    func appliedDocumentText(
-        for request: WritingAIRequest,
-        proseText: String
-    ) throws -> String {
-        let documentText: String
-        switch request.action {
-        case .startDraft:
-            documentText = proseText
-
-        case .continueWriting:
-            documentText = request.project.documentText + proseText
-
-        case .edit:
-            guard let range = request.selectionRange?.range(in: request.project.documentText) else {
-                throw BackendAIError.invalidRequest("A valid selectionRange is required for edit requests.")
-            }
-
-            var revised = request.project.documentText
-            revised.replaceSubrange(range, with: proseText)
-            documentText = revised
-        }
-        return documentText
     }
 
     private func intentSummary(for request: WritingAIRequest) -> String {
