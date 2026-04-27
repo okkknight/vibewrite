@@ -56,7 +56,6 @@ VibeWrite is a macOS SwiftUI writing collaborator. The product goal is editor-fi
 - The composer guidance rail now uses the old single-line overflow cutoff again instead of a hard two-chip cap, and the separate metadata request once again raises the `建议生成中` pill while metadata is in flight.
 - The assistant suggestion rail now measures its usable width from the outer composer container before applying the single-line overflow cutoff, so the layout can keep up to three chips when space allows and still drop trailing chips when the rail is genuinely too narrow.
 - Backend request failures now surface as a floating toast banner instead of inline red text, so the composer input no longer hides the error message and the visual style stays aligned with the app chrome.
-- 413 diagnosis now uses a dedicated request trace file at `~/Library/Application Support/VibeWrite/diagnostics/backend-gateway-request-trace.log`. The app writes only backend write request metrics and response summaries there, so request-size debugging can happen without scraping the noisy system log stream.
 - The prose/metadata overlap timing is now documented inline in `VibeWriteAppFlow`, so future edits keep metadata decoupled from prose tail playback instead of reserializing the two phases.
 - The app's default launch window size is now 1024x700.
 - The正文 now keeps only the top edge fade; the bottom edge fade is removed, and the wide Composer section sits fully flush against the正文 above it with no extra gap.

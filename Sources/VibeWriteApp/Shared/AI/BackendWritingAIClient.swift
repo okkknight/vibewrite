@@ -690,9 +690,6 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
         VibeWriteLog.ai.info(
             "backend write request metrics action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) envelopeBytes=\(requestBodyBytes, privacy: .public) contextBytes=\(contextBytes, privacy: .public) totalDocumentCharacters=\(totalDocumentCharacters, privacy: .public) tailBytes=\(tailBytes, privacy: .public) beforeContextBytes=\(beforeContextBytes, privacy: .public) selectionTextBytes=\(selectionTextBytes, privacy: .public) afterContextBytes=\(afterContextBytes, privacy: .public) userMessageBytes=\(userMessageBytes, privacy: .public)"
         )
-        VibeWriteRequestTrace.append(
-            "backend write request metrics action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) envelopeBytes=\(requestBodyBytes) contextBytes=\(contextBytes) totalDocumentCharacters=\(totalDocumentCharacters) tailBytes=\(tailBytes) beforeContextBytes=\(beforeContextBytes) selectionTextBytes=\(selectionTextBytes) afterContextBytes=\(afterContextBytes) userMessageBytes=\(userMessageBytes)"
-        )
     }
 
     private func logWriteRequestOutcome(
@@ -711,17 +708,11 @@ final class BackendWritingAIClient: WritingAIClient, @unchecked Sendable {
             VibeWriteLog.ai.warning(
                 "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreview, privacy: .public) requestBytes=\(requestBytes, privacy: .public) contextBytes=\(contextBytes, privacy: .public)"
             )
-            VibeWriteRequestTrace.append(
-                "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreview) requestBytes=\(requestBytes) contextBytes=\(contextBytes)"
-            )
             return
         }
 
         VibeWriteLog.ai.info(
             "backend write response action=\(request.action.rawValue, privacy: .public) kind=\(request.kind.rawValue, privacy: .public) requestId=\(requestId, privacy: .public) payloadFingerprint=\(payloadFingerprint, privacy: .public) statusCode=\(statusText, privacy: .public) responseBytes=\(responseBytes, privacy: .public) responsePreview=\(responsePreviewText, privacy: .public) requestBytes=\(requestBytes, privacy: .public) contextBytes=\(contextBytes, privacy: .public)"
-        )
-        VibeWriteRequestTrace.append(
-            "backend write response action=\(request.action.rawValue) kind=\(request.kind.rawValue) requestId=\(requestId) payloadFingerprint=\(payloadFingerprint) statusCode=\(statusText) responseBytes=\(responseBytes) responsePreview=\(responsePreviewText) requestBytes=\(requestBytes) contextBytes=\(contextBytes)"
         )
     }
 
