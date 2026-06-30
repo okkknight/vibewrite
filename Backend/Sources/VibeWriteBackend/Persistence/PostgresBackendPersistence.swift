@@ -3,7 +3,7 @@ import Fluent
 import Vapor
 import VibeWriteShared
 
-actor PostgresBackendPersistence: BackendPersistenceBootstrapper,
+actor DatabaseBackendPersistence: BackendPersistenceBootstrapper,
     VibeWriteDeviceRegistryStore,
     VibeWriteQuotaLedgerStore,
     VibeWriteRequestLogStore,

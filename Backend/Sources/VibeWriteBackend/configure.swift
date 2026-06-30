@@ -1,4 +1,5 @@
 import FluentPostgresDriver
+import FluentSQLiteDriver
 import Vapor
 
 @discardableResult
@@ -11,10 +12,14 @@ func configure(
     adminUsername: String? = nil,
     adminPassword: String? = nil
 ) throws -> (any BackendPersistenceBootstrapper)? {
+    let environment = ProcessInfo.processInfo.environment
     let backendAIConfiguration = BackendAIConfiguration.current(isTesting: app.environment == .testing)
-    let shouldUseMemoryStores = quotaLedger != nil || requestLogStore != nil || (app.environment == .testing && Environment.get("DATABASE_URL") == nil)
+    let shouldUseMemoryStores = quotaLedger != nil
+        || requestLogStore != nil
+        || (app.environment == .testing && !BackendPersistenceConfiguration.hasExplicitPersistentConfiguration(environment: environment))
     let resolvedAdminSecrets = try resolveAdminSecrets(
         app: app,
+        provider: backendAIConfiguration.provider,
         providerApiKey: providerApiKey,
         adminUsername: adminUsername,
         adminPassword: adminPassword
@@ -65,14 +70,8 @@ func configure(
         return nil
     }
 
-    guard let databaseURL = Environment.get("DATABASE_URL") else {
-        throw Abort(.internalServerError, reason: "Missing DATABASE_URL.")
-    }
-
-    guard let postgresConfiguration = PostgresConfiguration(url: databaseURL) else {
-        throw Abort(.internalServerError, reason: "DATABASE_URL is not a valid PostgreSQL URL.")
-    }
-    app.databases.use(.postgres(configuration: postgresConfiguration), as: .psql)
+    let persistenceConfiguration = try BackendPersistenceConfiguration.current(environment: environment)
+    try configureDatabase(app, persistenceConfiguration: persistenceConfiguration)
     BackendDatabaseMigrationPlan.register(app)
 
     let secretCipher = try BackendSecretCipher.resolveFromEnvironment()
@@ -83,7 +82,7 @@ func configure(
         updatedAt: clock.now()
     )
     let adminSystemPromptSeed = AdminSystemPromptSeed.makeSnapshot(clock: clock)
-    let persistence = PostgresBackendPersistence(
+    let persistence = DatabaseBackendPersistence(
         app: app,
         clock: clock,
         secretCipher: secretCipher,
@@ -120,13 +119,42 @@ func configure(
     return persistence
 }
 
+private func configureDatabase(
+    _ app: Application,
+    persistenceConfiguration: BackendPersistenceConfiguration
+) throws {
+    switch persistenceConfiguration.storage {
+    case .postgres(let databaseURL):
+        guard let postgresConfiguration = PostgresConfiguration(url: databaseURL) else {
+            throw Abort(.internalServerError, reason: "DATABASE_URL is not a valid PostgreSQL URL.")
+        }
+        app.databases.use(.postgres(configuration: postgresConfiguration), as: .psql)
+
+    case .sqlite(let filePath):
+        let databaseURL = URL(fileURLWithPath: filePath)
+        let parentDirectoryURL = databaseURL.deletingLastPathComponent()
+        try FileManager.default.createDirectory(
+            at: parentDirectoryURL,
+            withIntermediateDirectories: true
+        )
+        app.databases.use(.sqlite(.file(filePath)), as: .sqlite)
+    }
+}
+
 private func resolveAdminSecrets(
     app: Application,
+    provider: String,
     providerApiKey: String?,
     adminUsername: String?,
     adminPassword: String?
 ) throws -> (providerApiKey: String?, adminUsername: String, adminPassword: String) {
-    let resolvedProviderApiKey = providerApiKey ?? Environment.get("MINIMAX_API_KEY")
+    let resolvedProviderApiKey: String?
+    if provider.lowercased() == "codex" {
+        resolvedProviderApiKey = providerApiKey
+    } else {
+        resolvedProviderApiKey = providerApiKey ?? Environment.get("MINIMAX_API_KEY")
+    }
+
     let resolvedUsername = adminUsername
         ?? Environment.get("ADMIN_USERNAME")
         ?? (app.environment == .testing ? "admin" : nil)

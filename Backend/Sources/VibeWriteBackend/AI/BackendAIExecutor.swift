@@ -180,6 +180,10 @@ actor BackendAIExecutor {
     }
 
     private func resolvedProviderApiKey() async throws -> String {
+        if configuration.provider.lowercased() == "codex" {
+            return ""
+        }
+
         let secretSnapshot = try await secretStore.secretCurrentSnapshot()
         let providerApiKey = secretSnapshot.providerApiKey
 

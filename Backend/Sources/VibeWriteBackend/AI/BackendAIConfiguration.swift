@@ -39,6 +39,11 @@ struct BackendAIConfiguration: Sendable, Equatable {
         launchArguments: [String] = ProcessInfo.processInfo.arguments,
         isTesting: Bool = false
     ) -> BackendAIConfiguration {
+        let resolvedProvider = resolvedString(
+            for: "VIBEWRITE_AI_PROVIDER",
+            in: environment
+        ) ?? (isTesting ? "minimax" : "codex")
+
         let modeValue = resolvedString(
             for: "VIBEWRITE_BACKEND_AI_MODE",
             in: environment,
@@ -48,10 +53,7 @@ struct BackendAIConfiguration: Sendable, Equatable {
             arguments: launchArguments
         ) ?? (isTesting ? "stub" : "real")
 
-        let provider = resolvedString(
-            for: "VIBEWRITE_AI_PROVIDER",
-            in: environment
-        ) ?? "minimax"
+        let provider = resolvedProvider
 
         let baseURLValue = resolvedString(
             for: "MINIMAX_BASE_URL",
@@ -63,14 +65,16 @@ struct BackendAIConfiguration: Sendable, Equatable {
             in: environment
         ) ?? "https://api.minimaxi.com"
 
-        let model = resolvedString(
-            for: "MINIMAX_MODEL",
-            in: environment
-        ) ?? "MiniMax-M2.5-highspeed"
+        let model = resolvedModel(
+            for: provider,
+            in: environment,
+            isTesting: isTesting
+        )
 
         let metadataRoute = resolvedMetadataRoute(
             for: "MINIMAX_METADATA_ROUTE",
-            in: environment
+            in: environment,
+            provider: provider
         )
 
         return BackendAIConfiguration(
@@ -84,6 +88,10 @@ struct BackendAIConfiguration: Sendable, Equatable {
     }
 
     var metadataModel: String {
+        if isCodexProvider {
+            return model
+        }
+
         switch metadataRoute {
         case .current:
             return model
@@ -93,12 +101,20 @@ struct BackendAIConfiguration: Sendable, Equatable {
     }
 
     var metadataRequestBaseURL: URL {
+        if isCodexProvider {
+            return baseURL
+        }
+
         switch metadataRoute {
         case .current:
             return baseURL
         case .text01JsonSchema:
             return textBaseURL
         }
+    }
+
+    private var isCodexProvider: Bool {
+        provider.lowercased() == "codex"
     }
 
     private static func resolvedString(
@@ -143,8 +159,13 @@ struct BackendAIConfiguration: Sendable, Equatable {
 
     private static func resolvedMetadataRoute(
         for key: String,
-        in environment: [String: String]
+        in environment: [String: String],
+        provider: String
     ) -> MetadataRoute {
+        if provider.lowercased() == "codex" {
+            return .current
+        }
+
         let rawValue = resolvedString(for: key, in: environment)?.lowercased()
         switch rawValue {
         case "text01_json_schema", "text01-json-schema", "text01", "json_schema":
@@ -155,5 +176,75 @@ struct BackendAIConfiguration: Sendable, Equatable {
             return .current
         }
     }
-}
 
+    private static func resolvedModel(
+        for provider: String,
+        in environment: [String: String],
+        isTesting: Bool
+    ) -> String {
+        switch provider.lowercased() {
+        case "codex":
+            return resolvedCodexModel(in: environment) ?? "gpt-5.4-mini"
+        default:
+            return resolvedString(
+                for: "MINIMAX_MODEL",
+                in: environment
+            ) ?? (isTesting ? "MiniMax-M2.5-highspeed" : "MiniMax-M2.5-highspeed")
+        }
+    }
+
+    private static func resolvedCodexModel(in environment: [String: String]) -> String? {
+        if let explicitModel = resolvedString(
+            for: "VIBEWRITE_CODEX_MODEL",
+            in: environment,
+            fallbackKeys: ["CODEX_MODEL"]
+        ) {
+            return explicitModel
+        }
+
+        let configURL = resolvedCodexConfigURL(in: environment)
+        guard let configContents = try? String(contentsOf: configURL, encoding: .utf8) else {
+            return nil
+        }
+
+        for line in configContents.split(whereSeparator: \.isNewline) {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard trimmed.hasPrefix("model") else {
+                continue
+            }
+
+            let parts = trimmed.split(separator: "=", maxSplits: 1, omittingEmptySubsequences: false)
+            guard parts.count == 2 else {
+                continue
+            }
+
+            let rawValue = parts[1].trimmingCharacters(in: .whitespacesAndNewlines)
+            if rawValue.hasPrefix("\""), rawValue.hasSuffix("\""), rawValue.count >= 2 {
+                return String(rawValue.dropFirst().dropLast())
+            }
+
+            if rawValue.hasPrefix("'"), rawValue.hasSuffix("'"), rawValue.count >= 2 {
+                return String(rawValue.dropFirst().dropLast())
+            }
+
+            if !rawValue.isEmpty {
+                return rawValue
+            }
+        }
+
+        return nil
+    }
+
+    private static func resolvedCodexConfigURL(in environment: [String: String]) -> URL {
+        if let codexHome = resolvedString(
+            for: "CODEX_HOME",
+            in: environment
+        ) {
+            return URL(fileURLWithPath: codexHome).appendingPathComponent("config.toml")
+        }
+
+        return FileManager.default.homeDirectoryForCurrentUser
+            .appendingPathComponent(".codex")
+            .appendingPathComponent("config.toml")
+    }
+}

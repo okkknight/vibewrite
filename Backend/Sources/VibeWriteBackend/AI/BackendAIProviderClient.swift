@@ -99,7 +99,14 @@ enum BackendAIProviderClientFactory {
         case .stub:
             return StubBackendAIProviderClient()
         case .real:
-            return MiniMaxBackendAIProviderClient()
+            switch configuration.provider.lowercased() {
+            case "codex":
+                return CodexBackendAIProviderClient()
+            case "minimax":
+                return MiniMaxBackendAIProviderClient()
+            default:
+                return CodexBackendAIProviderClient()
+            }
         }
     }
 }
