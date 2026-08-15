@@ -1,4 +1,10 @@
 .build/
+.codex/
+.build/
+.DS_Store
+Backend/*.sqlite
+Backend/*.sqlite-*
+build/
 .swiftpm/
 .DS_Store
 Config/VibeWrite.local.xcconfig
