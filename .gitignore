@@ -1,5 +1,8 @@
 .build/
 .codex/
+.env
+.env.*
+!.env.example
 .build/
 .DS_Store
 Backend/*.sqlite
@@ -9,6 +12,8 @@ build/
 .DS_Store
 Config/VibeWrite.local.xcconfig
 Backend/.env.local
+Backend/.env.*
+!Backend/.env.local.example
 .derivedData/
 .derivedData-dmg/
 dist/
